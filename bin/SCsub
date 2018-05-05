@@ -1,0 +1,10 @@
+Import('env')
+
+
+ctfiles=['sytrax.cpp'];
+
+env.Append(LINKFLAGS=["-Wl,--start-group"])
+env.Append(LIBS=env.libs)
+env.Program('sytrax', ctfiles);
+
+
