@@ -21,6 +21,7 @@ protected:
 		TRACK_MENU_RENAME,
 		TRACK_MENU_MOVE_LEFT,
 		TRACK_MENU_MOVE_RIGHT,
+		TRACK_MENU_ADD_EFFECT,
 		TRACK_MENU_REMOVE,
 		AUTOMATION_MENU_VISIBLE,
 		AUTOMATION_MENU_MODE_ROWS,
@@ -28,7 +29,8 @@ protected:
 		AUTOMATION_MENU_MODE_LARGE,
 		AUTOMATION_MENU_MOVE_LEFT,
 		AUTOMATION_MENU_MOVE_RIGHT,
-		AUTOMATION_MENU_REMOVE
+		AUTOMATION_MENU_REMOVE,
+		BASE_EFFECT = 100
 	};
 
 	//Overrides:
@@ -165,7 +167,7 @@ protected:
 	void _menu_option(int p_option);
 	void _add_option_to_menu(Gtk::Menu *menu, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items);
 	void _add_check_option_to_menu(Gtk::Menu *menu, bool p_checked, bool p_radio, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items);
-	void _add_separator_to_menu(Gtk::Menu *menu, Vector<Gtk::MenuItem *> &items);
+	void _add_separator_to_menu(Gtk::Menu *menu, Vector<Gtk::MenuItem *> &items, const String &p_text = String());
 
 public:
 	void set_current_pattern(int p_pattern);

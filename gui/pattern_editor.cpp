@@ -7,31 +7,41 @@ void PatternEditor::_cursor_advance() {
 		cursor.row = get_total_rows() - 1;
 }
 
-void PatternEditor::_add_option_to_menu(Gtk::Menu *menu, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items) {
+void PatternEditor::_add_option_to_menu(Gtk::Menu *menu, const char *p_text,
+		int p_menu,
+		Vector<Gtk::MenuItem *> &items) {
 
 	Gtk::MenuItem *item = new Gtk::MenuItem;
 	item->set_label(p_text);
-	item->signal_activate().connect(sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
+	item->signal_activate().connect(
+			sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
 	item->show();
 	menu->append(*item);
 	items.push_back(item);
 }
 
-void PatternEditor::_add_check_option_to_menu(Gtk::Menu *menu, bool p_checked, bool p_radio, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items) {
+void PatternEditor::_add_check_option_to_menu(Gtk::Menu *menu, bool p_checked,
+		bool p_radio, const char *p_text,
+		int p_menu,
+		Vector<Gtk::MenuItem *> &items) {
 
 	Gtk::CheckMenuItem *item = new Gtk::CheckMenuItem;
 	item->set_label(p_text);
 	item->show();
 	item->set_active(p_checked);
 	item->set_draw_as_radio(p_radio);
-	item->signal_activate().connect(sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
+	item->signal_activate().connect(
+			sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
 	menu->append(*item);
 	items.push_back(item);
 }
 
-void PatternEditor::_add_separator_to_menu(Gtk::Menu *menu, Vector<Gtk::MenuItem *> &items) {
+void PatternEditor::_add_separator_to_menu(Gtk::Menu *menu,
+		Vector<Gtk::MenuItem *> &items, const String &p_text) {
 
 	Gtk::SeparatorMenuItem *sep = new Gtk::SeparatorMenuItem;
+	if (p_text != String())
+		sep->set_label(p_text.utf8().get_data());
 	sep->show();
 	menu->append(*sep);
 	items.push_back(sep);
@@ -258,7 +268,7 @@ void PatternEditor::_field_clear() {
 		return;
 	}
 
-	if (cursor.field == 0 || cursor.field == 1) { //just clear whathever
+	if (cursor.field == 0 || cursor.field == 1) { // just clear whathever
 
 		undo_redo->begin_action("Clear Event");
 
@@ -267,12 +277,10 @@ void PatternEditor::_field_clear() {
 			Track::Event old_ev = ev;
 			ev.a = Track::Note::EMPTY;
 			ev.b = 0xFF;
-			undo_redo->do_method(
-					song, &Song::set_event, current_pattern, cursor.column,
-					E->get().pos.tick, ev);
-			undo_redo->undo_method(
-					song, &Song::set_event, current_pattern, cursor.column,
-					E->get().pos.tick, old_ev);
+			undo_redo->do_method(song, &Song::set_event, current_pattern,
+					cursor.column, E->get().pos.tick, ev);
+			undo_redo->undo_method(song, &Song::set_event, current_pattern,
+					cursor.column, E->get().pos.tick, old_ev);
 			undo_redo->do_method(this, &PatternEditor::_redraw);
 			undo_redo->undo_method(this, &PatternEditor::_redraw);
 		}
@@ -284,12 +292,10 @@ void PatternEditor::_field_clear() {
 			Track::Event ev = E->get().event;
 			Track::Event old_ev = ev;
 			ev.b = Track::Note::EMPTY;
-			undo_redo->do_method(
-					song, &Song::set_event, current_pattern, cursor.column,
-					E->get().pos.tick, ev);
-			undo_redo->undo_method(
-					song, &Song::set_event, current_pattern, cursor.column,
-					E->get().pos.tick, old_ev);
+			undo_redo->do_method(song, &Song::set_event, current_pattern,
+					cursor.column, E->get().pos.tick, ev);
+			undo_redo->undo_method(song, &Song::set_event, current_pattern,
+					cursor.column, E->get().pos.tick, old_ev);
 			undo_redo->do_method(this, &PatternEditor::_redraw);
 			undo_redo->undo_method(this, &PatternEditor::_redraw);
 		}
@@ -395,9 +401,11 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				E = E->next()) {
 
 			if (E->get().r.intersects(posr)) {
+				Track *track = song->get_track(E->get().track);
 
 				if (track_menu) {
-					// I dont understand how to delete all the items, great usability there... so i create a new one
+					// I dont understand how to delete all the items, great usability
+					// there... so i create a new one
 					delete track_menu;
 					for (int i = 0; i < track_menu_items.size(); i++) {
 						delete track_menu_items[i];
@@ -407,32 +415,53 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
 				track_menu = new Gtk::Menu;
 
-				if (song->get_track(E->get().track)->get_column_count() < 16) {
-					_add_option_to_menu(track_menu, "Add Column", TRACK_MENU_ADD_COLUMN, track_menu_items);
+				if (track->get_column_count() < 16) {
+					_add_option_to_menu(track_menu, "Add Column", TRACK_MENU_ADD_COLUMN,
+							track_menu_items);
 				}
-				if (song->get_track(E->get().track)->get_column_count() > 1)
+				if (track->get_column_count() > 1) {
 
-					_add_option_to_menu(track_menu, "Remove Column", TRACK_MENU_REMOVE_COLUMN, track_menu_items);
+					_add_option_to_menu(track_menu, "Remove Column",
+							TRACK_MENU_REMOVE_COLUMN, track_menu_items);
+				}
 
 				_add_separator_to_menu(track_menu, track_menu_items);
 
-				_add_option_to_menu(track_menu,
-						"Solo", TRACK_MENU_SOLO, track_menu_items);
-				_add_option_to_menu(track_menu,
-						"Muted", TRACK_MENU_MUTE, track_menu_items);
+				_add_option_to_menu(track_menu, "Solo", TRACK_MENU_SOLO,
+						track_menu_items);
+				_add_option_to_menu(track_menu, "Muted", TRACK_MENU_MUTE,
+						track_menu_items);
 				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Automations..", TRACK_MENU_EDIT_AUTOMATIONS, track_menu_items);
+				_add_option_to_menu(track_menu, "Automations..",
+						TRACK_MENU_EDIT_AUTOMATIONS, track_menu_items);
 				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Rename..", TRACK_MENU_RENAME, track_menu_items);
+				_add_option_to_menu(track_menu, "Rename..", TRACK_MENU_RENAME,
+						track_menu_items);
+
+				_add_separator_to_menu(track_menu, track_menu_items);
+				_add_option_to_menu(track_menu, "Add Effect or Synth..", TRACK_MENU_ADD_EFFECT,
+						track_menu_items);
+				int effect_count = song->get_track(E->get().track)->get_audio_effect_count();
+				if (track->get_audio_effect_count()) {
+					_add_separator_to_menu(track_menu, track_menu_items, "Effects");
+					for (int i = 0; i < effect_count; i++) {
+						_add_option_to_menu(track_menu, track->get_audio_effect(i)->get_info()->caption.utf8().get_data(), BASE_EFFECT + i,
+								track_menu_items);
+					}
+				}
+
 				if (song->get_track_count() > 1) {
 					_add_separator_to_menu(track_menu, track_menu_items);
 					if (E->get().track > 0)
-						_add_option_to_menu(track_menu, "Move Left", TRACK_MENU_MOVE_LEFT, track_menu_items);
+						_add_option_to_menu(track_menu, "Move Left", TRACK_MENU_MOVE_LEFT,
+								track_menu_items);
 					if (E->get().track < song->get_track_count() - 1)
-						_add_option_to_menu(track_menu, "Move Right", TRACK_MENU_MOVE_RIGHT, track_menu_items);
+						_add_option_to_menu(track_menu, "Move Right", TRACK_MENU_MOVE_RIGHT,
+								track_menu_items);
 				}
 				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Remove", TRACK_MENU_REMOVE, track_menu_items);
+				_add_option_to_menu(track_menu, "Remove Track", TRACK_MENU_REMOVE,
+						track_menu_items);
 				current_menu_track = E->get().track;
 
 				track_menu->popup_at_pointer((GdkEvent *)event);
@@ -446,7 +475,8 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 			if (E->get().r.intersects(posr)) {
 
 				if (automation_menu) {
-					// I dont understand how to delete all the items, great usability there... so i create a new one
+					// I dont understand how to delete all the items, great usability
+					// there... so i create a new one
 					delete automation_menu;
 					for (int i = 0; i < automation_menu_items.size(); i++) {
 						delete automation_menu_items[i];
@@ -456,30 +486,53 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
 				automation_menu = new Gtk::Menu;
 
-				_add_check_option_to_menu(automation_menu, song->get_track(E->get().track)->get_automation(E->get().automation)->is_visible(), false, "Visible", AUTOMATION_MENU_VISIBLE,
+				_add_check_option_to_menu(automation_menu,
+						song->get_track(E->get().track)
+								->get_automation(E->get().automation)
+								->is_visible(),
+						false, "Visible", AUTOMATION_MENU_VISIBLE,
 						automation_menu_items);
 
 				_add_separator_to_menu(automation_menu, automation_menu_items);
 
-				_add_check_option_to_menu(automation_menu, song->get_track(E->get().track)->get_automation(E->get().automation)->get_display_mode() == Automation::DISPLAY_ROWS, true, "Numbers", AUTOMATION_MENU_MODE_ROWS,
+				_add_check_option_to_menu(
+						automation_menu,
+						song->get_track(E->get().track)
+										->get_automation(E->get().automation)
+										->get_display_mode() == Automation::DISPLAY_ROWS,
+						true, "Numbers", AUTOMATION_MENU_MODE_ROWS, automation_menu_items);
+
+				_add_check_option_to_menu(
+						automation_menu,
+						song->get_track(E->get().track)
+										->get_automation(E->get().automation)
+										->get_display_mode() == Automation::DISPLAY_SMALL,
+						true, "Small Envelope", AUTOMATION_MENU_MODE_SMALL,
 						automation_menu_items);
 
-				_add_check_option_to_menu(automation_menu, song->get_track(E->get().track)->get_automation(E->get().automation)->get_display_mode() == Automation::DISPLAY_SMALL, true, "Small Envelope", AUTOMATION_MENU_MODE_SMALL,
-						automation_menu_items);
-
-				_add_check_option_to_menu(automation_menu, song->get_track(E->get().track)->get_automation(E->get().automation)->get_display_mode() == Automation::DISPLAY_LARGE, true, "Large Envelope", AUTOMATION_MENU_MODE_LARGE,
+				_add_check_option_to_menu(
+						automation_menu,
+						song->get_track(E->get().track)
+										->get_automation(E->get().automation)
+										->get_display_mode() == Automation::DISPLAY_LARGE,
+						true, "Large Envelope", AUTOMATION_MENU_MODE_LARGE,
 						automation_menu_items);
 
 				if (song->get_track(E->get().track)->get_automation_count() > 1) {
 					_add_separator_to_menu(automation_menu, automation_menu_items);
 					if (E->get().automation > 0)
-						_add_option_to_menu(automation_menu, "Move Left", AUTOMATION_MENU_MOVE_LEFT, automation_menu_items);
+						_add_option_to_menu(automation_menu, "Move Left",
+								AUTOMATION_MENU_MOVE_LEFT,
+								automation_menu_items);
 					if (E->get().automation <
 							song->get_track(E->get().track)->get_automation_count() - 1)
-						_add_option_to_menu(automation_menu, "Move Right", AUTOMATION_MENU_MOVE_RIGHT, automation_menu_items);
+						_add_option_to_menu(automation_menu, "Move Right",
+								AUTOMATION_MENU_MOVE_RIGHT,
+								automation_menu_items);
 				}
 				_add_separator_to_menu(automation_menu, automation_menu_items);
-				_add_option_to_menu(automation_menu, "Remove", AUTOMATION_MENU_REMOVE, automation_menu_items);
+				_add_option_to_menu(automation_menu, "Remove", AUTOMATION_MENU_REMOVE,
+						automation_menu_items);
 
 				current_menu_track = E->get().track;
 				current_menu_automation = E->get().automation;
@@ -497,12 +550,15 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
 			int pos_x = 0;
 			int pos_y = 0;
-			for (List<ClickArea::AutomationPoint>::Element *F = E->get().automation_points.front(); F; F = F->next()) {
+			for (List<ClickArea::AutomationPoint>::Element *F =
+							E->get().automation_points.front();
+					F; F = F->next()) {
 
 				float x = F->get().x;
 				float y = F->get().y;
 
-				float d = sqrt((x - event->x) * (x - event->x) + (y - event->y) * (y - event->y));
+				float d = sqrt((x - event->x) * (x - event->x) +
+							   (y - event->y) * (y - event->y));
 
 				if (d < 4) {
 					if (point_index < 0 || d < point_d) {
@@ -516,8 +572,10 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
 			if (point_index >= 0) {
 				grabbing_point = point_index;
-				grabbing_point_tick_from = E->get().automation->get_point_tick_by_index(current_pattern, grabbing_point);
-				grabbing_point_value_from = E->get().automation->get_point_by_index(current_pattern, grabbing_point);
+				grabbing_point_tick_from = E->get().automation->get_point_tick_by_index(
+						current_pattern, grabbing_point);
+				grabbing_point_value_from = E->get().automation->get_point_by_index(
+						current_pattern, grabbing_point);
 				grabbing_point_tick = grabbing_point_tick_from;
 				grabbing_point_value = grabbing_point_value_from;
 				grabbing_automation = E->get().automation;
@@ -528,19 +586,23 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				grabbing_mouse_prev_x = grabbing_mouse_pos_x;
 				grabbing_mouse_prev_y = grabbing_mouse_pos_y;
 
-			} else if (event->state & GDK_CONTROL_MASK && event->x >= E->get().fields[0].x && event->x < E->get().fields[0].x + E->get().fields[0].width) {
-				//add it
+			} else if (event->state & GDK_CONTROL_MASK &&
+					   event->x >= E->get().fields[0].x &&
+					   event->x < E->get().fields[0].x + E->get().fields[0].width) {
+				// add it
 				int x = event->x - E->get().fields[0].x;
 				int y = event->y;
 				int w = E->get().fields[0].width;
 
-				Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) * TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
+				Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) *
+							TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
 
-				uint8_t value = CLAMP((x)*Automation::VALUE_MAX / w, 0, Automation::VALUE_MAX);
+				uint8_t value =
+						CLAMP((x)*Automation::VALUE_MAX / w, 0, Automation::VALUE_MAX);
 
 				grabbing_automation = E->get().automation;
 				grabbing_automation->set_point(current_pattern, tick, value);
-				grabbing_point = 1; //useless, can be anything here
+				grabbing_point = 1; // useless, can be anything here
 				grabbing_point_tick_from = tick;
 				grabbing_point_value_from = Automation::EMPTY;
 				grabbing_point_tick = tick;
@@ -570,17 +632,20 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 	}
 
 	if (p_press && event->button == 3 && grabbing_point == -1) {
-		//remove
+		// remove
 		for (List<ClickArea>::Element *E = click_areas.front(); E; E = E->next()) {
 
 			int point_index = -1;
 			float point_d = 1e20;
-			for (List<ClickArea::AutomationPoint>::Element *F = E->get().automation_points.front(); F; F = F->next()) {
+			for (List<ClickArea::AutomationPoint>::Element *F =
+							E->get().automation_points.front();
+					F; F = F->next()) {
 
 				float x = F->get().x;
 				float y = F->get().y;
 
-				float d = sqrt((x - event->x) * (x - event->x) + (y - event->y) * (y - event->y));
+				float d = sqrt((x - event->x) * (x - event->x) +
+							   (y - event->y) * (y - event->y));
 
 				if (d < 4) {
 					if (point_index < 0 || d < point_d) {
@@ -592,11 +657,15 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
 			if (point_index >= 0) {
 				undo_redo->begin_action("Remove Point");
-				Tick tick = E->get().automation->get_point_tick_by_index(current_pattern, point_index);
-				uint8_t value = E->get().automation->get_point_by_index(current_pattern, point_index);
+				Tick tick = E->get().automation->get_point_tick_by_index(
+						current_pattern, point_index);
+				uint8_t value = E->get().automation->get_point_by_index(current_pattern,
+						point_index);
 
-				undo_redo->do_method(E->get().automation, &Automation::remove_point, current_pattern, tick);
-				undo_redo->undo_method(E->get().automation, &Automation::set_point, current_pattern, tick, value);
+				undo_redo->do_method(E->get().automation, &Automation::remove_point,
+						current_pattern, tick);
+				undo_redo->undo_method(E->get().automation, &Automation::set_point,
+						current_pattern, tick, value);
 				undo_redo->do_method(this, &PatternEditor::_redraw);
 				undo_redo->undo_method(this, &PatternEditor::_redraw);
 				undo_redo->commit_action();
@@ -610,10 +679,16 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 			grabbing_point = -1;
 
 			undo_redo->begin_action("Move Point");
-			undo_redo->do_method(grabbing_automation, &Automation::remove_point, current_pattern, grabbing_point_tick_from);
-			undo_redo->do_method(grabbing_automation, &Automation::set_point, current_pattern, grabbing_point_tick, grabbing_point_value);
-			undo_redo->undo_method(grabbing_automation, &Automation::remove_point, current_pattern, grabbing_point_tick);
-			undo_redo->undo_method(grabbing_automation, &Automation::set_point, current_pattern, grabbing_point_tick_from, grabbing_point_value_from);
+			undo_redo->do_method(grabbing_automation, &Automation::remove_point,
+					current_pattern, grabbing_point_tick_from);
+			undo_redo->do_method(grabbing_automation, &Automation::set_point,
+					current_pattern, grabbing_point_tick,
+					grabbing_point_value);
+			undo_redo->undo_method(grabbing_automation, &Automation::remove_point,
+					current_pattern, grabbing_point_tick);
+			undo_redo->undo_method(grabbing_automation, &Automation::set_point,
+					current_pattern, grabbing_point_tick_from,
+					grabbing_point_value_from);
 			undo_redo->do_method(this, &PatternEditor::_redraw);
 			undo_redo->undo_method(this, &PatternEditor::_redraw);
 			undo_redo->commit_action();
@@ -650,13 +725,17 @@ bool PatternEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 
 		int y = grabbing_mouse_pos_y;
 		int x = grabbing_mouse_pos_x;
-		Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) * TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
+		Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) *
+					TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
 
 		grabbing_automation->remove_point(current_pattern, grabbing_point_tick);
-		while (grabbing_automation->get_point(current_pattern, tick) != Automation::EMPTY) {
+		while (grabbing_automation->get_point(current_pattern, tick) !=
+				Automation::EMPTY) {
 			tick++;
 		}
-		uint8_t value = CLAMP((x - grabbing_x) * Automation::VALUE_MAX / grabbing_width, 0, Automation::VALUE_MAX);
+		uint8_t value =
+				CLAMP((x - grabbing_x) * Automation::VALUE_MAX / grabbing_width, 0,
+						Automation::VALUE_MAX);
 
 		grabbing_point_tick = tick;
 		grabbing_point_value = value;
@@ -670,29 +749,36 @@ bool PatternEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 
 bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
-	printf("state: %x\n", (key_event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK | GDK_SUPER_MASK | GDK_META_MASK)));
+	printf("state: %x\n",
+			(key_event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK |
+										GDK_MOD1_MASK | GDK_SUPER_MASK | GDK_META_MASK)));
 	;
 	if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_UP)) {
 		cursor.row -= cursor.skip;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_DOWN)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_MOVE_DOWN)) {
 		cursor.row += cursor.skip;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_UP_1_ROW)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_MOVE_UP_1_ROW)) {
 		cursor.row -= 1;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_DOWN_1_ROW)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_MOVE_DOWN_1_ROW)) {
 		cursor.row += 1;
 		_validate_cursor();
 	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_PAGE_UP)) {
 		cursor.row -=
 				song->pattern_get_beats_per_bar(current_pattern) * rows_per_beat;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_PAGE_DOWN)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_PAGE_DOWN)) {
 		cursor.row +=
 				song->pattern_get_beats_per_bar(current_pattern) * rows_per_beat;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_LEFT)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_MOVE_LEFT)) {
 
 		if (cursor.field == 0) {
 			if (cursor.column > 0) {
@@ -719,7 +805,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			cursor.field--;
 		}
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_RIGHT)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::CURSOR_MOVE_RIGHT)) {
 
 		Track *track;
 		int automation;
@@ -775,7 +862,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		cursor.column = song->get_event_column_count() - 1;
 		cursor.field = 0;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PAN_WINDOW_UP)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::PATTERN_PAN_WINDOW_UP)) {
 
 		if (v_offset > 0) {
 			if (v_offset + visible_rows - 1 == cursor.row)
@@ -783,7 +871,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			v_offset--;
 			queue_draw();
 		}
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PAN_WINDOW_DOWN)) {
+	} else if (key_bindings->is_keybind(key_event,
+					   KeyBindings::PATTERN_PAN_WINDOW_DOWN)) {
 
 		if (v_offset + visible_rows < get_total_rows()) {
 			if (cursor.row <= v_offset) {
@@ -810,28 +899,37 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 			undo_redo->begin_action("Insert", true);
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Track::Event ev = E->get().event;
 				ev.a = 0xFF;
 				ev.b = 0xFF;
 
-				undo_redo->do_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick, ev);
+				undo_redo->do_method(song, &Song::set_event, current_pattern,
+						cursor.column, E->get().pos.tick, ev);
 			}
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Track::Event ev = E->get().event;
-				undo_redo->do_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
+				undo_redo->do_method(
+						song, &Song::set_event, current_pattern, cursor.column,
+						E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
 				ev.a = 0xFF;
 				ev.b = 0xFF;
-				undo_redo->undo_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
+				undo_redo->undo_method(
+						song, &Song::set_event, current_pattern, cursor.column,
+						E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
 			}
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Track::Event ev = E->get().event;
-				undo_redo->undo_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick, ev);
+				undo_redo->undo_method(song, &Song::set_event, current_pattern,
+						cursor.column, E->get().pos.tick, ev);
 			}
 
 			undo_redo->do_method(this, &PatternEditor::_redraw);
@@ -858,16 +956,19 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 			Tick limit = from.tick;
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Track::Event ev = E->get().event;
 				ev.a = 0xFF;
 				ev.b = 0xFF;
 
-				undo_redo->do_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick, ev);
+				undo_redo->do_method(song, &Song::set_event, current_pattern,
+						cursor.column, E->get().pos.tick, ev);
 			}
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Tick new_ofs = E->get().pos.tick - TICKS_PER_BEAT / rows_per_beat;
 
@@ -875,16 +976,20 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					continue;
 
 				Track::Event ev = E->get().event;
-				undo_redo->do_method(song, &Song::set_event, current_pattern, cursor.column, new_ofs, ev);
+				undo_redo->do_method(song, &Song::set_event, current_pattern,
+						cursor.column, new_ofs, ev);
 				ev.a = 0xFF;
 				ev.b = 0xFF;
-				undo_redo->undo_method(song, &Song::set_event, current_pattern, cursor.column, new_ofs, ev);
+				undo_redo->undo_method(song, &Song::set_event, current_pattern,
+						cursor.column, new_ofs, ev);
 			}
 
-			for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+			for (List<Track::PosEvent>::Element *E = events.front(); E;
+					E = E->next()) {
 
 				Track::Event ev = E->get().event;
-				undo_redo->undo_method(song, &Song::set_event, current_pattern, cursor.column, E->get().pos.tick, ev);
+				undo_redo->undo_method(song, &Song::set_event, current_pattern,
+						cursor.column, E->get().pos.tick, ev);
 			}
 
 			undo_redo->do_method(this, &PatternEditor::_redraw);
@@ -931,7 +1036,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					}
 				}
 
-				if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_CURSOR_NOTE_OFF)) {
+				if (key_bindings->is_keybind(key_event,
+							KeyBindings::PATTERN_CURSOR_NOTE_OFF)) {
 
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
@@ -951,7 +1057,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					_cursor_advance();
 				}
 
-				if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_FIELD_CLEAR)) {
+				if (key_bindings->is_keybind(key_event,
+							KeyBindings::CURSOR_FIELD_CLEAR)) {
 					_field_clear();
 				}
 
@@ -987,7 +1094,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					return true;
 				}
 
-				if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_FIELD_CLEAR)) {
+				if (key_bindings->is_keybind(key_event,
+							KeyBindings::CURSOR_FIELD_CLEAR)) {
 					_field_clear();
 				}
 
@@ -1023,7 +1131,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					return true;
 				}
 
-				if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_FIELD_CLEAR)) {
+				if (key_bindings->is_keybind(key_event,
+							KeyBindings::CURSOR_FIELD_CLEAR)) {
 					_field_clear();
 				}
 
@@ -1062,7 +1171,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					return true;
 				}
 
-				if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_FIELD_CLEAR)) {
+				if (key_bindings->is_keybind(key_event,
+							KeyBindings::CURSOR_FIELD_CLEAR)) {
 					_field_clear();
 				}
 			}
@@ -1107,7 +1217,8 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 				}
 			}
 
-			if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_FIELD_CLEAR)) {
+			if (key_bindings->is_keybind(key_event,
+						KeyBindings::CURSOR_FIELD_CLEAR)) {
 				_field_clear();
 			}
 		}
@@ -1124,81 +1235,87 @@ bool PatternEditor::on_key_release_event(GdkEventKey *key_event) {
 }
 
 Gtk::SizeRequestMode PatternEditor::get_request_mode_vfunc() const {
-	//Accept the default value supplied by the base class.
+	// Accept the default value supplied by the base class.
 	return Gtk::Widget::get_request_mode_vfunc();
 }
 
-//Discover the total amount of minimum space and natural space needed by
-//this widget.
-//Let's make this simple example widget always need minimum 60 by 50 and
-//natural 100 by 70.
-void PatternEditor::get_preferred_width_vfunc(int &minimum_width, int &natural_width) const {
+// Discover the total amount of minimum space and natural space needed by
+// this widget.
+// Let's make this simple example widget always need minimum 60 by 50 and
+// natural 100 by 70.
+void PatternEditor::get_preferred_width_vfunc(int &minimum_width,
+		int &natural_width) const {
 	minimum_width = 64;
 	natural_width = 64;
 }
 
-void PatternEditor::get_preferred_height_for_width_vfunc(int /* width */,
-		int &minimum_height, int &natural_height) const {
+void PatternEditor::get_preferred_height_for_width_vfunc(
+		int /* width */, int &minimum_height, int &natural_height) const {
 	minimum_height = 64;
 	natural_height = 64;
 }
 
-void PatternEditor::get_preferred_height_vfunc(int &minimum_height, int &natural_height) const {
+void PatternEditor::get_preferred_height_vfunc(int &minimum_height,
+		int &natural_height) const {
 	minimum_height = 64;
 	natural_height = 64;
 }
 
-void PatternEditor::get_preferred_width_for_height_vfunc(int /* height */,
-		int &minimum_width, int &natural_width) const {
+void PatternEditor::get_preferred_width_for_height_vfunc(
+		int /* height */, int &minimum_width, int &natural_width) const {
 	minimum_width = 64;
 	natural_width = 64;
 }
 
 void PatternEditor::on_size_allocate(Gtk::Allocation &allocation) {
-	//Do something with the space that we have actually been given:
+	// Do something with the space that we have actually been given:
 	//(We will not be given heights or widths less than we have requested, though
-	//we might get more)
+	// we might get more)
 
-	//Use the offered allocation for this container:
+	// Use the offered allocation for this container:
 	set_allocation(allocation);
 
 	if (m_refGdkWindow) {
 		m_refGdkWindow->move_resize(allocation.get_x(), allocation.get_y(),
-				allocation.get_width(), allocation.get_height());
+				allocation.get_width(),
+				allocation.get_height());
 	}
 }
 
 void PatternEditor::on_map() {
-	//Call base class:
+	// Call base class:
 	Gtk::Widget::on_map();
 }
 
 void PatternEditor::on_unmap() {
-	//Call base class:
+	// Call base class:
 	Gtk::Widget::on_unmap();
 }
 
 void PatternEditor::on_realize() {
-	//Do not call base class Gtk::Widget::on_realize().
-	//It's intended only for widgets that set_has_window(false).
+	// Do not call base class Gtk::Widget::on_realize().
+	// It's intended only for widgets that set_has_window(false).
 
 	set_realized();
 
 	if (!m_refGdkWindow) {
-		//Create the GdkWindow:
+		// Create the GdkWindow:
 
 		GdkWindowAttr attributes;
 		memset(&attributes, 0, sizeof(attributes));
 
 		Gtk::Allocation allocation = get_allocation();
 
-		//Set initial position and size of the Gdk::Window:
+		// Set initial position and size of the Gdk::Window:
 		attributes.x = allocation.get_x();
 		attributes.y = allocation.get_y();
 		attributes.width = allocation.get_width();
 		attributes.height = allocation.get_height();
 
-		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK | Gdk::BUTTON1_MOTION_MASK | Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK;
+		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK |
+								Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
+								Gdk::BUTTON1_MOTION_MASK | Gdk::KEY_PRESS_MASK |
+								Gdk::KEY_RELEASE_MASK;
 		attributes.window_type = GDK_WINDOW_CHILD;
 		attributes.wclass = GDK_INPUT_OUTPUT;
 
@@ -1206,7 +1323,7 @@ void PatternEditor::on_realize() {
 				GDK_WA_X | GDK_WA_Y);
 		set_window(m_refGdkWindow);
 
-		//make the widget receive expose events
+		// make the widget receive expose events
 		m_refGdkWindow->set_user_data(gobj());
 	}
 }
@@ -1214,11 +1331,13 @@ void PatternEditor::on_realize() {
 void PatternEditor::on_unrealize() {
 	m_refGdkWindow.reset();
 
-	//Call base class:
+	// Call base class:
 	Gtk::Widget::on_unrealize();
 }
 
-void PatternEditor::_draw_text(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, const String &p_text, const Gdk::RGBA &p_color, bool p_down) {
+void PatternEditor::_draw_text(const Cairo::RefPtr<Cairo::Context> &cr, int x,
+		int y, const String &p_text,
+		const Gdk::RGBA &p_color, bool p_down) {
 
 	Gdk::Cairo::set_source_rgba(cr, p_color);
 	cr->move_to(x, y);
@@ -1231,7 +1350,9 @@ void PatternEditor::_draw_text(const Cairo::RefPtr<Cairo::Context> &cr, int x, i
 	cr->stroke();
 }
 
-void PatternEditor::_draw_fill_rect(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, int w, int h, const Gdk::RGBA &p_color) {
+void PatternEditor::_draw_fill_rect(const Cairo::RefPtr<Cairo::Context> &cr,
+		int x, int y, int w, int h,
+		const Gdk::RGBA &p_color) {
 
 	Gdk::Cairo::set_source_rgba(cr, p_color);
 	cr->rectangle(x, y, w, h);
@@ -1239,14 +1360,16 @@ void PatternEditor::_draw_fill_rect(const Cairo::RefPtr<Cairo::Context> &cr, int
 	cr->stroke();
 }
 
-void PatternEditor::_draw_rect(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, int w, int h, const Gdk::RGBA &p_color) {
+void PatternEditor::_draw_rect(const Cairo::RefPtr<Cairo::Context> &cr, int x,
+		int y, int w, int h, const Gdk::RGBA &p_color) {
 
 	Gdk::Cairo::set_source_rgba(cr, p_color);
 	cr->rectangle(x, y, w, h);
 	cr->stroke();
 }
 
-void PatternEditor::_draw_arrow(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, int w, int h, const Gdk::RGBA &p_color) {
+void PatternEditor::_draw_arrow(const Cairo::RefPtr<Cairo::Context> &cr, int x,
+		int y, int w, int h, const Gdk::RGBA &p_color) {
 
 	Gdk::Cairo::set_source_rgba(cr, p_color);
 	cr->move_to(x + w / 4, y + h / 4);
@@ -1267,7 +1390,9 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	cr->rectangle(0, 0, w, h);
 	cr->fill();
 
-	cr->select_font_face(theme->fonts[Theme::FONT_PATTERN].face.utf8().get_data(), Cairo::FONT_SLANT_NORMAL, theme->fonts[Theme::FONT_PATTERN].bold ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
+	cr->select_font_face(theme->fonts[Theme::FONT_PATTERN].face.utf8().get_data(),
+			Cairo::FONT_SLANT_NORMAL,
+			theme->fonts[Theme::FONT_PATTERN].bold ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
 	cr->set_font_size(theme->fonts[Theme::FONT_PATTERN].size);
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
@@ -1283,9 +1408,11 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	row_top_ofs = top_ofs;
 
-	Gdk::RGBA track_sep_color = theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_SEPARATOR];
+	Gdk::RGBA track_sep_color =
+			theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_SEPARATOR];
 	Gdk::RGBA cursorcol = theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR];
-	int track_sep_w = theme->constants[Theme::CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION];
+	int track_sep_w =
+			theme->constants[Theme::CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION];
 
 	track_buttons.clear();
 	automation_buttons.clear();
@@ -1337,9 +1464,10 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			if (j == 0) {
 
 				int as = fh;
-				_draw_arrow(cr, ofs, top_ofs, as, as, theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME]);
-				_draw_text(cr, ofs + fh - fa, top_ofs + as,
-						t->get_name(), theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME], true);
+				_draw_arrow(cr, ofs, top_ofs, as, as,
+						theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME]);
+				_draw_text(cr, ofs + fh - fa, top_ofs + as, t->get_name(),
+						theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME], true);
 				TrackButton tb;
 				tb.track = i;
 
@@ -1349,7 +1477,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			}
 
 			{
-				//fill fields for click areas
+				// fill fields for click areas
 				ClickArea ca;
 				ca.column = idx;
 				ClickArea::Field f;
@@ -1382,10 +1510,12 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 				if (subbeat == 0 || k == 0) {
 					if ((beat % beats_per_bar) == 0)
-						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl, fh,
+						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
+								fh,
 								theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BAR]);
 					else
-						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl, fh,
+						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
+								fh,
 								theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
 				}
 
@@ -1447,17 +1577,18 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 						if (valid[l].note.note < 120) {
 							_draw_fill_rect(cr, base_x, base_y + h * l, fw * 3, h - 1, c);
-							_draw_rect(cr, base_x + valid[l].note.note * w / 120, base_y + 1 + h * l,
-									2, h - 2, bgc);
+							_draw_rect(cr, base_x + valid[l].note.note * w / 120,
+									base_y + 1 + h * l, 2, h - 2, bgc);
 						} else if (valid[l].note.note == Track::Note::OFF) {
 							_draw_rect(cr, base_x + 0, base_y + 1 + h * l, fw * 3, 1, c);
 							_draw_rect(cr, base_x, base_y + 1 + h * l + h - 2, fw * 3, 1, c);
 						}
 
 						if (valid[l].note.volume < 100) {
-							_draw_fill_rect(cr, base_x + fw * 4, base_y + h * l, fw * 2, h - 1, c);
-							_draw_rect(cr, base_x + fw * 4 + valid[l].note.volume * vw / 100, base_y + 1 + h * l,
-									2, h - 2, bgc);
+							_draw_fill_rect(cr, base_x + fw * 4, base_y + h * l, fw * 2,
+									h - 1, c);
+							_draw_rect(cr, base_x + fw * 4 + valid[l].note.volume * vw / 100,
+									base_y + 1 + h * l, 2, h - 2, bgc);
 						}
 					}
 				}
@@ -1467,13 +1598,13 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					int field_ofs[4] = { 0, 2, 4, 5 };
 					int cursor_x = ofs + field_ofs[cursor.field] * fw;
 					int cursor_y = top_ofs + k * fh - sep;
-					_draw_rect(cr, cursor_x - 1, cursor_y - 1, fw + 1, fh + 1,
-							cursorcol);
+					_draw_rect(cr, cursor_x - 1, cursor_y - 1, fw + 1, fh + 1, cursorcol);
 				}
 			}
 
 			if (j < t->get_column_count() - 1)
-				ofs += theme->constants[Theme::CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION];
+				ofs +=
+						theme->constants[Theme::CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION];
 			ofs += fw * 6;
 			idx++;
 		}
@@ -1492,9 +1623,12 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 				int as = fh;
 
-				_draw_arrow(cr, ofs, top_ofs, as, as, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME]);
-				_draw_text(cr, ofs + fh - fa, top_ofs + as, a->get_control_port()->get_name().utf8().get_data(),
-						theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME], true);
+				_draw_arrow(cr, ofs, top_ofs, as, as,
+						theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME]);
+				_draw_text(cr, ofs + fh - fa, top_ofs + as,
+						a->get_control_port()->get_name().utf8().get_data(),
+						theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME],
+						true);
 
 				AutomationButton ab;
 				ab.track = i;
@@ -1512,7 +1646,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				case Automation::DISPLAY_ROWS: {
 
 					{
-						//fill fields for click areas
+						// fill fields for click areas
 						ClickArea ca;
 						ca.column = idx;
 						ClickArea::Field f;
@@ -1532,18 +1666,20 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						int beat = row / rows_per_beat;
 						int subbeat = row % rows_per_beat;
 
-						Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
+						Gdk::RGBA c =
+								theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
 						Gdk::RGBA bgc = bgcol;
 
 						if (subbeat == 0 || k == 0) {
 							if ((beat % beats_per_bar) == 0)
-								_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep,
-										fw * 2, fh,
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, fw * 2, fh,
 										theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR]);
 							else
-								_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep,
-										fw * 2, fh,
-										theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, fw * 2, fh,
+										theme
+												->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
 						}
 
 						Tick from = row * TICKS_PER_BEAT / rows_per_beat;
@@ -1562,7 +1698,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 							int val = a->get_point_by_index(current_pattern, first);
 
 							if (a->get_point_tick_by_index(current_pattern, first) != from)
-								c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_NOFIT];
+								c = theme->colors
+											[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_NOFIT];
 
 							rowstr[0] = '0' + val / 10;
 							rowstr[1] = '0' + val % 10;
@@ -1581,7 +1718,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 								int val = a->get_point_by_index(current_pattern, first + l);
 
 								_draw_fill_rect(cr, base_x, base_y + h * l, fw * 2, h - 1, c);
-								_draw_rect(cr, base_x + val * w / Automation::VALUE_MAX, base_y + 1 + h * l, 2, h - 2, bgc);
+								_draw_rect(cr, base_x + val * w / Automation::VALUE_MAX,
+										base_y + 1 + h * l, 2, h - 2, bgc);
 							}
 						}
 
@@ -1589,7 +1727,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 							int cursor_pos_x = ofs + cursor.field * fw;
 							int cursor_pos_y = top_ofs + k * fh - sep;
-							_draw_rect(cr, cursor_pos_x - 1, cursor_pos_y - 1, fw + 1, fh + 1, cursorcol);
+							_draw_rect(cr, cursor_pos_x - 1, cursor_pos_y - 1, fw + 1, fh + 1,
+									cursorcol);
 						}
 					}
 
@@ -1602,10 +1741,12 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					int w = a->get_display_mode() == Automation::DISPLAY_SMALL ? 4 : 8;
 					w *= fw;
 
-					Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
-					Gdk::RGBA cpoint = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_POINT];
+					Gdk::RGBA c =
+							theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
+					Gdk::RGBA cpoint =
+							theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_POINT];
 
-					//fill fields for click areas
+					// fill fields for click areas
 					ClickArea ca;
 					ca.column = idx;
 					ClickArea::Field f;
@@ -1621,15 +1762,26 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 						if (subbeat == 0 || k == 0) {
 							if ((beat % beats_per_bar) == 0)
-								_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, w, fh, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR]);
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, w, fh,
+										theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR]);
 							else
-								_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, w, fh, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, w, fh,
+										theme
+												->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
 
 						} else {
 
-							_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep + fh, w, 1, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
-							_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, 1, fh, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
-							_draw_fill_rect(cr, ofs + w - 1, top_ofs + k * fh - sep, 1, fh, theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+							_draw_fill_rect(
+									cr, ofs, top_ofs + k * fh - sep + fh, w, 1,
+									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+							_draw_fill_rect(
+									cr, ofs, top_ofs + k * fh - sep, 1, fh,
+									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+							_draw_fill_rect(
+									cr, ofs + w - 1, top_ofs + k * fh - sep, 1, fh,
+									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
 						}
 
 						float prev = -1;
@@ -1642,8 +1794,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 								prev = tofs;
 
 							if (tofs >= 0)
-								_draw_fill_rect(cr, ofs + tofs * w, top_ofs + k * fh - sep + l,
-										2, 1, c);
+								_draw_fill_rect(cr, ofs + tofs * w, top_ofs + k * fh - sep + l, 2,
+										1, c);
 
 							prev = tofs;
 						}
@@ -1653,7 +1805,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 							int cursor_ofs_x = ofs;
 							int cursor_ofs_y = top_ofs + k * fh - sep;
 
-							_draw_rect(cr, cursor_ofs_x - 1, cursor_ofs_y - 1, w + 1, fh + 1, cursorcol);
+							_draw_rect(cr, cursor_ofs_x - 1, cursor_ofs_y - 1, w + 1, fh + 1,
+									cursorcol);
 						}
 					}
 
@@ -1665,10 +1818,12 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					ca.automation = a;
 
 					for (int l = first; l < first + count; l++) {
-						int x = (a->get_point_by_index(current_pattern, l) * w / Automation::VALUE_MAX);
-						int y = a->get_point_tick_by_index(current_pattern, l) * fh / (TICKS_PER_BEAT / rows_per_beat) - v_offset * fh;
-						_draw_fill_rect(cr, ofs + x - 2, top_ofs + y - 2 - sep,
-								5, 5, cpoint);
+						int x = (a->get_point_by_index(current_pattern, l) * w /
+								 Automation::VALUE_MAX);
+						int y = a->get_point_tick_by_index(current_pattern, l) * fh /
+										(TICKS_PER_BEAT / rows_per_beat) -
+								v_offset * fh;
+						_draw_fill_rect(cr, ofs + x - 2, top_ofs + y - 2 - sep, 5, 5, cpoint);
 
 						ClickArea::AutomationPoint ap;
 						ap.tick = a->get_point_tick_by_index(current_pattern, l);
@@ -1734,18 +1889,21 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	return true;
 }
 
-void PatternEditor::on_parsing_error(const Glib::RefPtr<const Gtk::CssSection> &section, const Glib::Error &error) {
-}
-PatternEditor::PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings) :
-		//The GType name will actually be gtkmm__CustomObject_mywidget
+void PatternEditor::on_parsing_error(
+		const Glib::RefPtr<const Gtk::CssSection> &section,
+		const Glib::Error &error) {}
+PatternEditor::PatternEditor(Song *p_song, UndoRedo *p_undo_redo,
+		Theme *p_theme, KeyBindings *p_bindings) :
+		// The GType name will actually be gtkmm__CustomObject_mywidget
 		Glib::ObjectBase("pattern_editor"),
 		Gtk::Widget() {
 
-	//This shows the GType name, which must be used in the CSS file.
-	//std::cout << "GType name: " << G_OBJECT_TYPE_NAME(gobj()) << std::endl;
+	// This shows the GType name, which must be used in the CSS file.
+	// std::cout << "GType name: " << G_OBJECT_TYPE_NAME(gobj()) << std::endl;
 
-	//This shows that the GType still derives from GtkWidget:
-	//std::cout << "Gtype is a GtkWidget?:" << GTK_IS_WIDGET(gobj()) << std::endl;
+	// This shows that the GType still derives from GtkWidget:
+	// std::cout << "Gtype is a GtkWidget?:" << GTK_IS_WIDGET(gobj()) <<
+	// std::endl;
 
 	song = p_song;
 	undo_redo = p_undo_redo;
