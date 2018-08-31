@@ -4,6 +4,8 @@ EnsureSConsVersion(0,14);
 env = Environment(CPPPATH=['#/globals','#gui','#.'])
 
 env.ParseConfig("pkg-config gtkmm-3.0 --libs --cflags")
+env.ParseConfig("pkg-config lilv-0 --libs --cflags")
+env.ParseConfig("pkg-config suil-0 --libs --cflags")
 env.Append(CXXFLAGS=["-g3"])
 
 def add_sources(self, sources, filetype, lib_env = None, shared = False):
@@ -32,6 +34,7 @@ env.libs=[]
 
 SConscript('globals/SCsub');
 SConscript('engine/SCsub');
+SConscript('drivers/SCsub');
 SConscript('gui/SCsub');
 SConscript('bin/SCsub');
 

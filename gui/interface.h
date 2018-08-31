@@ -3,6 +3,7 @@
 
 #include "engine/song.h"
 #include "gui/pattern_editor.h"
+#include "gui/track_settings.h"
 #include <gtkmm.h>
 
 class Interface : public Gtk::Window {
@@ -39,6 +40,7 @@ class Interface : public Gtk::Window {
 	Gtk::SpinButton volume;
 	Gtk::SpinButton tempo;
 
+	TrackSettings track_settings;
 	/* Editors */
 
 	UndoRedo undo_redo;
@@ -47,11 +49,15 @@ class Interface : public Gtk::Window {
 	Theme theme;
 	KeyBindings key_bindings;
 	PatternEditor pattern_editor;
+	AudioEffectFactory *fx_factory;
 
 	/* Data */
 
+	void _track_edited(int p_track);
+
 public:
-	Interface();
+	Interface(AudioEffectFactory *p_fx_factory);
+
 	~Interface();
 };
 

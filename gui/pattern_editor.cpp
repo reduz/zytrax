@@ -106,8 +106,9 @@ void PatternEditor::_menu_option(int p_option) {
 			undo_redo->commit_action();
 
 		} break;
-		case TRACK_MENU_EDIT_AUTOMATIONS: {
+		case TRACK_MENU_SETTINGS: {
 
+			track_edited.emit(current_menu_track);
 		} break;
 		case TRACK_MENU_RENAME: {
 
@@ -439,7 +440,7 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 						track_menu_items);
 
 				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Add Effect or Synth..", TRACK_MENU_ADD_EFFECT,
+				_add_option_to_menu(track_menu, "Track Settings..", TRACK_MENU_SETTINGS,
 						track_menu_items);
 				int effect_count = song->get_track(E->get().track)->get_audio_effect_count();
 				if (track->get_audio_effect_count()) {

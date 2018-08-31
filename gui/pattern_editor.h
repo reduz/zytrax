@@ -21,7 +21,7 @@ protected:
 		TRACK_MENU_RENAME,
 		TRACK_MENU_MOVE_LEFT,
 		TRACK_MENU_MOVE_RIGHT,
-		TRACK_MENU_ADD_EFFECT,
+		TRACK_MENU_SETTINGS,
 		TRACK_MENU_REMOVE,
 		AUTOMATION_MENU_VISIBLE,
 		AUTOMATION_MENU_MODE_ROWS,
@@ -170,6 +170,8 @@ protected:
 	void _add_separator_to_menu(Gtk::Menu *menu, Vector<Gtk::MenuItem *> &items, const String &p_text = String());
 
 public:
+	sigc::signal1<void, int> track_edited;
+
 	void set_current_pattern(int p_pattern);
 	int get_current_pattern() const;
 

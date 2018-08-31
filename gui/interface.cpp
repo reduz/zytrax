@@ -1,8 +1,14 @@
 #include "interface.h"
 
-Interface::Interface() :
+void Interface::_track_edited(int p_track) {
+	track_settings.show();
+}
+
+Interface::Interface(AudioEffectFactory *p_fx_factory) :
+		track_settings(p_fx_factory),
 		pattern_editor(&song, &undo_redo, &theme, &key_bindings) {
 
+	fx_factory = p_fx_factory;
 	add(main_vbox);
 	main_vbox.pack_start(menu, Gtk::PACK_SHRINK);
 	menu.show();
@@ -33,6 +39,7 @@ Interface::Interface() :
 	main_vbox.pack_end(main_hbox, Gtk::PACK_EXPAND_WIDGET);
 
 	main_hbox.pack_end(pattern_editor, Gtk::PACK_EXPAND_WIDGET);
+	pattern_editor.track_edited.connect(sigc::mem_fun(this, &Interface::_track_edited));
 
 	show_all_children();
 
