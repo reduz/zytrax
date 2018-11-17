@@ -1,11 +1,11 @@
-
+import os
 EnsureSConsVersion(0,14);
 
-env = Environment(CPPPATH=['#/globals','#gui','#.'])
+env = Environment(CPPPATH=['#/globals','#gui','#.'],ENV=os.environ)
 
 env.ParseConfig("pkg-config gtkmm-3.0 --libs --cflags")
-env.ParseConfig("pkg-config lilv-0 --libs --cflags")
-env.ParseConfig("pkg-config suil-0 --libs --cflags")
+#env.ParseConfig("pkg-config lilv-0 --libs --cflags")
+#env.ParseConfig("pkg-config suil-0 --libs --cflags")
 env.Append(CXXFLAGS=["-g3"])
 
 def add_sources(self, sources, filetype, lib_env = None, shared = False):

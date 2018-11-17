@@ -32,7 +32,8 @@ Theme::Theme() {
 	colors[COLOR_PATTERN_EDITOR_TRACK_NAME] = make_rgba(181, 181, 234);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_NAME] = make_rgba(217, 217, 180);
 
-	fonts[FONT_PATTERN].face = "FreeMono";
+//	fonts[FONT_PATTERN].face = "FreeMono";
+	fonts[FONT_PATTERN].face = "Consolas";
 	fonts[FONT_PATTERN].size = 15;
 	fonts[FONT_PATTERN].bold = true;
 

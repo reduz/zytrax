@@ -28,6 +28,7 @@ struct AudioEffectInfo {
 	String category; ///< String to categorize this node (for node browser)
 	String icon_string; ///< icon string (to look up for an bundled icon - internal nodes)
 	bool synth;
+	bool has_ui;
 	int version; ///< node_version, any scheme the node likes as long as it increases.
 	AudioEffect *(*creation_func)(const AudioEffectInfo *); ///< creation function for instancing this node
 	AudioEffectProvider *provider;
@@ -70,7 +71,7 @@ public:
 class AudioEffect {
 public:
 	//process
-	virtual bool process(const AudioFrame2 *p_in, AudioFrame2 *p_out, const Event *p_events, bool p_prev_active) = 0;
+	virtual bool process(const Frame *p_in, Frame *p_out, const Event *p_events, bool p_prev_active) = 0;
 
 	//info
 	virtual bool has_synth() const = 0;

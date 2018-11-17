@@ -1,5 +1,6 @@
 #include "audio_effect_factory_lv2.h"
 #include "engine/sound_driver_manager.h"
+#ifdef UNIX_ENABLED
 //process
 bool AudioEffectLV2::process(const AudioFrame2 *p_in, AudioFrame2 *p_out, const Event *p_events, bool p_prev_active) {
 
@@ -441,3 +442,4 @@ AudioEffectProviderLV2::AudioEffectProviderLV2(int *argc, char ***argv) {
 	jalv.control_in = (uint32_t)-1;
 #endif
 }
+#endif

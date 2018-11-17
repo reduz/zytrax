@@ -1,6 +1,8 @@
 #ifndef AUDIO_EFFECT_FACTORY_LV2_H
 #define AUDIO_EFFECT_FACTORY_LV2_H
 
+#ifdef UNIX_ENABLED
+
 #include "lilv/lilv.h"
 #include "suil/suil.h"
 
@@ -168,4 +170,5 @@ public:
 	AudioEffectProviderLV2(int *argc, char ***argv);
 };
 
+#endif
 #endif // AUDIO_EFFECT_FACTORY_LV2_H

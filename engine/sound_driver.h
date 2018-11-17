@@ -25,8 +25,8 @@ public:
 
 	virtual const char *get_name() = 0;
 
-	virtual Uint16 get_max_level_l() = 0; //max level, range 0 - 1024
-	virtual Uint16 get_max_level_r() = 0; //max level, range 0 - 1024
+	virtual uint16_t get_max_level_l() = 0; //max level, range 0 - 1024
+	virtual uint16_t get_max_level_r() = 0; //max level, range 0 - 1024
 
 	virtual bool is_active() = 0;
 	virtual bool init(int p_mix_rate, int p_buffer_size) = 0;

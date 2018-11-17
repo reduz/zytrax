@@ -13,7 +13,7 @@
 #define SOUND_DRIVER_MANAGER_H
 
 #include "engine/sound_driver.h"
-#include "frame.h"
+#include "dsp/frame.h"
 /**
 	@author Juan Linietsky <reduzio@gmail.com>
 */

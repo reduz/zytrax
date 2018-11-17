@@ -1,13 +1,7 @@
 .
+drivers
 dsp
 engine
 globals
 gui
-/usr/include/gtkmm-3.0/gtkmm
-/usr/include/gtkmm-3.0
-/usr/include/gdkmm-3.0/gdkmm
-/usr/include/gdkmm-3.0
-/usr/include/cairomm-1.0/cairomm
-/usr/include/lilv-0
-bin
-drivers
+gui/icons

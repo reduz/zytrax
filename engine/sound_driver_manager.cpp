@@ -62,7 +62,7 @@ bool SoundDriverManager::init_driver(int p_driver) {
 
 	current_driver = p_driver;
 
-	return sound_drivers[current_driver]->init();
+	return sound_drivers[current_driver]->init(mixing_hz,1024);
 }
 void SoundDriverManager::finish_driver() {
 
