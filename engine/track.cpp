@@ -566,6 +566,17 @@ bool Track::is_muted() const {
 	return muted;
 }
 
+void Track::set_mix_volume_db(float p_db) {
+	mix_volume = p_db;
+}
+float Track::get_mix_volume_db() const {
+	return mix_volume;
+}
+
+float Track::get_peak_volume_db() const {
+	return -40;
+}
+
 Track::Track() {
 
 	swing.name = "Swing";
@@ -592,6 +603,8 @@ Track::Track() {
 	name = "New Track";
 	swing_step = 1;
 	note_columns = 1;
+
+	mix_volume = -12;
 
 	muted = false;
 }

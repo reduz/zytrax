@@ -3,10 +3,11 @@
 
 #include "engine/song.h"
 #include "gui/pattern_editor.h"
+#include "gui/track_editor.h"
 #include "gui/track_settings.h"
 #include <gtkmm.h>
 
-class Interface : public Gtk::Window {
+class Interface : public Gtk::ApplicationWindow {
 
 	enum {
 		FILE_NEW,
@@ -18,27 +19,132 @@ class Interface : public Gtk::Window {
 		SETTINGS_ABOUT
 
 	};
-	Gtk::MenuBar menu;
-	Gtk::MenuItem file_menu_item;
-	Gtk::Menu file_menu;
-	Gtk::Menu settings_menu;
+
+	//dear GTK, why all this for a simple combo?
+	class ModelColumns : public Gtk::TreeModelColumnRecord {
+	public:
+		ModelColumns() {
+			add(name);
+			add(index);
+		}
+
+		Gtk::TreeModelColumn<Glib::ustring> name;
+		Gtk::TreeModelColumn<int> index;
+	};
+
+	ModelColumns zoom_model_columns;
+	Glib::RefPtr<Gtk::ListStore> zoomlist_store;
+	Vector<Gtk::TreeModel::Row> zoom_rows;
+
+	Gtk::Image prev_pattern_icon;
+	Gtk::Button prev_pattern;
+
+	Gtk::Image play_icon;
+	Gtk::Button play;
+
+	Gtk::Image stop_icon;
+	Gtk::Button stop;
+
+	Gtk::Image next_pattern_icon;
+	Gtk::Button next_pattern;
+
+	//separator is broken in GTK, so using a Label :(
+	Gtk::Label sep1, sep2, sep3;
+
+	Gtk::Image play_pattern_icon;
+	Gtk::Button play_pattern;
+
+	Gtk::Image play_cursor_icon;
+	Gtk::Button play_cursor;
+
+	Gtk::Image add_track_icon;
+	Gtk::Button add_track;
+
+	Gtk::Label spacer1, spacer2;
+
+	Glib::RefPtr<Gio::Menu> menu;
+	Glib::RefPtr<Gio::Menu> file_menu;
+	Glib::RefPtr<Gio::Menu> file_menu_file;
+	Glib::RefPtr<Gio::Menu> file_menu_exit;
+
+	Glib::RefPtr<Gio::Menu> play_menu;
+	Glib::RefPtr<Gio::Menu> play_menu_play;
+	Glib::RefPtr<Gio::Menu> play_menu_seek;
+	Glib::RefPtr<Gio::Menu> play_menu_pattern;
+	Glib::RefPtr<Gio::Menu> play_menu_extra;
+
+	Glib::RefPtr<Gio::Menu> edit_menu;
+	Glib::RefPtr<Gio::Menu> edit_menu_undo;
+	Glib::RefPtr<Gio::Menu> edit_menu_focus;
+
+	Glib::RefPtr<Gio::Menu> track_menu;
+	Glib::RefPtr<Gio::Menu> track_menu_add;
+	Glib::RefPtr<Gio::Menu> track_menu_column;
+	Glib::RefPtr<Gio::Menu> track_menu_solo;
+	Glib::RefPtr<Gio::Menu> track_menu_edit;
+	Glib::RefPtr<Gio::Menu> track_menu_remove;
+
+	Glib::RefPtr<Gio::SimpleAction> automation_action;
+	Glib::RefPtr<Gio::Menu> automation_menu;
+	Glib::RefPtr<Gio::MenuItem> automation_menu_item;
+	Glib::RefPtr<Gio::Menu> automation_menu_visible;
+	Glib::RefPtr<Gio::Menu> automation_menu_mode;
+	Glib::RefPtr<Gio::Menu> automation_menu_move;
+	Glib::RefPtr<Gio::Menu> automation_menu_remove;
+
+	Glib::RefPtr<Gio::Menu> select_menu;
+	Glib::RefPtr<Gio::Menu> select_menu_select;
+	Glib::RefPtr<Gio::Menu> select_menu_clipboard;
+	Glib::RefPtr<Gio::Menu> select_menu_transpose;
+	Glib::RefPtr<Gio::Menu> select_menu_operations;
+	Glib::RefPtr<Gio::Menu> select_menu_length;
+
+	Glib::RefPtr<Gio::Menu> settings_menu;
+	Glib::RefPtr<Gio::Menu> settings_menu_preferences;
+	Glib::RefPtr<Gio::Menu> settings_menu_cheat;
+	Glib::RefPtr<Gio::Menu> settings_menu_about;
+
+	Gtk::MenuItem menu_item_file_open;
 
 	Vector<Gtk::MenuItem *> menu_items;
 
 	/* Boxes */
+	Gtk::Grid grid;
 	Gtk::VBox main_vbox;
-	Gtk::HBox top_hbox;
+	Gtk::HBox play_hbox;
+	Gtk::HBox pattern_hbox;
+	Gtk::VBox pattern_vbox;
 	Gtk::HBox main_hbox;
 	/* Labels */
 	Gtk::Label pattern_label;
+	Gtk::Label pattern_length_label;
 	Gtk::Label octave_label;
-	Gtk::Label volume_label;
+	Gtk::Label step_label;
+	Gtk::Label zoom_label;
+	Gtk::CheckButton volume_mask;
 	Gtk::Label tempo_label;
+	Gtk::Label swing_label;
+	/* Scrolls */
+	Gtk::VScrollbar pattern_vscroll;
+	Gtk::HScrollbar pattern_hscroll;
 
 	Gtk::SpinButton pattern;
+	Gtk::Image pattern_settings_icon;
+	Gtk::Button pattern_settings;
+	Gtk::SpinButton pattern_length;
+	Gtk::Button pattern_length_set_next;
 	Gtk::SpinButton octave;
 	Gtk::SpinButton volume;
 	Gtk::SpinButton tempo;
+	Gtk::SpinButton swing;
+	Gtk::SpinButton step;
+	Gtk::ComboBox zoom;
+
+	Gtk::VPaned main_split;
+	Gtk::ScrolledWindow track_scroll;
+	Gtk::HBox track_hbox;
+
+	KeyBindings key_bindings;
 
 	TrackSettings track_settings;
 	/* Editors */
@@ -47,16 +153,49 @@ class Interface : public Gtk::Window {
 	Song song;
 
 	Theme theme;
-	KeyBindings key_bindings;
 	PatternEditor pattern_editor;
 	AudioEffectFactory *fx_factory;
 
+	struct TrackRacks {
+		TrackRackVolume *volume;
+		TrackRackEditor *rack;
+	};
+
+	Vector<TrackRacks> racks;
+
 	/* Data */
 
+	void _add_track();
 	void _track_edited(int p_track);
 
+	void _pattern_changed();
+	void _octave_changed();
+	void _step_changed();
+	void _volume_changed();
+	void _tempo_changed();
+	void _swing_changed();
+	void _zoom_changed();
+
+	bool updating_editors;
+	void _update_editors();
+
+	Gtk::Application *application;
+
+	void _on_application_startup();
+	void _on_action_activated(KeyBindings::KeyBind p_bind);
+
+	void _update_selected_track();
+	void _update_tracks();
+	void _ensure_selected_track_visible();
+
+	void _update_volume_mask();
+	void _update_octave();
+	void _update_pattern();
+	void _update_step();
+	void _update_zoom();
+
 public:
-	Interface(AudioEffectFactory *p_fx_factory);
+	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory);
 
 	~Interface();
 };

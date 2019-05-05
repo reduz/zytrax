@@ -1,6 +1,6 @@
 #include "color_theme.h"
 
-static Gdk::RGBA make_rgba(uint8_t p_red, uint8_t p_green, uint8_t p_blue, uint8_t p_alpha = 255) {
+Gdk::RGBA Theme::make_rgba(uint8_t p_red, uint8_t p_green, uint8_t p_blue, uint8_t p_alpha) {
 
 	Gdk::RGBA rgba;
 	rgba.set_red(float(p_red) / 255.0);
@@ -21,21 +21,32 @@ Theme::Theme() {
 	colors[COLOR_PATTERN_EDITOR_ROW_SUB_BEAT] = make_rgba(60, 60, 80);
 	colors[COLOR_PATTERN_EDITOR_BG] = make_rgba(26, 26, 42);
 	colors[COLOR_PATTERN_EDITOR_NOTE] = make_rgba(181, 181, 234);
+	colors[COLOR_PATTERN_EDITOR_BG_SELECTED] = make_rgba(80, 80, 100);
+	colors[COLOR_PATTERN_EDITOR_NOTE_SELECTED] = make_rgba(255, 255, 255);
 	colors[COLOR_PATTERN_EDITOR_HL_BAR] = make_rgba(61, 61, 95);
 	colors[COLOR_PATTERN_EDITOR_HL_BEAT] = make_rgba(41, 41, 61);
+	colors[COLOR_PATTERN_EDITOR_HL_BAR_SELECTED] = make_rgba(110, 110, 150);
+	colors[COLOR_PATTERN_EDITOR_HL_BEAT_SELECTED] = make_rgba(95, 95, 120);
 	colors[COLOR_PATTERN_EDITOR_NOTE_NOFIT] = make_rgba(144, 144, 169);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_VALUE] = make_rgba(217, 217, 180);
+	colors[COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_SELECTED] = make_rgba(255, 255, 210);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR] = make_rgba(87, 87, 65);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT] = make_rgba(63, 63, 49);
+	colors[COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR_SELECTED] = make_rgba(140, 140, 100);
+	colors[COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT_SELECTED] = make_rgba(119, 90, 90);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_NOFIT] = make_rgba(205, 205, 190);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_POINT] = make_rgba(251, 246, 220);
 	colors[COLOR_PATTERN_EDITOR_TRACK_NAME] = make_rgba(181, 181, 234);
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_NAME] = make_rgba(217, 217, 180);
 
-//	fonts[FONT_PATTERN].face = "FreeMono";
+	//	fonts[FONT_PATTERN].face = "FreeMono";
 	fonts[FONT_PATTERN].face = "Consolas";
 	fonts[FONT_PATTERN].size = 15;
 	fonts[FONT_PATTERN].bold = true;
+
+	fonts[FONT_TRACK_EDIT].face = "Consolas";
+	fonts[FONT_TRACK_EDIT].size = 15;
+	fonts[FONT_TRACK_EDIT].bold = true;
 
 	constants[CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION] = 5;
 	constants[CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION] = 10;

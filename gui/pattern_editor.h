@@ -11,28 +11,24 @@
 #include "gui/key_bindings.h"
 
 class PatternEditor : public Gtk::Widget {
-protected:
-	enum {
-		TRACK_MENU_ADD_COLUMN,
-		TRACK_MENU_REMOVE_COLUMN,
-		TRACK_MENU_SOLO,
-		TRACK_MENU_MUTE,
-		TRACK_MENU_EDIT_AUTOMATIONS,
-		TRACK_MENU_RENAME,
-		TRACK_MENU_MOVE_LEFT,
-		TRACK_MENU_MOVE_RIGHT,
-		TRACK_MENU_SETTINGS,
-		TRACK_MENU_REMOVE,
-		AUTOMATION_MENU_VISIBLE,
-		AUTOMATION_MENU_MODE_ROWS,
-		AUTOMATION_MENU_MODE_SMALL,
-		AUTOMATION_MENU_MODE_LARGE,
-		AUTOMATION_MENU_MOVE_LEFT,
-		AUTOMATION_MENU_MOVE_RIGHT,
-		AUTOMATION_MENU_REMOVE,
-		BASE_EFFECT = 100
+public:
+	enum BeatZoom {
+		BEAT_ZOOM_1,
+		BEAT_ZOOM_2,
+		BEAT_ZOOM_3,
+		BEAT_ZOOM_4,
+		BEAT_ZOOM_6,
+		BEAT_ZOOM_8,
+		BEAT_ZOOM_12,
+		BEAT_ZOOM_16,
+		BEAT_ZOOM_24,
+		BEAT_ZOOM_32,
+		BEAT_ZOOM_48,
+		BEAT_ZOOM_64,
+		BEAT_ZOOM_MAX
 	};
 
+protected:
 	//Overrides:
 	Gtk::SizeRequestMode get_request_mode_vfunc() const override;
 	void get_preferred_width_vfunc(int &minimum_width, int &natural_width) const override;
@@ -51,6 +47,7 @@ protected:
 
 	void _mouse_button_event(GdkEventButton *event, bool p_press);
 
+	bool on_scroll_event(GdkEventScroll *scroll_event);
 	bool on_button_press_event(GdkEventButton *event);
 	bool on_button_release_event(GdkEventButton *event);
 	bool on_motion_notify_event(GdkEventMotion *motion_event);
@@ -65,8 +62,10 @@ protected:
 	int current_pattern;
 	int current_octave;
 	int cursor_advance;
+	int volume_mask;
+	bool volume_mask_active;
 	int v_offset;
-	int rows_per_beat;
+	BeatZoom beat_zoom;
 	int h_offset;
 	int visible_rows;
 
@@ -80,18 +79,37 @@ protected:
 		int skip;
 	} cursor;
 
-	struct TrackButton {
-		int track;
-		Gdk::Rectangle r;
-	};
+	struct Selection {
+		int begin_column;
+		Tick begin_tick;
 
-	List<TrackButton> track_buttons;
+		int end_column;
+		Tick end_tick;
 
-	struct AutomationButton {
-		int track;
-		int automation;
-		Gdk::Rectangle r;
-	};
+		Tick row_tick_size;
+
+		bool active;
+
+		int shift_from_column;
+		int shift_from_row;
+		bool shift_active;
+
+		int mouse_drag_from_column;
+		int mouse_drag_from_row;
+		bool mouse_drag_active;
+
+	} selection;
+
+	struct Clipboard {
+
+		List<Track::PosEvent> events;
+		int columns;
+		Tick ticks;
+		bool active;
+	} clipboard;
+
+	void _update_shift_selection();
+	bool _is_in_selection(int p_column, Tick p_tick);
 
 	struct ClickArea {
 
@@ -120,10 +138,12 @@ protected:
 		}
 	};
 
-	List<ClickArea> click_areas;
+	int fw_cache;
+	int fh_cache;
 
-	int current_menu_track;
-	int current_menu_automation;
+	int get_column_offset(int p_column);
+
+	List<ClickArea> click_areas;
 
 	int grabbing_point;
 	Tick grabbing_point_tick_from;
@@ -137,8 +157,6 @@ protected:
 
 	int grabbing_mouse_prev_x;
 	int grabbing_mouse_prev_y;
-
-	List<AutomationButton> automation_buttons;
 
 	int get_total_rows() const;
 	int get_visible_rows() const;
@@ -154,26 +172,58 @@ protected:
 
 	void _field_clear();
 	void _validate_cursor();
+	void _validate_selection();
 	void _redraw();
 
 	Theme *theme;
 	KeyBindings *key_bindings;
 
-	Vector<Gtk::MenuItem *> track_menu_items;
-	Gtk::Menu *track_menu;
-	Vector<Gtk::MenuItem *> automation_menu_items;
-	Gtk::Menu *automation_menu;
+	int _get_rows_per_beat() const;
+	void _on_action_activated(KeyBindings::KeyBind p_bind);
+	void _validate_menus();
+	void _notify_track_layout_changed();
 
-	void _menu_option(int p_option);
-	void _add_option_to_menu(Gtk::Menu *menu, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items);
-	void _add_check_option_to_menu(Gtk::Menu *menu, bool p_checked, bool p_radio, const char *p_text, int p_menu, Vector<Gtk::MenuItem *> &items);
-	void _add_separator_to_menu(Gtk::Menu *menu, Vector<Gtk::MenuItem *> &items, const String &p_text = String());
+	bool drawing;
+	int last_amplify_value;
+	float last_scale_value;
+
+	Glib::RefPtr<Gtk::Adjustment> h_scroll;
+	Glib::RefPtr<Gtk::Adjustment> v_scroll;
+
+	void _v_scroll_changed();
+	void _h_scroll_changed();
 
 public:
 	sigc::signal1<void, int> track_edited;
+	sigc::signal0<void> track_layout_changed;
+	sigc::signal0<void> current_track_changed;
+
+	sigc::signal0<void> volume_mask_changed;
+	sigc::signal0<void> octave_changed;
+	sigc::signal0<void> step_changed;
+	sigc::signal0<void> zoom_changed;
+	sigc::signal0<void> pattern_changed;
 
 	void set_current_pattern(int p_pattern);
 	int get_current_pattern() const;
+
+	void set_current_octave(int p_octave);
+	int get_current_octave() const;
+
+	void set_current_cursor_advance(int p_cursor_advance);
+	int get_current_cursor_advance() const;
+
+	void set_current_volume_mask(int p_volume_mask, bool p_active);
+	int get_current_volume_mask() const;
+	bool is_current_volume_mask_active() const;
+
+	void set_beat_zoom(BeatZoom p_zoom);
+	BeatZoom get_beat_zoom() const;
+
+	int get_current_track() const;
+
+	void set_hscroll(Glib::RefPtr<Gtk::Adjustment> p_h_scroll);
+	void set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll);
 
 	PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);
 	~PatternEditor();

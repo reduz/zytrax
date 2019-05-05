@@ -114,6 +114,58 @@ int Song::get_event_column_count() const {
 
 	return cc;
 }
+
+int Song::get_event_column_track(int p_column) const {
+
+	for (int i = 0; i < tracks.size(); i++) {
+
+		if (p_column < tracks[i]->get_event_column_count()) {
+
+			return i;
+		}
+
+		p_column -= tracks[i]->get_event_column_count();
+	}
+
+	return -1;
+}
+int Song::get_event_column_note_column(int p_column) const {
+
+	for (int i = 0; i < tracks.size(); i++) {
+
+		if (p_column < tracks[i]->get_event_column_count()) {
+
+			if (p_column < tracks[i]->get_column_count()) {
+				return p_column;
+			} else {
+				return -1;
+			}
+		}
+
+		p_column -= tracks[i]->get_event_column_count();
+	}
+
+	return -1;
+}
+int Song::get_event_column_automation(int p_column) const {
+
+	for (int i = 0; i < tracks.size(); i++) {
+
+		if (p_column < tracks[i]->get_event_column_count()) {
+
+			if (p_column < tracks[i]->get_column_count()) {
+				return -1;
+			} else {
+				return p_column - tracks[i]->get_column_count();
+			}
+		}
+
+		p_column -= tracks[i]->get_event_column_count();
+	}
+
+	return -1;
+}
+
 void Song::set_event(int p_pattern, int p_column, Tick p_pos, Track::Event p_event) {
 
 	for (int i = 0; i < tracks.size(); i++) {
@@ -192,6 +244,20 @@ void Song::get_events_in_range(int p_pattern, const Track::Pos &p_from, const Tr
 	}
 }
 
+void Song::set_bpm(float p_value) {
+	bpm = p_value;
+}
+float Song::get_bpm() const {
+	return bpm;
+}
+
+void Song::set_swing(float p_value) {
+	swing = p_value;
+}
+float Song::get_swing() const {
+	return swing;
+}
+
 Song::~Song() {
 
 	for (int i = 0; i < tracks.size(); i++)
@@ -199,4 +265,6 @@ Song::~Song() {
 }
 
 Song::Song() {
+	bpm = 125;
+	swing = 0;
 }

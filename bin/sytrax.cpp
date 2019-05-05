@@ -14,7 +14,6 @@ int main(int argc, char *argv[]) {
 
 #ifdef UNIX_ENABLED
 
-
 	AudioEffectProviderLV2 provider_lv2(&argc, &argv); //lv2 madness
 	provider_lv2.scan_effects(&effect_factory);
 	effect_factory.add_provider(&provider_lv2);
@@ -22,7 +21,12 @@ int main(int argc, char *argv[]) {
 
 	auto app = Gtk::Application::create(argc, argv, "org.gtkmm.examples.base");
 
-	Interface window(&effect_factory);
+	/* make it dark */
+	/*g_object_set(gtk_settings_get_default(),
+			"gtk-application-prefer-dark-theme", TRUE,
+			NULL);*/
+
+	Interface window(app.operator->(), &effect_factory);
 	window.set_default_size(800, 600);
 
 	return app->run(window);

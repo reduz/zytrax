@@ -7,256 +7,21 @@ void PatternEditor::_cursor_advance() {
 		cursor.row = get_total_rows() - 1;
 }
 
-void PatternEditor::_add_option_to_menu(Gtk::Menu *menu, const char *p_text,
-		int p_menu,
-		Vector<Gtk::MenuItem *> &items) {
-
-	Gtk::MenuItem *item = new Gtk::MenuItem;
-	item->set_label(p_text);
-	item->signal_activate().connect(
-			sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
-	item->show();
-	menu->append(*item);
-	items.push_back(item);
-}
-
-void PatternEditor::_add_check_option_to_menu(Gtk::Menu *menu, bool p_checked,
-		bool p_radio, const char *p_text,
-		int p_menu,
-		Vector<Gtk::MenuItem *> &items) {
-
-	Gtk::CheckMenuItem *item = new Gtk::CheckMenuItem;
-	item->set_label(p_text);
-	item->show();
-	item->set_active(p_checked);
-	item->set_draw_as_radio(p_radio);
-	item->signal_activate().connect(
-			sigc::bind(sigc::mem_fun(this, &PatternEditor::_menu_option), p_menu));
-	menu->append(*item);
-	items.push_back(item);
-}
-
-void PatternEditor::_add_separator_to_menu(Gtk::Menu *menu,
-		Vector<Gtk::MenuItem *> &items, const String &p_text) {
-
-	Gtk::SeparatorMenuItem *sep = new Gtk::SeparatorMenuItem;
-	if (p_text != String())
-		sep->set_label(p_text.utf8().get_data());
-	sep->show();
-	menu->append(*sep);
-	items.push_back(sep);
-}
-
-void PatternEditor::_menu_option(int p_option) {
-
-	switch (p_option) {
-
-		case TRACK_MENU_ADD_COLUMN: {
-
-			undo_redo->begin_action("Add Column");
-			undo_redo->do_method(
-					song->get_track(current_menu_track), &Track::set_columns,
-					song->get_track(current_menu_track)->get_column_count() + 1);
-			undo_redo->undo_method(
-					song->get_track(current_menu_track), &Track::set_columns,
-					song->get_track(current_menu_track)->get_column_count());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-		} break;
-		case TRACK_MENU_REMOVE_COLUMN: {
-
-			undo_redo->begin_action("Remove Column");
-			undo_redo->do_method(
-					song->get_track(current_menu_track), &Track::set_columns,
-					song->get_track(current_menu_track)->get_column_count() - 1);
-			undo_redo->undo_method(
-					song->get_track(current_menu_track), &Track::set_columns,
-					song->get_track(current_menu_track)->get_column_count());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case TRACK_MENU_SOLO: {
-
-			undo_redo->begin_action("Solo");
-			for (int i = 0; i < song->get_track_count(); i++) {
-
-				undo_redo->do_method(song->get_track(i), &Track::set_muted,
-						i != current_menu_track);
-				undo_redo->undo_method(song->get_track(i), &Track::set_muted,
-						song->get_track(i)->is_muted());
-			}
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case TRACK_MENU_MUTE: {
-
-			undo_redo->begin_action("Mute");
-			undo_redo->do_method(song->get_track(current_menu_track), &Track::set_muted,
-					!song->get_track(current_menu_track)->is_muted());
-			undo_redo->undo_method(song->get_track(current_menu_track),
-					&Track::set_muted,
-					song->get_track(current_menu_track)->is_muted());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case TRACK_MENU_SETTINGS: {
-
-			track_edited.emit(current_menu_track);
-		} break;
-		case TRACK_MENU_RENAME: {
-
-		} break;
-		case TRACK_MENU_MOVE_LEFT: {
-
-			undo_redo->begin_action("Track Move Left");
-			undo_redo->do_method(song, &Song::swap_tracks, current_menu_track,
-					current_menu_track - 1);
-			undo_redo->undo_method(song, &Song::swap_tracks, current_menu_track,
-					current_menu_track - 1);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case TRACK_MENU_MOVE_RIGHT: {
-
-			undo_redo->begin_action("Track Move Right");
-			undo_redo->do_method(song, &Song::swap_tracks, current_menu_track,
-					current_menu_track + 1);
-			undo_redo->undo_method(song, &Song::swap_tracks, current_menu_track,
-					current_menu_track + 1);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case TRACK_MENU_REMOVE: {
-
-			undo_redo->begin_action("Remove");
-			undo_redo->do_method(song, &Song::remove_track, current_menu_track);
-			undo_redo->undo_method(song, &Song::add_track_at_pos,
-					song->get_track(current_menu_track),
-					current_menu_track);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_data(song->get_track(current_menu_track));
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_VISIBLE: {
-
-			Automation *a = song->get_track(current_menu_track)
-									->get_automation(current_menu_automation);
-			undo_redo->begin_action("Toggle Automation Visibility");
-			undo_redo->do_method(a, &Automation::set_visible, !a->is_visible());
-			undo_redo->undo_method(a, &Automation::set_visible, a->is_visible());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_MODE_ROWS: {
-
-			Automation *a = song->get_track(current_menu_track)
-									->get_automation(current_menu_automation);
-			undo_redo->begin_action("Automation Display Numbers");
-			undo_redo->do_method(a, &Automation::set_display_mode,
-					Automation::DISPLAY_ROWS);
-			undo_redo->undo_method(a, &Automation::set_display_mode,
-					a->get_display_mode());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_MODE_SMALL: {
-
-			Automation *a = song->get_track(current_menu_track)
-									->get_automation(current_menu_automation);
-			undo_redo->begin_action("Automation Display Small");
-			undo_redo->do_method(a, &Automation::set_display_mode,
-					Automation::DISPLAY_SMALL);
-			undo_redo->undo_method(a, &Automation::set_display_mode,
-					a->get_display_mode());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_MODE_LARGE: {
-
-			Automation *a = song->get_track(current_menu_track)
-									->get_automation(current_menu_automation);
-			undo_redo->begin_action("Automation Display Large");
-			undo_redo->do_method(a, &Automation::set_display_mode,
-					Automation::DISPLAY_LARGE);
-			undo_redo->undo_method(a, &Automation::set_display_mode,
-					a->get_display_mode());
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_MOVE_LEFT: {
-
-			undo_redo->begin_action("Automation Move Left");
-			undo_redo->do_method(song->get_track(current_menu_track),
-					&Track::swap_automations, current_menu_automation,
-					current_menu_automation - 1);
-			undo_redo->undo_method(song->get_track(current_menu_track),
-					&Track::swap_automations, current_menu_automation,
-					current_menu_automation - 1);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_MOVE_RIGHT: {
-
-			undo_redo->begin_action("Automation Move Right");
-			undo_redo->do_method(song->get_track(current_menu_track),
-					&Track::swap_automations, current_menu_automation,
-					current_menu_automation + 1);
-			undo_redo->undo_method(song->get_track(current_menu_track),
-					&Track::swap_automations, current_menu_automation,
-					current_menu_automation + 1);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-		case AUTOMATION_MENU_REMOVE: {
-
-			Automation *a = song->get_track(current_menu_track)
-									->get_automation(current_menu_automation);
-			undo_redo->begin_action("Remove Automation");
-			undo_redo->do_method(song->get_track(current_menu_track),
-					&Track::remove_automation, current_menu_automation);
-			undo_redo->undo_method(song->get_track(current_menu_track),
-					&Track::add_automation, a, current_menu_automation);
-			undo_redo->do_method(this, &PatternEditor::_redraw);
-			undo_redo->undo_method(this, &PatternEditor::_redraw);
-			undo_redo->commit_action();
-
-		} break;
-	}
+int PatternEditor::_get_rows_per_beat() const {
+	static const int rows_per_beat[BEAT_ZOOM_MAX] = {
+		1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64
+	};
+	return rows_per_beat[beat_zoom];
 }
 
 void PatternEditor::_field_clear() {
 
 	Track::Pos from;
-	from.tick = cursor.row * TICKS_PER_BEAT / rows_per_beat;
+	from.tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
 	from.column = cursor.column;
 
 	Track::Pos to;
-	to.tick = from.tick + TICKS_PER_BEAT / rows_per_beat;
+	to.tick = from.tick + TICKS_PER_BEAT / _get_rows_per_beat();
 	to.column = cursor.column;
 
 	List<Track::PosEvent> events;
@@ -306,7 +71,24 @@ void PatternEditor::_field_clear() {
 	_cursor_advance();
 }
 
+bool PatternEditor::_is_in_selection(int p_column, Tick p_tick) {
+
+	return (selection.active && p_column >= selection.begin_column && p_column <= selection.end_column && p_tick >= selection.begin_tick && p_tick < (selection.end_tick + selection.row_tick_size - 1));
+}
+void PatternEditor::_validate_selection() {
+	if (selection.begin_column > selection.end_column) {
+		SWAP(selection.begin_column, selection.end_column);
+	}
+	if (selection.begin_tick > selection.end_tick) {
+		SWAP(selection.begin_tick, selection.end_tick);
+	}
+}
+
 void PatternEditor::_validate_cursor() {
+
+	if (song->get_track_count() == 0) {
+		return;
+	}
 
 	if (cursor.row < 0)
 		cursor.row = 0;
@@ -322,12 +104,27 @@ void PatternEditor::_validate_cursor() {
 		h_offset = cursor.column;
 	}
 
+	while (true) {
+		int base_ofs = h_offset ? get_column_offset(h_offset - 1) : 0;
+		int window_size = get_allocated_width() - fw_cache * 4; //minus number row
+		int cursor_end = get_column_offset(cursor.column);
+
+		if (h_offset == song->get_event_column_count() - 1) {
+			break;
+		}
+		if (base_ofs + window_size >= cursor_end) {
+			break;
+		}
+
+		h_offset++;
+	}
+
 	queue_draw();
 }
 
 int PatternEditor::get_total_rows() const {
 
-	return song->pattern_get_beats(current_pattern) * rows_per_beat;
+	return song->pattern_get_beats(current_pattern) * _get_rows_per_beat();
 }
 
 int PatternEditor::get_visible_rows() const {
@@ -387,162 +184,48 @@ int PatternEditor::get_current_pattern() const {
 	return current_pattern;
 }
 
+void PatternEditor::set_current_octave(int p_octave) {
+	current_octave = p_octave;
+}
+int PatternEditor::get_current_octave() const {
+	return current_octave;
+}
+
+void PatternEditor::set_current_cursor_advance(int p_cursor_advance) {
+	cursor_advance = p_cursor_advance;
+}
+int PatternEditor::get_current_cursor_advance() const {
+	return cursor_advance;
+}
+
+void PatternEditor::set_current_volume_mask(int p_volume_mask, bool p_active) {
+	volume_mask = p_volume_mask;
+	volume_mask_active = p_active;
+}
+int PatternEditor::get_current_volume_mask() const {
+	return volume_mask;
+}
+bool PatternEditor::is_current_volume_mask_active() const {
+	return volume_mask_active;
+}
+
 void PatternEditor::_redraw() {
 	queue_draw();
 }
 
 void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
+	if (song->get_track_count() == 0) {
+		return;
+	}
+
 	Gdk::Rectangle posr(event->x, event->y, 1, 1);
 
 	if (p_press && event->button == 1) {
 
-		// test trackbuttons
-		for (List<TrackButton>::Element *E = track_buttons.front(); E;
-				E = E->next()) {
-
-			if (E->get().r.intersects(posr)) {
-				Track *track = song->get_track(E->get().track);
-
-				if (track_menu) {
-					// I dont understand how to delete all the items, great usability
-					// there... so i create a new one
-					delete track_menu;
-					for (int i = 0; i < track_menu_items.size(); i++) {
-						delete track_menu_items[i];
-					}
-					track_menu_items.clear();
-				}
-
-				track_menu = new Gtk::Menu;
-
-				if (track->get_column_count() < 16) {
-					_add_option_to_menu(track_menu, "Add Column", TRACK_MENU_ADD_COLUMN,
-							track_menu_items);
-				}
-				if (track->get_column_count() > 1) {
-
-					_add_option_to_menu(track_menu, "Remove Column",
-							TRACK_MENU_REMOVE_COLUMN, track_menu_items);
-				}
-
-				_add_separator_to_menu(track_menu, track_menu_items);
-
-				_add_option_to_menu(track_menu, "Solo", TRACK_MENU_SOLO,
-						track_menu_items);
-				_add_option_to_menu(track_menu, "Muted", TRACK_MENU_MUTE,
-						track_menu_items);
-				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Automations..",
-						TRACK_MENU_EDIT_AUTOMATIONS, track_menu_items);
-				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Rename..", TRACK_MENU_RENAME,
-						track_menu_items);
-
-				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Track Settings..", TRACK_MENU_SETTINGS,
-						track_menu_items);
-				int effect_count = song->get_track(E->get().track)->get_audio_effect_count();
-				if (track->get_audio_effect_count()) {
-					_add_separator_to_menu(track_menu, track_menu_items, "Effects");
-					for (int i = 0; i < effect_count; i++) {
-						_add_option_to_menu(track_menu, track->get_audio_effect(i)->get_info()->caption.utf8().get_data(), BASE_EFFECT + i,
-								track_menu_items);
-					}
-				}
-
-				if (song->get_track_count() > 1) {
-					_add_separator_to_menu(track_menu, track_menu_items);
-					if (E->get().track > 0)
-						_add_option_to_menu(track_menu, "Move Left", TRACK_MENU_MOVE_LEFT,
-								track_menu_items);
-					if (E->get().track < song->get_track_count() - 1)
-						_add_option_to_menu(track_menu, "Move Right", TRACK_MENU_MOVE_RIGHT,
-								track_menu_items);
-				}
-				_add_separator_to_menu(track_menu, track_menu_items);
-				_add_option_to_menu(track_menu, "Remove Track", TRACK_MENU_REMOVE,
-						track_menu_items);
-				current_menu_track = E->get().track;
-
-				track_menu->popup_at_pointer((GdkEvent *)event);
-				return;
-			}
-		}
-
-		for (List<AutomationButton>::Element *E = automation_buttons.front(); E;
-				E = E->next()) {
-
-			if (E->get().r.intersects(posr)) {
-
-				if (automation_menu) {
-					// I dont understand how to delete all the items, great usability
-					// there... so i create a new one
-					delete automation_menu;
-					for (int i = 0; i < automation_menu_items.size(); i++) {
-						delete automation_menu_items[i];
-					}
-					automation_menu_items.clear();
-				}
-
-				automation_menu = new Gtk::Menu;
-
-				_add_check_option_to_menu(automation_menu,
-						song->get_track(E->get().track)
-								->get_automation(E->get().automation)
-								->is_visible(),
-						false, "Visible", AUTOMATION_MENU_VISIBLE,
-						automation_menu_items);
-
-				_add_separator_to_menu(automation_menu, automation_menu_items);
-
-				_add_check_option_to_menu(
-						automation_menu,
-						song->get_track(E->get().track)
-										->get_automation(E->get().automation)
-										->get_display_mode() == Automation::DISPLAY_ROWS,
-						true, "Numbers", AUTOMATION_MENU_MODE_ROWS, automation_menu_items);
-
-				_add_check_option_to_menu(
-						automation_menu,
-						song->get_track(E->get().track)
-										->get_automation(E->get().automation)
-										->get_display_mode() == Automation::DISPLAY_SMALL,
-						true, "Small Envelope", AUTOMATION_MENU_MODE_SMALL,
-						automation_menu_items);
-
-				_add_check_option_to_menu(
-						automation_menu,
-						song->get_track(E->get().track)
-										->get_automation(E->get().automation)
-										->get_display_mode() == Automation::DISPLAY_LARGE,
-						true, "Large Envelope", AUTOMATION_MENU_MODE_LARGE,
-						automation_menu_items);
-
-				if (song->get_track(E->get().track)->get_automation_count() > 1) {
-					_add_separator_to_menu(automation_menu, automation_menu_items);
-					if (E->get().automation > 0)
-						_add_option_to_menu(automation_menu, "Move Left",
-								AUTOMATION_MENU_MOVE_LEFT,
-								automation_menu_items);
-					if (E->get().automation <
-							song->get_track(E->get().track)->get_automation_count() - 1)
-						_add_option_to_menu(automation_menu, "Move Right",
-								AUTOMATION_MENU_MOVE_RIGHT,
-								automation_menu_items);
-				}
-				_add_separator_to_menu(automation_menu, automation_menu_items);
-				_add_option_to_menu(automation_menu, "Remove", AUTOMATION_MENU_REMOVE,
-						automation_menu_items);
-
-				current_menu_track = E->get().track;
-				current_menu_automation = E->get().automation;
-
-				automation_menu->popup_at_pointer((GdkEvent *)event);
-
-				return;
-			}
-		}
+		int closest_field = -1;
+		int closest_column = -1;
+		int closest_distance = 0x7FFFFFFF;
 
 		for (List<ClickArea>::Element *E = click_areas.front(); E; E = E->next()) {
 
@@ -561,7 +244,7 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				float d = sqrt((x - event->x) * (x - event->x) +
 							   (y - event->y) * (y - event->y));
 
-				if (d < 4) {
+				if (d < 6) {
 					if (point_index < 0 || d < point_d) {
 						point_index = F->get().index;
 						point_d = d;
@@ -587,6 +270,7 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				grabbing_mouse_prev_x = grabbing_mouse_pos_x;
 				grabbing_mouse_prev_y = grabbing_mouse_pos_y;
 
+				return;
 			} else if (event->state & GDK_CONTROL_MASK &&
 					   event->x >= E->get().fields[0].x &&
 					   event->x < E->get().fields[0].x + E->get().fields[0].width) {
@@ -596,7 +280,7 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				int w = E->get().fields[0].width;
 
 				Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) *
-							TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
+							TICKS_PER_BEAT / (row_height_cache * _get_rows_per_beat());
 
 				uint8_t value =
 						CLAMP((x)*Automation::VALUE_MAX / w, 0, Automation::VALUE_MAX);
@@ -616,6 +300,7 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				grabbing_mouse_prev_y = grabbing_mouse_pos_y;
 
 				queue_draw();
+				return;
 			} else {
 				for (int i = 0; i < E->get().fields.size(); i++) {
 					int localx = event->x - E->get().fields[i].x;
@@ -624,11 +309,37 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 						cursor.column = E->get().column;
 						queue_draw();
 						cursor.row = (event->y / row_height_cache) + v_offset;
+						_validate_menus();
 
+						selection.mouse_drag_from_column = cursor.column;
+						selection.mouse_drag_from_row = cursor.row;
+						selection.mouse_drag_active = true;
 						return;
+					} else {
+
+						int distance = localx < 0 ? -localx : localx - E->get().fields[i].width;
+						if (distance < closest_distance) {
+							closest_distance = distance;
+							closest_field = i;
+							closest_column = E->get().column;
+						}
 					}
 				}
 			}
+		}
+
+		if (closest_column >= 0) {
+			cursor.field = closest_field;
+			cursor.column = closest_column;
+			queue_draw();
+			cursor.row = (event->y / row_height_cache) + v_offset;
+
+			selection.mouse_drag_from_column = cursor.column;
+			selection.mouse_drag_from_row = cursor.row;
+			selection.mouse_drag_active = true;
+
+			_validate_menus();
+			return;
 		}
 	}
 
@@ -694,9 +405,24 @@ void PatternEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 			undo_redo->undo_method(this, &PatternEditor::_redraw);
 			undo_redo->commit_action();
 		}
+
+		selection.mouse_drag_active = false;
 	}
 }
 
+bool PatternEditor::on_scroll_event(GdkEventScroll *scroll_event) {
+
+	if (scroll_event->direction == GDK_SCROLL_UP) {
+		v_scroll->set_value(v_scroll->get_value() - _get_rows_per_beat());
+		return true;
+	}
+	if (scroll_event->direction == GDK_SCROLL_DOWN) {
+		v_scroll->set_value(v_scroll->get_value() + _get_rows_per_beat());
+		return true;
+	}
+
+	return false;
+}
 bool PatternEditor::on_button_press_event(GdkEventButton *event) {
 	grab_focus();
 	_mouse_button_event(event, true);
@@ -709,6 +435,60 @@ bool PatternEditor::on_button_release_event(GdkEventButton *release_event) {
 }
 
 bool PatternEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
+
+	if (song->get_track_count() == 0) {
+		return false;
+	}
+
+	if (selection.mouse_drag_active) {
+		int closest_field = -1;
+		int closest_column = -1;
+		int closest_distance = 0x7FFFFFFF;
+
+		for (List<ClickArea>::Element *E = click_areas.front(); E; E = E->next()) {
+
+			for (int i = 0; i < E->get().fields.size(); i++) {
+				int localx = motion_event->x - E->get().fields[i].x;
+				if (localx >= 0 && localx < E->get().fields[i].width) {
+					closest_field = i;
+					closest_column = E->get().column;
+					closest_distance = 0;
+					break;
+
+				} else {
+
+					int distance = localx < 0 ? -localx : localx - E->get().fields[i].width;
+					if (distance < closest_distance) {
+						closest_distance = distance;
+						closest_field = i;
+						closest_column = E->get().column;
+					}
+				}
+			}
+			if (closest_distance == 0) {
+				break;
+			}
+		}
+
+		if (closest_column >= 0) {
+
+			int row = (motion_event->y / row_height_cache) + v_offset;
+			bool prev_active = selection.active;
+			selection.active = true;
+			selection.begin_column = selection.mouse_drag_from_column;
+			selection.begin_tick = selection.mouse_drag_from_row * TICKS_PER_BEAT / _get_rows_per_beat();
+			selection.end_column = closest_column;
+			selection.end_tick = row * TICKS_PER_BEAT / _get_rows_per_beat();
+			selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+
+			_validate_selection();
+			if (prev_active != selection.active) {
+				_validate_menus();
+			}
+			queue_draw();
+			return true;
+		}
+	}
 
 	if (grabbing_point >= 0) {
 
@@ -727,7 +507,7 @@ bool PatternEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 		int y = grabbing_mouse_pos_y;
 		int x = grabbing_mouse_pos_x;
 		Tick tick = MAX(0, (y - row_top_ofs + v_offset * row_height_cache)) *
-					TICKS_PER_BEAT / (row_height_cache * rows_per_beat);
+					TICKS_PER_BEAT / (row_height_cache * _get_rows_per_beat());
 
 		grabbing_automation->remove_point(current_pattern, grabbing_point_tick);
 		while (grabbing_automation->get_point(current_pattern, tick) !=
@@ -748,38 +528,1174 @@ bool PatternEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 	return false;
 }
 
+void PatternEditor::_validate_menus() {
+
+	//begin by validating cursor
+	_validate_cursor();
+
+	int current_track = get_current_track();
+
+	key_bindings->set_action_enabled(KeyBindings::TRACK_ADD_COLUMN, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_REMOVE_COLUMN, current_track >= 0 && song->get_track(current_track)->get_column_count() > 1);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_MOVE_LEFT, current_track > 0);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_MOVE_RIGHT, current_track >= 0 && current_track < song->get_track_count() - 1);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_MUTE, current_track >= 0);
+	key_bindings->set_action_checked(KeyBindings::TRACK_MUTE, current_track >= 0 && song->get_track(current_track)->is_muted());
+	key_bindings->set_action_enabled(KeyBindings::TRACK_SOLO, current_track >= 0);
+
+	key_bindings->set_action_enabled(KeyBindings::TRACK_RENAME, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_REMOVE, current_track >= 0);
+
+	int current_automation = current_track >= 0 ? song->get_event_column_automation(cursor.column) : -1;
+
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_TOGGLE_VISIBLE, current_automation >= 0);
+	key_bindings->set_action_checked(KeyBindings::AUTOMATION_TOGGLE_VISIBLE, current_automation >= 0 && song->get_track(current_track)->get_automation(current_automation)->is_visible());
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS, current_automation >= 0);
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_RADIO_ENVELOPE_SMALL, current_automation >= 0);
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_RADIO_ENVELOPE_LARGE, current_automation >= 0);
+	if (current_automation >= 0) {
+		switch (song->get_track(current_track)->get_automation(current_automation)->get_display_mode()) {
+			case Automation::DISPLAY_ROWS: {
+				key_bindings->set_action_state(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS, key_bindings->get_keybind_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS));
+			} break;
+			case Automation::DISPLAY_SMALL: {
+				key_bindings->set_action_state(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS, key_bindings->get_keybind_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_SMALL));
+			} break;
+			case Automation::DISPLAY_LARGE: {
+				key_bindings->set_action_state(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS, key_bindings->get_keybind_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_LARGE));
+			} break;
+		}
+	}
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_MOVE_LEFT, current_automation > 0);
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_MOVE_RIGHT, current_automation >= 0 && current_automation < song->get_track(current_track)->get_automation_count() - 1);
+	key_bindings->set_action_enabled(KeyBindings::AUTOMATION_REMOVE, current_automation >= 0);
+
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECT_BEGIN, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECT_END, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECT_COLUMN_TRACK_ALL, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_RAISE_NOTES_SEMITONE, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_RAISE_NOTES_OCTAVE, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_LOWER_NOTES_SEMITONE, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_LOWER_NOTES_OCTAVE, current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_SET_VOLUME, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_INTERPOLATE_VOLUME_AUTOMATION, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_AMPLIFY_VOLUME_AUTOMATION, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_CUT, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_COPY, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_PASTE_INSERT, clipboard.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_PASTE_OVERWRITE, clipboard.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_PASTE_MIX, clipboard.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_DISABLE, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_DOUBLE_LENGTH, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_HALVE_LENGTH, selection.active && current_track >= 0);
+	key_bindings->set_action_enabled(KeyBindings::PATTERN_SELECTION_SCALE_LENGTH, selection.active && current_track >= 0);
+
+	current_track_changed.emit(); //this should probably be optimized a bit
+}
+
+void PatternEditor::_notify_track_layout_changed() {
+	track_layout_changed.emit();
+}
+
+void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
+
+	if (p_bind == KeyBindings::TRACK_ADD_TRACK) {
+		//always available
+		Track *track = new Track;
+		String name = "New Track";
+		int idx = 1;
+		while (true) {
+			bool exists = false;
+			for (int i = 0; i < song->get_track_count(); i++) {
+				if (song->get_track(i)->get_name() == name) {
+					exists = true;
+					break;
+				}
+			}
+
+			if (exists) {
+				idx++;
+				name = "New Track " + String::num(idx);
+			} else {
+				break;
+			}
+		}
+
+		track->set_name(name);
+
+		undo_redo->begin_action("Add Track");
+		undo_redo->do_method(
+				song, &Song::add_track, track);
+		undo_redo->undo_method(
+				song, &Song::remove_track, song->get_track_count());
+		undo_redo->do_method(this, &PatternEditor::_redraw);
+		undo_redo->undo_method(this, &PatternEditor::_redraw);
+		undo_redo->do_method(this, &PatternEditor::_validate_menus);
+		undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+		undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+		undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+		undo_redo->do_data(track);
+		undo_redo->commit_action();
+	}
+
+	int current_track = get_current_track();
+	if (current_track >= 0) {
+		switch (p_bind) {
+
+			case KeyBindings::TRACK_ADD_COLUMN: {
+
+				undo_redo->begin_action("Add Column");
+				undo_redo->do_method(
+						song->get_track(current_track), &Track::set_columns,
+						song->get_track(current_track)->get_column_count() + 1);
+				undo_redo->undo_method(
+						song->get_track(current_track), &Track::set_columns,
+						song->get_track(current_track)->get_column_count());
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+
+				undo_redo->commit_action();
+			} break;
+			case KeyBindings::TRACK_REMOVE_COLUMN: {
+
+				ERR_FAIL_COND(song->get_track(current_track)->get_column_count() == 0);
+				undo_redo->begin_action("Remove Column");
+				undo_redo->do_method(
+						song->get_track(current_track), &Track::set_columns,
+						song->get_track(current_track)->get_column_count() - 1);
+				undo_redo->undo_method(
+						song->get_track(current_track), &Track::set_columns,
+						song->get_track(current_track)->get_column_count());
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->commit_action();
+
+			} break;
+			case KeyBindings::TRACK_SOLO: {
+
+				bool unsolo = true;
+
+				for (int i = 0; i < song->get_track_count(); i++) {
+
+					if (i == current_track) {
+						if (song->get_track(i)->is_muted()) {
+							unsolo = false;
+							break;
+						}
+					} else {
+						if (!song->get_track(i)->is_muted()) {
+							unsolo = false;
+							break;
+						}
+					}
+				}
+
+				undo_redo->begin_action("Solo");
+				for (int i = 0; i < song->get_track_count(); i++) {
+
+					if (unsolo) {
+						undo_redo->do_method(song->get_track(i), &Track::set_muted,
+								false);
+					} else {
+						undo_redo->do_method(song->get_track(i), &Track::set_muted,
+								i != current_track);
+					}
+					undo_redo->undo_method(song->get_track(i), &Track::set_muted,
+							song->get_track(i)->is_muted());
+				}
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->commit_action();
+
+			} break;
+			case KeyBindings::TRACK_MUTE: {
+
+				undo_redo->begin_action("Mute");
+				undo_redo->do_method(song->get_track(current_track), &Track::set_muted,
+						!song->get_track(current_track)->is_muted());
+				undo_redo->undo_method(song->get_track(current_track),
+						&Track::set_muted,
+						song->get_track(current_track)->is_muted());
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->commit_action();
+
+			} break;
+
+			case KeyBindings::TRACK_RENAME: {
+
+				/*undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);*/
+
+				Gtk::MessageDialog dialog("Enter Track Name:",
+						false /* use_markup */, Gtk::MESSAGE_QUESTION,
+						Gtk::BUTTONS_OK_CANCEL);
+				dialog.set_title("Rename Track");
+				dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+				Gtk::Entry entry;
+				entry.set_text(song->get_track(current_track)->get_name().utf8().get_data());
+				dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
+				entry.show();
+				//make sure pressing enter also causes rename
+				entry.signal_activate().connect(sigc::bind<int>(sigc::mem_fun(dialog, &Gtk::MessageDialog::response), int(Gtk::RESPONSE_OK)));
+
+				if (dialog.run() == Gtk::RESPONSE_OK) {
+					String name = entry.get_text().c_str();
+					if (name != song->get_track(current_track)->get_name()) {
+						undo_redo->begin_action("Track Rename");
+						undo_redo->do_method(song->get_track(current_track), &Track::set_name, name);
+						undo_redo->undo_method(song->get_track(current_track), &Track::set_name, song->get_track(current_track)->get_name());
+						undo_redo->do_method(this, &PatternEditor::_redraw);
+						undo_redo->undo_method(this, &PatternEditor::_redraw);
+						undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+						undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+						undo_redo->commit_action();
+					}
+				}
+
+			} break;
+			case KeyBindings::TRACK_MOVE_LEFT: {
+
+				ERR_FAIL_COND(current_track == 0);
+
+				cursor.column -= song->get_track(current_track - 1)->get_event_column_count();
+
+				undo_redo->begin_action("Track Move Left");
+				undo_redo->do_method(song, &Song::swap_tracks, current_track,
+						current_track - 1);
+				undo_redo->undo_method(song, &Song::swap_tracks, current_track,
+						current_track - 1);
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->commit_action();
+
+			} break;
+			case KeyBindings::TRACK_MOVE_RIGHT: {
+
+				ERR_FAIL_COND(current_track == song->get_track_count() - 1);
+
+				cursor.column += song->get_track(current_track + 1)->get_event_column_count();
+
+				undo_redo->begin_action("Track Move Right");
+				undo_redo->do_method(song, &Song::swap_tracks, current_track,
+						current_track + 1);
+				undo_redo->undo_method(song, &Song::swap_tracks, current_track,
+						current_track + 1);
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->commit_action();
+
+			} break;
+			case KeyBindings::TRACK_REMOVE: {
+
+				undo_redo->begin_action("Remove");
+				undo_redo->do_method(song, &Song::remove_track, current_track);
+				undo_redo->undo_method(song, &Song::add_track_at_pos,
+						song->get_track(current_track),
+						current_track);
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_data(song->get_track(current_track));
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->commit_action();
+
+			} break;
+
+			case KeyBindings::PATTERN_SELECT_BEGIN: {
+				if (!selection.active) {
+					selection.begin_column = cursor.column;
+					selection.begin_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.end_column = cursor.column;
+					selection.end_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.active = true;
+					_validate_menus();
+				} else {
+					selection.begin_column = cursor.column;
+					selection.begin_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+					_validate_selection();
+				}
+
+				queue_draw();
+			} break;
+
+			case KeyBindings::PATTERN_SELECT_END: {
+				if (!selection.active) {
+					selection.begin_column = cursor.column;
+					selection.begin_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.end_column = cursor.column;
+					selection.end_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.active = true;
+					_validate_menus();
+				} else {
+					selection.end_column = cursor.column;
+					selection.end_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+					_validate_selection();
+				}
+
+				queue_draw();
+
+			} break;
+			case KeyBindings::PATTERN_SELECT_COLUMN_TRACK_ALL: {
+
+				Tick pattern_ticks = song->pattern_get_beats(current_pattern) * TICKS_PER_BEAT;
+				pattern_ticks -= TICKS_PER_BEAT / _get_rows_per_beat();
+
+				int pattern_columns = song->get_event_column_count();
+
+				Track *track;
+				int automation;
+				int column;
+				get_cursor_column_data(&track, automation, column);
+				ERR_FAIL_COND(!track);
+
+				int track_begin_column;
+
+				if (column >= 0) {
+					track_begin_column = cursor.column - column;
+
+				} else {
+					track_begin_column = cursor.column - automation - track->get_column_count();
+				}
+
+				int track_event_columns = track->get_event_column_count();
+				int track_end_column = track_begin_column + track_event_columns - 1;
+
+				//printf("track begin: %i, track end %i\n", track_begin_column, track_end_column);
+
+				if (selection.active && selection.begin_column == track_begin_column && selection.end_column == track_end_column && selection.begin_tick == 0 && selection.end_tick == pattern_ticks) {
+					//in track (or single column), switch to all (if there is anything to switch to)
+					if (selection.begin_column != 0 || selection.end_column != pattern_columns - 1) {
+						selection.begin_column = 0;
+						selection.end_column = pattern_columns - 1;
+						queue_draw();
+						break;
+					}
+				}
+
+				if (selection.active && selection.begin_column == cursor.column && selection.end_column == cursor.column && selection.begin_tick == 0 && selection.end_tick == pattern_ticks) {
+					//in column, switch to track, unless track is a single column
+					selection.begin_column = track_begin_column;
+					selection.end_column = track_end_column;
+					queue_draw();
+					break;
+				}
+
+				//select column
+
+				selection.begin_column = cursor.column;
+				selection.end_column = cursor.column;
+				selection.begin_tick = 0;
+				selection.end_tick = pattern_ticks;
+				selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+				selection.active = true;
+				_validate_menus();
+				queue_draw();
+
+			} break;
+			case KeyBindings::PATTERN_SELECTION_DISABLE: {
+
+				selection.active = false;
+				_validate_menus();
+				queue_draw();
+
+			} break;
+				/* selection AREA actions */
+
+			case KeyBindings::PATTERN_SELECTION_RAISE_NOTES_SEMITONE:
+			case KeyBindings::PATTERN_SELECTION_RAISE_NOTES_OCTAVE:
+			case KeyBindings::PATTERN_SELECTION_LOWER_NOTES_SEMITONE:
+			case KeyBindings::PATTERN_SELECTION_LOWER_NOTES_OCTAVE: {
+
+				int amount = 0;
+				String action;
+				switch (p_bind) {
+					case KeyBindings::PATTERN_SELECTION_RAISE_NOTES_SEMITONE:
+						amount = 1;
+						action = "Raise Semitone";
+						break;
+					case KeyBindings::PATTERN_SELECTION_RAISE_NOTES_OCTAVE:
+						amount = 12;
+						action = "Raise Octave";
+						break;
+					case KeyBindings::PATTERN_SELECTION_LOWER_NOTES_SEMITONE:
+						amount = -1;
+						action = "Lower Semitone";
+						break;
+					case KeyBindings::PATTERN_SELECTION_LOWER_NOTES_OCTAVE:
+						amount = -12;
+						action = "Raise Octave";
+						break;
+				}
+
+				int column_from;
+				int column_to;
+				Tick tick_from;
+				Tick tick_to;
+
+				if (selection.active) {
+					column_from = selection.begin_column;
+					tick_from = selection.begin_tick;
+					column_to = selection.end_column;
+					tick_to = selection.end_tick + selection.row_tick_size - 1;
+				} else {
+					column_from = cursor.column;
+					column_to = cursor.column;
+					tick_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					tick_to = tick_from + selection.row_tick_size - 1;
+				}
+
+				List<Track::PosEvent> events;
+				song->get_events_in_range(current_pattern, Track::Pos(tick_from, column_from), Track::Pos(tick_to, column_to), &events);
+
+				if (events.empty()) {
+					break;
+				}
+
+				undo_redo->begin_action(action, true);
+
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+					Track::Event ev = E->get().event;
+					if (ev.type == Track::Event::TYPE_NOTE && ev.a < Track::Note::MAX_NOTE) {
+						undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						ev.a = CLAMP(int(ev.a + amount), 0, Track::Note::MAX_NOTE);
+						undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+					}
+				}
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->commit_action();
+			} break;
+
+			case KeyBindings::PATTERN_SELECTION_SET_VOLUME: {
+				int column_from;
+				int column_to;
+				Tick tick_from;
+				Tick tick_to;
+
+				if (selection.active) {
+					column_from = selection.begin_column;
+					tick_from = selection.begin_tick;
+					column_to = selection.end_column;
+					tick_to = selection.end_tick + selection.row_tick_size - 1;
+				} else {
+					column_from = cursor.column;
+					column_to = cursor.column;
+					tick_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					tick_to = tick_from + selection.row_tick_size - 1;
+				}
+
+				List<Track::PosEvent> events;
+				song->get_events_in_range(current_pattern, Track::Pos(tick_from, column_from), Track::Pos(tick_to, column_to), &events);
+
+				if (events.empty()) {
+					break;
+				}
+
+				undo_redo->begin_action("Set Volume Mask", true);
+
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+					Track::Event ev = E->get().event;
+					if (ev.type == Track::Event::TYPE_NOTE && ev.a < Track::Note::MAX_NOTE) {
+						undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						ev.b = volume_mask;
+						undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+					}
+				}
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->commit_action();
+
+			} break;
+			case KeyBindings::PATTERN_SELECTION_INTERPOLATE_VOLUME_AUTOMATION: {
+
+				if (!selection.active) {
+					break;
+				}
+
+				bool valid = false;
+				for (int i = selection.begin_column; i <= selection.begin_column; i++) {
+					Track::Event ev_first = song->get_event(current_pattern, i, selection.begin_tick);
+					Track::Event ev_last = song->get_event(current_pattern, i, selection.end_tick);
+					if (ev_first.type == Track::Event::TYPE_NOTE && ev_first.a != Track::Note::EMPTY && ev_last.a != Track::Note::EMPTY) {
+						valid = true;
+						break;
+					}
+					if (ev_first.type == Track::Event::TYPE_AUTOMATION && ev_first.a != Automation::EMPTY && ev_last.a != Automation::EMPTY) {
+						valid = true;
+						break;
+					}
+				}
+
+				if (!valid) {
+					break;
+				}
+
+				undo_redo->begin_action("Interpolate", true);
+
+				Tick tick_from = selection.begin_tick;
+				Tick tick_to = selection.end_tick;
+
+				for (int i = selection.begin_column; i <= selection.begin_column; i++) {
+					Track::Event ev_first = song->get_event(current_pattern, i, selection.begin_tick);
+					Track::Event ev_last = song->get_event(current_pattern, i, selection.end_tick);
+					if (ev_first.type == Track::Event::TYPE_NOTE && ev_first.a != Track::Note::EMPTY && ev_last.a != Track::Note::EMPTY) {
+						//interpolate notes
+						List<Track::PosEvent> events;
+						song->get_events_in_range(current_pattern, Track::Pos(tick_from, i), Track::Pos(tick_to, i), &events);
+						int volume_from = ev_first.b == Track::Note::EMPTY ? 99 : ev_first.b;
+						int volume_to = ev_last.b == Track::Note::EMPTY ? 99 : ev_last.b;
+
+						for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+
+							Track::Event ev = E->get().event;
+
+							undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+
+							float c = float(E->get().pos.tick - tick_from) / float(tick_to - tick_from);
+							int volume = CLAMP(int(volume_from * (1.0 - c) + volume_to * c), 0, 99);
+							ev.b = volume;
+
+							undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						}
+					}
+
+					if (ev_first.type == Track::Event::TYPE_AUTOMATION && ev_first.a != Automation::EMPTY && ev_last.a != Automation::EMPTY) {
+
+						//interpolate automations
+						int value_from = ev_first.a == Automation::EMPTY ? 99 : ev_first.a;
+						int value_to = ev_last.a == Automation::EMPTY ? 99 : ev_last.a;
+
+						Tick tick_increment = TICKS_PER_BEAT / _get_rows_per_beat();
+						Tick tick_pos = tick_from;
+						while (tick_pos < tick_to) {
+							Track::Event ev = song->get_event(current_pattern, i, tick_pos);
+							undo_redo->undo_method(song, &Song::set_event, current_pattern, i, tick_pos, ev);
+
+							float c = float(tick_pos - tick_from) / float(tick_to - tick_from);
+							int value = CLAMP(int(value_from * (1.0 - c) + value_to * c), 0, 99);
+							ev.a = value;
+
+							undo_redo->do_method(song, &Song::set_event, current_pattern, i, tick_pos, ev);
+
+							tick_pos += tick_increment;
+						}
+					}
+				}
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->commit_action();
+			} break;
+			case KeyBindings::PATTERN_SELECTION_AMPLIFY_VOLUME_AUTOMATION: {
+
+				Gtk::MessageDialog dialog("Amplify(%):",
+						false /* use_markup */, Gtk::MESSAGE_QUESTION,
+						Gtk::BUTTONS_OK_CANCEL);
+				dialog.set_title("Amplify Volume / Automation");
+				dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+				Gtk::Entry entry;
+				entry.set_text(String::num(last_amplify_value).ascii().get_data());
+				dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
+				entry.show();
+				//make sure pressing enter also causes enter
+				entry.signal_activate().connect(sigc::bind<int>(sigc::mem_fun(dialog, &Gtk::MessageDialog::response), int(Gtk::RESPONSE_OK)));
+
+				if (dialog.run() == Gtk::RESPONSE_OK) {
+					int amount = String(entry.get_text().c_str()).to_int();
+					last_amplify_value = amount;
+					float ratio = float(amount) / 100;
+
+					int column_from;
+					int column_to;
+					Tick tick_from;
+					Tick tick_to;
+
+					if (selection.active) {
+						column_from = selection.begin_column;
+						tick_from = selection.begin_tick;
+						column_to = selection.end_column;
+						tick_to = selection.end_tick + selection.row_tick_size - 1;
+					} else {
+						column_from = cursor.column;
+						column_to = cursor.column;
+						tick_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+						tick_to = tick_from + selection.row_tick_size - 1;
+					}
+
+					List<Track::PosEvent> events;
+					song->get_events_in_range(current_pattern, Track::Pos(tick_from, column_from), Track::Pos(tick_to, column_to), &events);
+
+					if (events.empty()) {
+						break;
+					}
+
+					undo_redo->begin_action("Amplify", true);
+
+					for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+						Track::Event ev = E->get().event;
+						undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+
+						if (ev.type == Track::Event::TYPE_NOTE) {
+							if (ev.b == Track::Note::EMPTY) {
+								ev.b = Track::Note::MAX_VOLUME;
+							}
+							ev.b = int(CLAMP(float(ev.b) * ratio, 0, Track::Note::MAX_VOLUME));
+							undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						} else if (ev.type == Track::Event::TYPE_AUTOMATION) {
+							ev.a = int(CLAMP(float(ev.a) * ratio, 0, Automation::VALUE_MAX));
+							undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						}
+					}
+
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->commit_action();
+				}
+			} break;
+			case KeyBindings::PATTERN_SELECTION_DOUBLE_LENGTH:
+			case KeyBindings::PATTERN_SELECTION_HALVE_LENGTH:
+			case KeyBindings::PATTERN_SELECTION_SCALE_LENGTH: {
+
+				if (!selection.active) {
+					break;
+				}
+				float scale = 1.0;
+				String action;
+				switch (p_bind) {
+					case KeyBindings::PATTERN_SELECTION_DOUBLE_LENGTH:
+						scale = 2.0;
+						action = "Double Length";
+						break;
+					case KeyBindings::PATTERN_SELECTION_HALVE_LENGTH:
+						scale = 0.5;
+						action = "Halve Length";
+						break;
+					case KeyBindings::PATTERN_SELECTION_SCALE_LENGTH: {
+						action = "Scale Length";
+						Gtk::MessageDialog dialog("Scale Ratio:",
+								false /* use_markup */, Gtk::MESSAGE_QUESTION,
+								Gtk::BUTTONS_OK_CANCEL);
+						dialog.set_title("Scale Selection Length");
+						dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+						Gtk::Entry entry;
+						entry.set_text(String::num(last_scale_value).ascii().get_data());
+						dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
+						entry.show();
+						//make sure pressing enter also causes enter
+						entry.signal_activate().connect(sigc::bind<int>(sigc::mem_fun(dialog, &Gtk::MessageDialog::response), int(Gtk::RESPONSE_OK)));
+
+						if (dialog.run() == Gtk::RESPONSE_OK) {
+
+							scale = String(entry.get_text().c_str()).to_double();
+							last_scale_value = scale;
+						} else {
+							return;
+						}
+					} break;
+				}
+
+				int column_from;
+				int column_to;
+				Tick tick_from;
+				Tick tick_to;
+
+				if (selection.active) {
+					column_from = selection.begin_column;
+					tick_from = selection.begin_tick;
+					column_to = selection.end_column;
+					tick_to = selection.end_tick + selection.row_tick_size - 1;
+				} else {
+					column_from = cursor.column;
+					column_to = cursor.column;
+					tick_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					tick_to = tick_from + selection.row_tick_size - 1;
+				}
+
+				List<Track::PosEvent> events;
+				song->get_events_in_range(current_pattern, Track::Pos(tick_from, column_from), Track::Pos(tick_to, column_to), &events);
+
+				if (events.empty()) {
+					break;
+				}
+
+				undo_redo->begin_action(action, true);
+
+				//erase stuff first
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+					Track::Event ev = E->get().event;
+
+					if (ev.type == Track::Event::TYPE_NOTE) {
+						ev.a = Track::Note::EMPTY;
+						ev.b = Track::Note::EMPTY;
+					} else if (ev.type == Track::Event::TYPE_AUTOMATION) {
+						ev.a = Automation::EMPTY;
+					}
+					undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+				}
+
+				//replace
+				Tick max_len = song->pattern_get_beats(current_pattern) * TICKS_PER_BEAT;
+
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+
+					Tick new_pos = E->get().pos.tick * scale;
+					if (new_pos >= max_len) {
+						continue;
+					}
+					Track::Event ev = song->get_event(current_pattern, E->get().pos.column, new_pos);
+					undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, new_pos, ev);
+					undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, new_pos, E->get().event);
+				}
+
+				//readd undone stuff
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+					Track::Event ev = E->get().event;
+					undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+				}
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->commit_action();
+
+			} break;
+			/* CLIPBOARD */
+			case KeyBindings::PATTERN_SELECTION_CUT:
+			case KeyBindings::PATTERN_SELECTION_COPY: {
+
+				int column_from = selection.begin_column;
+				int column_to = selection.end_column;
+				Tick tick_from = selection.begin_tick;
+
+				Tick tick_to = selection.end_tick + selection.row_tick_size - 1;
+
+				List<Track::PosEvent> events;
+				song->get_events_in_range(current_pattern, Track::Pos(tick_from, column_from), Track::Pos(tick_to, column_to), &events);
+
+				printf("events to copy: %i\n", events.size());
+				if (events.empty()) {
+					clipboard.active = false;
+					_validate_menus();
+					break;
+				}
+
+				clipboard.active = true;
+				clipboard.columns = column_to - column_from + 1;
+				clipboard.ticks = tick_to - tick_from + 1; //else paste insert wont work
+				clipboard.events.clear();
+
+				for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+					Track::PosEvent pe = E->get();
+					pe.pos.tick -= tick_from;
+					pe.pos.column -= column_from;
+					clipboard.events.push_back(pe);
+				}
+
+				if (p_bind == KeyBindings::PATTERN_SELECTION_CUT) {
+					//also cut
+
+					undo_redo->begin_action("Selection Zap (cut)");
+
+					for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+						Track::Event ev = E->get().event;
+						undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						if (ev.type == Track::Event::TYPE_NOTE) {
+							ev.a = Track::Note::EMPTY;
+							ev.b = Track::Note::EMPTY;
+						} else {
+							ev.a = Automation::EMPTY;
+							ev.b = Automation::EMPTY;
+						}
+						undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+					}
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->commit_action();
+				}
+
+				_validate_menus();
+
+			} break;
+			case KeyBindings::PATTERN_SELECTION_PASTE_INSERT:
+			case KeyBindings::PATTERN_SELECTION_PASTE_OVERWRITE:
+			case KeyBindings::PATTERN_SELECTION_PASTE_MIX: {
+				if (!clipboard.active) {
+					break;
+				}
+
+				String action;
+				switch (p_bind) {
+					case KeyBindings::PATTERN_SELECTION_PASTE_INSERT: action = "Paste Insert"; break;
+					case KeyBindings::PATTERN_SELECTION_PASTE_OVERWRITE: action = "Paste Overwrite"; break;
+					case KeyBindings::PATTERN_SELECTION_PASTE_MIX: action = "Paste Mix"; break;
+				}
+				undo_redo->begin_action(action);
+
+				int last_column = song->get_event_column_count() - 1;
+
+				//clear space to paste (pre)
+				if (p_bind == KeyBindings::PATTERN_SELECTION_PASTE_INSERT || p_bind == KeyBindings::PATTERN_SELECTION_PASTE_OVERWRITE) {
+
+					Tick clear_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					Tick clear_to = clear_from + clipboard.ticks;
+
+					int clear_from_colum = cursor.column;
+					int clear_to_column = cursor.column + clipboard.columns;
+					clear_to_column = MIN(clear_to_column, last_column);
+
+					for (int i = clear_from_colum; i <= clear_to_column; i++) {
+
+						List<Track::PosEvent> events;
+						song->get_events_in_range(current_pattern, Track::Pos(clear_from, i), Track::Pos(clear_to, i), &events);
+						for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+
+							Track::Event ev;
+							if (E->get().event.type == Track::Event::TYPE_NOTE) {
+								ev.a = Track::Note::EMPTY;
+								ev.a = Track::Note::EMPTY;
+							} else {
+
+								ev.a = Automation::EMPTY;
+								ev.a = Automation::EMPTY;
+							}
+							undo_redo->do_method(song, &Song::set_event, current_pattern, i, E->get().pos.tick, ev);
+						}
+					}
+				}
+
+				//paste
+				{
+
+					Tick paste_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+
+					for (List<Track::PosEvent>::Element *E = clipboard.events.front(); E; E = E->next()) {
+
+						int column = cursor.column + E->get().pos.column;
+
+						if (column > last_column) {
+							continue;
+						}
+						if (song->get_event_column_type(E->get().pos.column) != E->get().event.type) {
+							//different type, do nothing (Can't paste)
+							continue;
+						}
+
+						Tick tick = paste_from + E->get().pos.tick;
+
+						undo_redo->do_method(song, &Song::set_event, current_pattern, column, tick, E->get().event);
+						undo_redo->undo_method(song, &Song::set_event, current_pattern, column, tick, song->get_event(current_pattern, column, tick));
+					}
+				}
+
+				//move everything down on insert
+				if (p_bind == KeyBindings::PATTERN_SELECTION_PASTE_INSERT) {
+					Tick move_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					Tick move_to = song->pattern_get_beats(current_pattern) * TICKS_PER_BEAT;
+
+					int move_from_colum = cursor.column;
+					int move_to_column = cursor.column + clipboard.columns;
+					move_to_column = MIN(move_to_column, last_column);
+
+					for (int i = move_from_colum; i <= move_to_column; i++) {
+
+						if (move_from + clipboard.ticks >= move_to) {
+							continue; //nothing to do
+						}
+
+						//erase
+
+						List<Track::PosEvent> erase_events;
+						song->get_events_in_range(current_pattern, Track::Pos(move_from + clipboard.ticks, i), Track::Pos(move_to, i), &erase_events);
+						for (List<Track::PosEvent>::Element *E = erase_events.front(); E; E = E->next()) {
+							Track::Event ev;
+							if (E->get().event.type == Track::Event::TYPE_NOTE) {
+								ev.a = Track::Note::EMPTY;
+								ev.a = Track::Note::EMPTY;
+							} else {
+
+								ev.a = Automation::EMPTY;
+								ev.a = Automation::EMPTY;
+							}
+							undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, ev);
+						}
+						//move
+						List<Track::PosEvent> move_events;
+						song->get_events_in_range(current_pattern, Track::Pos(move_from, i), Track::Pos(move_to - clipboard.ticks, i), &move_events);
+						for (List<Track::PosEvent>::Element *E = move_events.front(); E; E = E->next()) {
+							undo_redo->do_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick + clipboard.ticks, E->get().event);
+							Track::Event ev;
+							if (E->get().event.type == Track::Event::TYPE_NOTE) {
+								ev.a = Track::Note::EMPTY;
+								ev.a = Track::Note::EMPTY;
+							} else {
+
+								ev.a = Automation::EMPTY;
+								ev.a = Automation::EMPTY;
+							}
+							undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick + clipboard.ticks, ev);
+						}
+						//restore
+
+						for (List<Track::PosEvent>::Element *E = erase_events.front(); E; E = E->next()) {
+							undo_redo->undo_method(song, &Song::set_event, current_pattern, E->get().pos.column, E->get().pos.tick, E->get().event);
+						}
+					}
+				}
+
+				//clear space to paste (post)
+				if (p_bind == KeyBindings::PATTERN_SELECTION_PASTE_INSERT || p_bind == KeyBindings::PATTERN_SELECTION_PASTE_OVERWRITE) {
+
+					Tick clear_from = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+					Tick clear_to = clear_from + clipboard.ticks;
+
+					int clear_from_colum = cursor.column;
+					int clear_to_column = cursor.column + clipboard.columns;
+					clear_to_column = MIN(clear_to_column, last_column);
+
+					for (int i = clear_from_colum; i <= clear_to_column; i++) {
+
+						List<Track::PosEvent> events;
+						song->get_events_in_range(current_pattern, Track::Pos(clear_from, i), Track::Pos(clear_to, i), &events);
+						for (List<Track::PosEvent>::Element *E = events.front(); E; E = E->next()) {
+							undo_redo->undo_method(song, &Song::set_event, current_pattern, i, E->get().pos.tick, E->get().event);
+						}
+					}
+				}
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->commit_action();
+
+			} break;
+		}
+
+		int current_automation = song->get_event_column_automation(cursor.column);
+
+		if (current_automation >= 0) {
+
+			switch (p_bind) {
+
+				case KeyBindings::AUTOMATION_TOGGLE_VISIBLE: {
+
+					Automation *a = song->get_track(current_track)
+											->get_automation(current_automation);
+					undo_redo->begin_action("Toggle Automation Visibility");
+					undo_redo->do_method(a, &Automation::set_visible, !a->is_visible());
+					undo_redo->undo_method(a, &Automation::set_visible, a->is_visible());
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS: {
+
+					Automation *a = song->get_track(current_track)
+											->get_automation(current_automation);
+					undo_redo->begin_action("Automation Display Numbers");
+					undo_redo->do_method(a, &Automation::set_display_mode,
+							Automation::DISPLAY_ROWS);
+					undo_redo->undo_method(a, &Automation::set_display_mode,
+							a->get_display_mode());
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_RADIO_ENVELOPE_SMALL: {
+
+					Automation *a = song->get_track(current_track)
+											->get_automation(current_automation);
+					undo_redo->begin_action("Automation Display Small");
+					undo_redo->do_method(a, &Automation::set_display_mode,
+							Automation::DISPLAY_SMALL);
+					undo_redo->undo_method(a, &Automation::set_display_mode,
+							a->get_display_mode());
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_RADIO_ENVELOPE_LARGE: {
+
+					Automation *a = song->get_track(current_track)
+											->get_automation(current_automation);
+					undo_redo->begin_action("Automation Display Large");
+					undo_redo->do_method(a, &Automation::set_display_mode,
+							Automation::DISPLAY_LARGE);
+					undo_redo->undo_method(a, &Automation::set_display_mode,
+							a->get_display_mode());
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_MOVE_LEFT: {
+
+					ERR_FAIL_COND(current_automation == 0);
+
+					cursor.column -= 1;
+
+					undo_redo->begin_action("Automation Move Left");
+					undo_redo->do_method(song->get_track(current_track),
+							&Track::swap_automations, current_automation,
+							current_automation - 1);
+					undo_redo->undo_method(song->get_track(current_track),
+							&Track::swap_automations, current_automation,
+							current_automation - 1);
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_MOVE_RIGHT: {
+
+					ERR_FAIL_COND(current_automation == song->get_track(current_track)->get_automation_count() - 1);
+
+					cursor.column += 1;
+
+					undo_redo->begin_action("Automation Move Right");
+					undo_redo->do_method(song->get_track(current_track),
+							&Track::swap_automations, current_automation,
+							current_automation + 1);
+					undo_redo->undo_method(song->get_track(current_track),
+							&Track::swap_automations, current_automation,
+							current_automation + 1);
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+
+				} break;
+				case KeyBindings::AUTOMATION_REMOVE: {
+
+					Automation *a = song->get_track(current_track)
+											->get_automation(current_automation);
+					undo_redo->begin_action("Remove Automation");
+					undo_redo->do_method(song->get_track(current_track),
+							&Track::remove_automation, current_automation);
+					undo_redo->undo_method(song->get_track(current_track),
+							&Track::add_automation, a, current_automation);
+					undo_redo->do_method(this, &PatternEditor::_redraw);
+					undo_redo->undo_method(this, &PatternEditor::_redraw);
+					undo_redo->do_method(this, &PatternEditor::_validate_menus);
+					undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+					undo_redo->commit_action();
+				} break;
+			}
+		}
+	}
+}
+
+void PatternEditor::_update_shift_selection() {
+
+	bool prev_active = selection.active;
+	selection.active = true;
+	selection.begin_column = selection.shift_from_column;
+	selection.begin_tick = selection.shift_from_row * TICKS_PER_BEAT / _get_rows_per_beat();
+	selection.end_column = cursor.column;
+	selection.end_tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
+	selection.row_tick_size = TICKS_PER_BEAT / _get_rows_per_beat();
+	selection.shift_active = true;
+
+	_validate_selection();
+	if (prev_active != selection.active) {
+		_validate_menus();
+	}
+}
+
 bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
-	printf("state: %x\n",
-			(key_event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK |
-										GDK_MOD1_MASK | GDK_SUPER_MASK | GDK_META_MASK)));
-	;
-	if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_MOVE_UP)) {
+	bool shift_pressed = key_event->state & GDK_SHIFT_MASK;
+	if (!shift_pressed) {
+		//shift selection will always begin from a previous state
+
+		selection.shift_active = false;
+	}
+
+	if (song->get_track_count() == 0) {
+		return false;
+	}
+
+	if (!selection.shift_active) {
+
+		selection.shift_from_column = cursor.column;
+		selection.shift_from_row = cursor.row;
+	}
+
+	if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_UP)) {
 		cursor.row -= cursor.skip;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_MOVE_DOWN)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_DOWN)) {
 		cursor.row += cursor.skip;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_MOVE_UP_1_ROW)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_UP_1_ROW)) {
 		cursor.row -= 1;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_MOVE_DOWN_1_ROW)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_DOWN_1_ROW)) {
 		cursor.row += 1;
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_PAGE_UP)) {
-		cursor.row -=
-				song->pattern_get_beats_per_bar(current_pattern) * rows_per_beat;
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_PAGE_UP)) {
+		cursor.row -= song->pattern_get_beats_per_bar(current_pattern) * _get_rows_per_beat();
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_PAGE_DOWN)) {
-		cursor.row +=
-				song->pattern_get_beats_per_bar(current_pattern) * rows_per_beat;
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_PAGE_DOWN)) {
+		cursor.row += song->pattern_get_beats_per_bar(current_pattern) * _get_rows_per_beat();
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_MOVE_LEFT)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_LEFT)) {
 
 		if (cursor.field == 0) {
 			if (cursor.column > 0) {
@@ -801,13 +1717,17 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 				} else {
 					cursor.field = 3;
 				}
+				_validate_menus();
 			}
 		} else {
 			cursor.field--;
 		}
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::CURSOR_MOVE_RIGHT)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_MOVE_RIGHT)) {
 
 		Track *track;
 		int automation;
@@ -832,39 +1752,103 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			if (cursor.column < song->get_event_column_count() - 1) {
 				cursor.column++;
 				cursor.field = 0;
+				_validate_menus();
 			}
 		} else {
 			cursor.field++;
 		}
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TAB)) {
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_TAB)) {
 
 		if (cursor.column < song->get_event_column_count() - 1) {
 			cursor.column++;
 			cursor.field = 0;
 		}
 		_validate_cursor();
+		_validate_menus();
 
 	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_BACKTAB)) {
 
 		if (cursor.field > 0)
 			cursor.field = 0;
-		else if (cursor.column > 0)
+		else if (cursor.column > 0) {
 			cursor.column--;
+		}
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_HOME)) {
+		_validate_menus();
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_HOME)) {
 
-		cursor.column = 0;
-		cursor.field = 0;
+		if (cursor.field != 0) {
+			cursor.field = 0;
+		} else {
+
+			Track *track;
+			int automation;
+			int column;
+			get_cursor_column_data(&track, automation, column);
+			ERR_FAIL_COND_V(!track, false);
+
+			if (column != 0) {
+				if (column >= 0) {
+					cursor.column -= column;
+				} else {
+					cursor.column -= automation + track->get_column_count();
+				}
+			} else {
+
+				if (cursor.column == 0) {
+					cursor.row = 0;
+				} else {
+					cursor.column = 0;
+				}
+			}
+		}
 		_validate_cursor();
+		_validate_menus();
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
 
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_END)) {
+	} else if (key_bindings->is_keybind_noshift(key_event, KeyBindings::CURSOR_END)) {
 
-		cursor.column = song->get_event_column_count() - 1;
-		cursor.field = 0;
+		Track *track;
+		int automation;
+		int column;
+		get_cursor_column_data(&track, automation, column);
+		ERR_FAIL_COND_V(!track, false);
+
+		int pattern_w = song->get_event_column_count();
+
+		int event_ofs;
+		if (column >= 0) {
+			event_ofs = column;
+		} else {
+			event_ofs = automation + track->get_column_count();
+		}
+		int event_total = track->get_event_column_count();
+
+		if (event_ofs < event_total - 1) {
+			cursor.column += event_total - event_ofs - 1;
+			cursor.field = 0;
+		} else if (cursor.column < pattern_w - 1) {
+			cursor.column = pattern_w - 1;
+			cursor.field = 0;
+		} else {
+			cursor.row = song->pattern_get_beats(current_pattern) * _get_rows_per_beat() - 1;
+			cursor.field = 0;
+		}
+
 		_validate_cursor();
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::PATTERN_PAN_WINDOW_UP)) {
+		_validate_menus();
+		if (shift_pressed) {
+			_update_shift_selection();
+		}
+
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PAN_WINDOW_UP)) {
 
 		if (v_offset > 0) {
 			if (v_offset + visible_rows - 1 == cursor.row)
@@ -872,8 +1856,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			v_offset--;
 			queue_draw();
 		}
-	} else if (key_bindings->is_keybind(key_event,
-					   KeyBindings::PATTERN_PAN_WINDOW_DOWN)) {
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PAN_WINDOW_DOWN)) {
 
 		if (v_offset + visible_rows < get_total_rows()) {
 			if (cursor.row <= v_offset) {
@@ -887,7 +1870,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		List<Track::PosEvent> events;
 
 		Track::Pos from;
-		from.tick = cursor.row * TICKS_PER_BEAT / rows_per_beat;
+		from.tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
 		from.column = cursor.column;
 
 		Track::Pos to;
@@ -917,12 +1900,12 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 				Track::Event ev = E->get().event;
 				undo_redo->do_method(
 						song, &Song::set_event, current_pattern, cursor.column,
-						E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
+						E->get().pos.tick + TICKS_PER_BEAT / _get_rows_per_beat(), ev);
 				ev.a = 0xFF;
 				ev.b = 0xFF;
 				undo_redo->undo_method(
 						song, &Song::set_event, current_pattern, cursor.column,
-						E->get().pos.tick + TICKS_PER_BEAT / rows_per_beat, ev);
+						E->get().pos.tick + TICKS_PER_BEAT / _get_rows_per_beat(), ev);
 			}
 
 			for (List<Track::PosEvent>::Element *E = events.front(); E;
@@ -942,7 +1925,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		List<Track::PosEvent> events;
 
 		Track::Pos from;
-		from.tick = cursor.row * TICKS_PER_BEAT / rows_per_beat;
+		from.tick = cursor.row * TICKS_PER_BEAT / _get_rows_per_beat();
 		from.column = cursor.column;
 
 		Track::Pos to;
@@ -971,7 +1954,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			for (List<Track::PosEvent>::Element *E = events.front(); E;
 					E = E->next()) {
 
-				Tick new_ofs = E->get().pos.tick - TICKS_PER_BEAT / rows_per_beat;
+				Tick new_ofs = E->get().pos.tick - TICKS_PER_BEAT / _get_rows_per_beat();
 
 				if (new_ofs < limit)
 					continue;
@@ -998,7 +1981,79 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			undo_redo->commit_action();
 		}
 
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TOGGLE_VOLUME_MASK)) {
+
+		Track *track;
+		int automation;
+		int column;
+		get_cursor_column_data(&track, automation, column);
+		ERR_FAIL_COND_V(!track, false);
+
+		if (column >= 0) {
+			volume_mask_active = !volume_mask_active;
+			volume_mask_changed.emit();
+		}
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_COPY_VOLUME_MASK)) {
+
+		Track *track;
+		int automation;
+		int column;
+		get_cursor_column_data(&track, automation, column);
+		ERR_FAIL_COND_V(!track, false);
+
+		if (column >= 0) {
+
+			Track::Event ev =
+					song->get_event(current_pattern, cursor.column,
+							cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
+
+			if (ev.b != Track::Note::EMPTY) {
+				volume_mask = ev.b;
+				volume_mask_changed.emit();
+			}
+		}
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_LOWER)) {
+		if (current_octave > 0) {
+			current_octave--;
+			octave_changed.emit();
+		}
+
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_RAISE)) {
+		if (current_octave < 8) {
+			current_octave++;
+			octave_changed.emit();
+		}
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PREV_PATTERN)) {
+		if (current_pattern > 0) {
+			current_pattern--;
+			pattern_changed.emit();
+			queue_draw();
+		}
+
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_NEXT_PATTERN)) {
+		if (current_pattern < Song::MAX_PATTERN - 1) {
+			current_pattern++;
+			pattern_changed.emit();
+			queue_draw();
+		}
+
 	} else {
+
+		//set step or zoom
+
+		for (int i = 0; i < 10; i++) {
+			if (key_bindings->is_keybind(key_event, KeyBindings::KeyBind(KeyBindings::CURSOR_ADVANCE_1 + i))) {
+				cursor_advance = i + 1;
+				step_changed.emit();
+				return true;
+			}
+			if (key_bindings->is_keybind(key_event, KeyBindings::KeyBind(KeyBindings::CURSOR_ZOOM_1 + i))) {
+				beat_zoom = BeatZoom(i);
+				zoom_changed.emit();
+				queue_draw();
+				return true;
+			}
+		}
 
 		// check field
 
@@ -1018,16 +2073,24 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 						Track::Event ev =
 								song->get_event(current_pattern, cursor.column,
-										cursor.row * TICKS_PER_BEAT / rows_per_beat);
+										cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
+
+						if (volume_mask_active) {
+							ev.b = volume_mask;
+						}
+
 						Track::Event old_ev = ev;
 						ev.a = current_octave * 12 + note;
+						if (ev.a >= 120) {
+							ev.a = 119;
+						}
 						undo_redo->begin_action("Add Note");
 						undo_redo->do_method(
 								song, &Song::set_event, current_pattern, cursor.column,
-								Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+								Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 						undo_redo->undo_method(
 								song, &Song::set_event, current_pattern, cursor.column,
-								Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+								Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 						undo_redo->do_method(this, &PatternEditor::_redraw);
 						undo_redo->undo_method(this, &PatternEditor::_redraw);
 						undo_redo->commit_action();
@@ -1042,16 +2105,16 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
-									cursor.row * TICKS_PER_BEAT / rows_per_beat);
+									cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
 					Track::Event old_ev = ev;
 					ev.a = Track::Note::OFF;
 					undo_redo->begin_action("Add Note Off");
 					undo_redo->do_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 					undo_redo->undo_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 					undo_redo->do_method(this, &PatternEditor::_redraw);
 					undo_redo->undo_method(this, &PatternEditor::_redraw);
 					undo_redo->commit_action();
@@ -1065,13 +2128,13 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 			} else if (cursor.field == 1) {
 				// put octave
-				if (key_event->keyval >= GDK_KEY_0 && key_event->keyval <= GDK_KEY_9) {
+				if ((key_event->keyval >= GDK_KEY_0 && key_event->keyval <= GDK_KEY_9)) {
 
 					int octave = key_event->keyval - GDK_KEY_0;
 
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
-									cursor.row * TICKS_PER_BEAT / rows_per_beat);
+									cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
 					Track::Event old_ev = ev;
 
 					if (old_ev.a == Track::Note::EMPTY) {
@@ -1083,10 +2146,10 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					undo_redo->begin_action("Set Octave");
 					undo_redo->do_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 					undo_redo->undo_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 					undo_redo->do_method(this, &PatternEditor::_redraw);
 					undo_redo->undo_method(this, &PatternEditor::_redraw);
 					undo_redo->commit_action();
@@ -1108,7 +2171,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
-									cursor.row * TICKS_PER_BEAT / rows_per_beat);
+									cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
 					Track::Event old_ev = ev;
 
 					if (old_ev.b == Track::Note::EMPTY) {
@@ -1117,13 +2180,16 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 					ev.b = (ev.b % 10) + vol_g * 10;
 
+					volume_mask = ev.b;
+					volume_mask_changed.emit();
+
 					undo_redo->begin_action("Set Volume");
 					undo_redo->do_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 					undo_redo->undo_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 					undo_redo->do_method(this, &PatternEditor::_redraw);
 					undo_redo->undo_method(this, &PatternEditor::_redraw);
 					undo_redo->commit_action();
@@ -1145,7 +2211,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
-									cursor.row * TICKS_PER_BEAT / rows_per_beat);
+									cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
 
 					Track::Event old_ev = ev;
 
@@ -1156,13 +2222,16 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					ev.b -= (ev.b % 10);
 					ev.b += vol_l;
 
+					volume_mask = ev.b;
+					volume_mask_changed.emit();
+
 					undo_redo->begin_action("Set Volume");
 					undo_redo->do_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 					undo_redo->undo_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 					undo_redo->do_method(this, &PatternEditor::_redraw);
 					undo_redo->undo_method(this, &PatternEditor::_redraw);
 					undo_redo->commit_action();
@@ -1185,7 +2254,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 				if (key_event->keyval >= GDK_KEY_0 && key_event->keyval <= GDK_KEY_9) {
 					Track::Event ev =
 							song->get_event(current_pattern, cursor.column,
-									cursor.row * TICKS_PER_BEAT / rows_per_beat);
+									cursor.row * TICKS_PER_BEAT / _get_rows_per_beat());
 
 					Track::Event old_ev = ev;
 
@@ -1202,10 +2271,10 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 					undo_redo->begin_action("Set Automation Point");
 					undo_redo->do_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), ev);
 					undo_redo->undo_method(
 							song, &Song::set_event, current_pattern, cursor.column,
-							Tick(cursor.row * TICKS_PER_BEAT / rows_per_beat), old_ev);
+							Tick(cursor.row * TICKS_PER_BEAT / _get_rows_per_beat()), old_ev);
 					undo_redo->do_method(this, &PatternEditor::_redraw);
 					undo_redo->undo_method(this, &PatternEditor::_redraw);
 					undo_redo->commit_action();
@@ -1231,7 +2300,12 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 }
 
 bool PatternEditor::on_key_release_event(GdkEventKey *key_event) {
-	printf("keypress\n");
+
+	bool shift_pressed = key_event->state & GDK_SHIFT_MASK;
+	if (!shift_pressed) {
+		selection.shift_active = false;
+	}
+
 	return false;
 }
 
@@ -1313,7 +2387,7 @@ void PatternEditor::on_realize() {
 		attributes.width = allocation.get_width();
 		attributes.height = allocation.get_height();
 
-		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK |
+		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK | Gdk::SCROLL_MASK |
 								Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
 								Gdk::BUTTON1_MOTION_MASK | Gdk::KEY_PRESS_MASK |
 								Gdk::KEY_RELEASE_MASK;
@@ -1381,7 +2455,103 @@ void PatternEditor::_draw_arrow(const Cairo::RefPtr<Cairo::Context> &cr, int x,
 	cr->stroke();
 }
 
+void PatternEditor::_v_scroll_changed() {
+	if (drawing) {
+		return;
+	}
+
+	v_offset = v_scroll->get_value();
+	queue_draw();
+}
+
+void PatternEditor::_h_scroll_changed() {
+
+	if (drawing) {
+		return;
+	}
+
+	int offset = h_scroll->get_value();
+
+	h_offset = 0;
+	while (true) {
+		if (h_offset == song->get_event_column_count() - 1) {
+			break;
+		}
+		if (offset < get_column_offset(h_offset)) {
+			break;
+		}
+		h_offset++;
+	}
+	queue_draw();
+}
+
+int PatternEditor::get_column_offset(int p_column) {
+
+	int offset = 0;
+	int idx = 0;
+
+	int track_sep = theme->constants[Theme::CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION];
+
+	for (int i = 0; i < song->get_track_count(); i++) {
+
+		Track *t = song->get_track(i);
+		for (int j = 0; j < t->get_column_count(); j++) {
+
+			if (idx == p_column + 1) {
+				return offset;
+			}
+
+			int cw = fw_cache * 6; //base column width
+			if (j == 0) {
+				cw += fh_cache; //name
+			} else {
+				cw += fw_cache; //separator
+			}
+			offset += cw;
+			idx++;
+		}
+
+		for (int j = 0; j < t->get_automation_count(); j++) {
+
+			if (idx == p_column + 1) {
+				return offset;
+			}
+
+			Automation *a = t->get_automation(j);
+			if (!a->is_visible()) {
+				continue; //not a column if not visible
+			}
+
+			int cw = fh_cache; //base column width
+			if (a->is_visible()) {
+				switch (a->get_display_mode()) {
+					case Automation::DISPLAY_ROWS: {
+						cw += fw_cache * 2;
+					} break;
+					case Automation::DISPLAY_SMALL: {
+						cw += fw_cache * 4;
+					} break;
+					case Automation::DISPLAY_LARGE: {
+						cw += fw_cache * 8;
+					} break;
+				}
+
+				idx++;
+			}
+
+			offset += cw;
+		}
+
+		offset += track_sep;
+	}
+
+	return offset;
+}
+
 bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
+
+	drawing = true;
+
 	const Gtk::Allocation allocation = get_allocation();
 
 	int w = allocation.get_width();
@@ -1398,11 +2568,22 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
 
-	int fw = fe.max_x_advance;
+	// Believe it or not, this the only reliable way to get the width of
+	// a monospace char in GTK. Yes.
+
+	Cairo::TextExtents te;
+	cr->get_text_extents("XXX", te);
+	int fw = te.width;
+	cr->get_text_extents("XX", te);
+	fw -= te.width;
+
 	int fh = fe.height;
 	int fa = fe.ascent;
 	int sep = 1;
 	fh += sep;
+
+	fw_cache = fw;
+	fh_cache = fh;
 
 	row_height_cache = fh;
 	int top_ofs = 4;
@@ -1415,8 +2596,6 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	int track_sep_w =
 			theme->constants[Theme::CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION];
 
-	track_buttons.clear();
-	automation_buttons.clear();
 	click_areas.clear();
 
 	visible_rows = (h - top_ofs) / fh;
@@ -1426,8 +2605,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	for (int i = 0; i < visible_rows; i++) {
 
 		int row = v_offset + i;
-		int beat = row / rows_per_beat;
-		int subbeat = row % rows_per_beat;
+		int beat = row / _get_rows_per_beat();
+		int subbeat = row % _get_rows_per_beat();
 
 		if (subbeat == 0 || i == 0) {
 			if (beat % beats_per_bar == 0)
@@ -1462,18 +2641,15 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				idx++;
 				continue;
 			}
+
 			if (j == 0) {
 
-				int as = fh;
-				_draw_arrow(cr, ofs, top_ofs, as, as,
-						theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME]);
-				_draw_text(cr, ofs + fh - fa, top_ofs + as, t->get_name(),
-						theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME], true);
-				TrackButton tb;
-				tb.track = i;
-
-				tb.r = Gdk::Rectangle(ofs, top_ofs, as, as);
-				track_buttons.push_back(tb);
+				int as = 2;
+				Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_TRACK_NAME];
+				if (t->is_muted()) {
+					c.set_alpha(c.get_alpha() * 0.5);
+				}
+				_draw_text(cr, ofs + fh - fa, top_ofs + as, t->get_name(), c, true);
 				ofs += fh;
 			}
 
@@ -1503,13 +2679,40 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				char rowstr[7] = { '.', '.', '.', ' ', '.', '.', 0 };
 
 				int row = v_offset + k;
-				int beat = row / rows_per_beat;
-				int subbeat = row % rows_per_beat;
+				int beat = row / _get_rows_per_beat();
+				int subbeat = row % _get_rows_per_beat();
+				Tick from_tick = row * TICKS_PER_BEAT / _get_rows_per_beat();
+				Tick to_tick = (row + 1) * TICKS_PER_BEAT / _get_rows_per_beat();
+
+				bool bg_selected = _is_in_selection(idx, from_tick);
 
 				Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE];
+				Gdk::RGBA csel = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE_SELECTED];
+
+				if (t->is_muted()) {
+					c.set_alpha(c.get_alpha() * 0.5);
+					csel.set_alpha(csel.get_alpha() * 0.5);
+				}
 				Gdk::RGBA bgc = bgcol;
 
-				if (subbeat == 0 || k == 0) {
+				if (bg_selected) {
+					bgc = theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_SELECTED];
+					if (subbeat == 0 || k == 0) {
+						if ((beat % beats_per_bar) == 0)
+							_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
+									fh,
+									theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BAR_SELECTED]);
+						else
+							_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
+									fh,
+									theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT_SELECTED]);
+					} else {
+						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
+								fh,
+								bgc);
+					}
+
+				} else if (subbeat == 0 || k == 0) {
 					if ((beat % beats_per_bar) == 0)
 						_draw_fill_rect(cr, ofs, top_ofs + k * fh - sep, fw * 6 + extrahl,
 								fh,
@@ -1521,9 +2724,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				}
 
 				Track::Pos from, to;
-				from.tick = row * TICKS_PER_BEAT / rows_per_beat;
+				from.tick = from_tick;
 				from.column = j;
-				Tick to_tick = (row + 1) * TICKS_PER_BEAT / rows_per_beat;
 				to.tick = to_tick;
 				to.column = j;
 
@@ -1540,12 +2742,20 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 				if (valid.size() == 0) {
 
-					_draw_text(cr, ofs, top_ofs + k * fh + fa, rowstr, c);
+					_draw_text(cr, ofs, top_ofs + k * fh + fa, rowstr, bg_selected ? csel : c);
 				} else if (valid.size() == 1) {
 
 					Track::PosNote n = pn.front()->get();
-					if (n.pos.tick != from.tick)
+
+					if (_is_in_selection(idx, n.pos.tick)) {
+						//in-selection
+						c = csel;
+					} else if (n.pos.tick != from.tick) {
 						c = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE_NOFIT];
+						if (t->is_muted()) {
+							c.set_alpha(c.get_alpha() * 0.5);
+						}
+					}
 					if (n.note.note == Track::Note::OFF) {
 						rowstr[0] = '=';
 						rowstr[1] = '=';
@@ -1553,9 +2763,10 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					} else if (n.note.note < 120) {
 						static const char *note[12] = { "C-", "C#", "D-", "D#", "E-", "F-",
 							"F#", "G-", "G#", "A-", "A#", "B-" };
+						static const char octave[12] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
 						rowstr[0] = note[n.note.note % 12][0];
 						rowstr[1] = note[n.note.note % 12][1];
-						rowstr[2] = '0' + n.note.note / 12; // octave
+						rowstr[2] = octave[n.note.note / 12]; // octave
 					}
 
 					if (n.note.volume < 100) {
@@ -1576,18 +2787,24 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						int w = fw * 3 - 2;
 						int vw = fw * 2 - 2;
 
+						Gdk::RGBA col = c;
+
+						if (_is_in_selection(idx, valid[l].pos.tick)) {
+							col = csel;
+						}
+
 						if (valid[l].note.note < 120) {
-							_draw_fill_rect(cr, base_x, base_y + h * l, fw * 3, h - 1, c);
+							_draw_fill_rect(cr, base_x, base_y + h * l, fw * 3, h - 1, col);
 							_draw_rect(cr, base_x + valid[l].note.note * w / 120,
 									base_y + 1 + h * l, 2, h - 2, bgc);
 						} else if (valid[l].note.note == Track::Note::OFF) {
-							_draw_rect(cr, base_x + 0, base_y + 1 + h * l, fw * 3, 1, c);
-							_draw_rect(cr, base_x, base_y + 1 + h * l + h - 2, fw * 3, 1, c);
+							_draw_rect(cr, base_x + 0, base_y + 1 + h * l, fw * 3, 1, col);
+							_draw_rect(cr, base_x, base_y + 1 + h * l + h - 2, fw * 3, 1, col);
 						}
 
 						if (valid[l].note.volume < 100) {
 							_draw_fill_rect(cr, base_x + fw * 4, base_y + h * l, fw * 2,
-									h - 1, c);
+									h - 1, col);
 							_draw_rect(cr, base_x + fw * 4 + valid[l].note.volume * vw / 100,
 									base_y + 1 + h * l, 2, h - 2, bgc);
 						}
@@ -1604,8 +2821,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			}
 
 			if (j < t->get_column_count() - 1)
-				ofs +=
-						theme->constants[Theme::CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION];
+				ofs += fw; //
+
 			ofs += fw * 6;
 			idx++;
 		}
@@ -1622,20 +2839,17 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 			{
 
-				int as = fh;
+				int as = 2;
 
-				_draw_arrow(cr, ofs, top_ofs, as, as,
-						theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME]);
+				Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME];
+
+				if (t->is_muted()) {
+					c.set_alpha(c.get_alpha() * 0.5);
+				}
+
 				_draw_text(cr, ofs + fh - fa, top_ofs + as,
-						a->get_control_port()->get_name().utf8().get_data(),
-						theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_NAME],
+						a->get_control_port()->get_name().utf8().get_data(), c,
 						true);
-
-				AutomationButton ab;
-				ab.track = i;
-				ab.automation = j;
-				ab.r = Gdk::Rectangle(ofs, top_ofs, as, as);
-				automation_buttons.push_back(ab);
 			}
 			ofs += fh;
 
@@ -1664,14 +2878,41 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						char rowstr[3] = { '.', '.', 0 };
 
 						int row = v_offset + k;
-						int beat = row / rows_per_beat;
-						int subbeat = row % rows_per_beat;
+						int beat = row / _get_rows_per_beat();
+						int subbeat = row % _get_rows_per_beat();
+						Tick from = row * TICKS_PER_BEAT / _get_rows_per_beat();
+						Tick to = (row + 1) * TICKS_PER_BEAT / _get_rows_per_beat();
+
+						bool bg_selected = _is_in_selection(idx, from);
 
 						Gdk::RGBA c =
 								theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
+						Gdk::RGBA csel = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_SELECTED];
+
+						if (t->is_muted()) {
+							c.set_alpha(c.get_alpha() * 0.5);
+							csel.set_alpha(csel.get_alpha() * 0.5);
+						}
+
 						Gdk::RGBA bgc = bgcol;
 
-						if (subbeat == 0 || k == 0) {
+						if (bg_selected) {
+							bgc = theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_SELECTED];
+
+							if (subbeat == 0 || k == 0) {
+								if ((beat % beats_per_bar) == 0)
+									_draw_fill_rect(
+											cr, ofs, top_ofs + k * fh - sep, fw * 2, fh,
+											theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR_SELECTED]);
+								else
+									_draw_fill_rect(
+											cr, ofs, top_ofs + k * fh - sep, fw * 2, fh,
+											theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT_SELECTED]);
+							} else {
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, fw * 2, fh, bgc);
+							}
+						} else if (subbeat == 0 || k == 0) {
 							if ((beat % beats_per_bar) == 0)
 								_draw_fill_rect(
 										cr, ofs, top_ofs + k * fh - sep, fw * 2, fh,
@@ -1683,9 +2924,6 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 												->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
 						}
 
-						Tick from = row * TICKS_PER_BEAT / rows_per_beat;
-						Tick to = (row + 1) * TICKS_PER_BEAT / rows_per_beat;
-
 						int first;
 						int count;
 
@@ -1693,14 +2931,20 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 						if (count == 0) {
 
-							_draw_text(cr, ofs, top_ofs + k * fh + fa, rowstr, c);
+							_draw_text(cr, ofs, top_ofs + k * fh + fa, rowstr, bg_selected ? csel : c);
 						} else if (count == 1) {
 
 							int val = a->get_point_by_index(current_pattern, first);
 
-							if (a->get_point_tick_by_index(current_pattern, first) != from)
-								c = theme->colors
-											[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_NOFIT];
+							Tick point_tick = a->get_point_tick_by_index(current_pattern, first);
+							if (_is_in_selection(idx, point_tick)) {
+								c = csel;
+							} else if (point_tick != from) {
+								c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_NOFIT];
+								if (t->is_muted()) {
+									c.set_alpha(c.get_alpha() * 0.5);
+								}
+							}
 
 							rowstr[0] = '0' + val / 10;
 							rowstr[1] = '0' + val % 10;
@@ -1716,9 +2960,17 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 								int h = (fh - 2) / count;
 								int w = fw * 2 - 2;
-								int val = a->get_point_by_index(current_pattern, first + l);
+								Tick point_tick = a->get_point_tick_by_index(current_pattern, first + l);
 
-								_draw_fill_rect(cr, base_x, base_y + h * l, fw * 2, h - 1, c);
+								int val = a->get_point_by_index(current_pattern, first + l);
+								Gdk::RGBA col;
+								if (_is_in_selection(idx, point_tick)) {
+									col = csel;
+								} else {
+									col = c;
+								}
+
+								_draw_fill_rect(cr, base_x, base_y + h * l, fw * 2, h - 1, col);
 								_draw_rect(cr, base_x + val * w / Automation::VALUE_MAX,
 										base_y + 1 + h * l, 2, h - 2, bgc);
 							}
@@ -1734,7 +2986,6 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					}
 
 					ofs += fw * 2;
-
 				} break;
 				case Automation::DISPLAY_SMALL:
 				case Automation::DISPLAY_LARGE: {
@@ -1742,10 +2993,20 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					int w = a->get_display_mode() == Automation::DISPLAY_SMALL ? 4 : 8;
 					w *= fw;
 
-					Gdk::RGBA c =
-							theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
+					Gdk::RGBA c = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE];
+					Gdk::RGBA csel = theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_VALUE_SELECTED];
+
+					if (t->is_muted()) {
+						c.set_alpha(c.get_alpha() * 0.5);
+						csel.set_alpha(csel.get_alpha() * 0.5);
+					}
+
 					Gdk::RGBA cpoint =
 							theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_POINT];
+
+					if (t->is_muted()) {
+						cpoint.set_alpha(cpoint.get_alpha() * 0.5);
+					}
 
 					// fill fields for click areas
 					ClickArea ca;
@@ -1758,10 +3019,35 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					for (int k = 0; k < visible_rows; k++) {
 
 						int row = v_offset + k;
-						int beat = row / rows_per_beat;
-						int subbeat = row % rows_per_beat;
+						int beat = row / _get_rows_per_beat();
+						int subbeat = row % _get_rows_per_beat();
+						Tick from = row * TICKS_PER_BEAT / _get_rows_per_beat();
+						bool bg_selected = _is_in_selection(idx, from);
 
-						if (subbeat == 0 || k == 0) {
+						bool draw_outline = false;
+
+						if (bg_selected) {
+
+							if (subbeat == 0 || k == 0) {
+								if ((beat % beats_per_bar) == 0)
+									_draw_fill_rect(
+											cr, ofs, top_ofs + k * fh - sep, w, fh,
+											theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BAR_SELECTED]);
+								else
+									_draw_fill_rect(
+											cr, ofs, top_ofs + k * fh - sep, w, fh,
+											theme
+													->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT_SELECTED]);
+							} else {
+
+								_draw_fill_rect(
+										cr, ofs, top_ofs + k * fh - sep, w, fh,
+										theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_SELECTED]);
+								draw_outline = true;
+							}
+
+						} else if (subbeat == 0 || k == 0) {
+
 							if ((beat % beats_per_bar) == 0)
 								_draw_fill_rect(
 										cr, ofs, top_ofs + k * fh - sep, w, fh,
@@ -1771,24 +3057,29 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 										cr, ofs, top_ofs + k * fh - sep, w, fh,
 										theme
 												->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
-
 						} else {
+							draw_outline = true;
+						}
 
+						if (draw_outline) {
+
+							Gdk::RGBA col = bg_selected ? theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT_SELECTED] : theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT];
 							_draw_fill_rect(
-									cr, ofs, top_ofs + k * fh - sep + fh, w, 1,
-									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+									cr, ofs, top_ofs + k * fh - sep + fh - 1, w, 1,
+									col);
 							_draw_fill_rect(
 									cr, ofs, top_ofs + k * fh - sep, 1, fh,
-									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+									col);
 							_draw_fill_rect(
 									cr, ofs + w - 1, top_ofs + k * fh - sep, 1, fh,
-									theme->colors[Theme::COLOR_PATTERN_EDITOR_AUTOMATION_HL_BEAT]);
+									col);
 						}
 
 						float prev = -1;
 						for (int l = 0; l < fh; l++) {
 
-							Tick at = (fh * row + l) * (TICKS_PER_BEAT / rows_per_beat) / fh;
+							Tick at = (fh * row + l) * (TICKS_PER_BEAT / _get_rows_per_beat()) / fh;
+							bool selected = _is_in_selection(idx, at);
 
 							float tofs = a->interpolate_offset(current_pattern, at);
 							if (prev == -1)
@@ -1796,7 +3087,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 							if (tofs >= 0)
 								_draw_fill_rect(cr, ofs + tofs * w, top_ofs + k * fh - sep + l, 2,
-										1, c);
+										1, selected ? csel : c);
 
 							prev = tofs;
 						}
@@ -1811,8 +3102,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						}
 					}
 
-					Tick pfrom = (v_offset) * (TICKS_PER_BEAT / rows_per_beat);
-					Tick pto = (v_offset + visible_rows) * (TICKS_PER_BEAT / rows_per_beat);
+					Tick pfrom = (v_offset) * (TICKS_PER_BEAT / _get_rows_per_beat());
+					Tick pto = (v_offset + visible_rows) * (TICKS_PER_BEAT / _get_rows_per_beat());
 					int first;
 					int count;
 					a->get_points_in_range(current_pattern, pfrom, pto, first, count);
@@ -1822,7 +3113,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						int x = (a->get_point_by_index(current_pattern, l) * w /
 								 Automation::VALUE_MAX);
 						int y = a->get_point_tick_by_index(current_pattern, l) * fh /
-										(TICKS_PER_BEAT / rows_per_beat) -
+										(TICKS_PER_BEAT / _get_rows_per_beat()) -
 								v_offset * fh;
 						_draw_fill_rect(cr, ofs + x - 2, top_ofs + y - 2 - sep, 5, 5, cpoint);
 
@@ -1857,6 +3148,21 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	cr->stroke();
 
+	v_scroll->set_upper(song->pattern_get_beats(current_pattern) * _get_rows_per_beat());
+	v_scroll->set_page_size(visible_rows);
+	v_scroll->set_value(v_offset);
+
+	{
+		int total = get_column_offset(song->get_event_column_count());
+		h_scroll->set_upper(total);
+		h_scroll->set_page_size(w - fw * 4);
+		int hofs = h_offset == 0 ? 0 : get_column_offset(h_offset - 1);
+		//printf("total %i, pagesize %i, offset %i\n", total, w - fw * 4, hofs);
+		h_scroll->set_value(hofs);
+	}
+
+	drawing = false;
+
 #if 0
 	const double scale_x = (double)allocation.get_width() / ;
 	const double scale_y = (double)allocation.get_height() / m_scale;
@@ -1890,6 +3196,28 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	return true;
 }
 
+void PatternEditor::set_beat_zoom(BeatZoom p_zoom) {
+	beat_zoom = p_zoom;
+	queue_draw();
+}
+PatternEditor::BeatZoom PatternEditor::get_beat_zoom() const {
+	return beat_zoom;
+}
+
+int PatternEditor::get_current_track() const {
+
+	return song->get_event_column_track(cursor.column);
+}
+
+void PatternEditor::set_hscroll(Glib::RefPtr<Gtk::Adjustment> p_h_scroll) {
+	h_scroll = p_h_scroll;
+	h_scroll->signal_value_changed().connect(sigc::mem_fun(*this, &PatternEditor::_h_scroll_changed));
+}
+void PatternEditor::set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll) {
+	v_scroll = p_v_scroll;
+	v_scroll->signal_value_changed().connect(sigc::mem_fun(*this, &PatternEditor::_v_scroll_changed));
+}
+
 void PatternEditor::on_parsing_error(
 		const Glib::RefPtr<const Gtk::CssSection> &section,
 		const Glib::Error &error) {}
@@ -1921,11 +3249,10 @@ PatternEditor::PatternEditor(Song *p_song, UndoRedo *p_undo_redo,
 	h_offset = 0;
 
 	current_pattern = 0;
-	rows_per_beat = 4;
+	beat_zoom = BEAT_ZOOM_4;
+	volume_mask = 99;
+	volume_mask_active = true;
 
-	Track *t = new Track;
-	t->set_columns(2);
-	song->add_track(t);
 	visible_rows = 4;
 	current_octave = 5;
 	cursor_advance = 1;
@@ -1934,6 +3261,15 @@ PatternEditor::PatternEditor(Song *p_song, UndoRedo *p_undo_redo,
 	cursor.field = 0;
 	cursor.column = 0;
 	cursor.skip = 1;
+
+	selection.active = false;
+	selection.shift_active = false;
+	selection.mouse_drag_active = false;
+	clipboard.active = false;
+#if 0
+	Track *t = new Track;
+	t->set_columns(2);
+	song->add_track(t);
 
 	t->set_note(0, Track::Pos(0, 0), Track::Note(60, 99));
 	t->set_note(0, Track::Pos(TICKS_PER_BEAT, 1),
@@ -1958,23 +3294,15 @@ PatternEditor::PatternEditor(Song *p_song, UndoRedo *p_undo_redo,
 	t->get_automation(2)->set_point(0, 0, 22);
 	t->get_automation(2)->set_point(0, TICKS_PER_BEAT * 2, 22);
 	t->get_automation(2)->set_point(0, TICKS_PER_BEAT * 3, 44);
-
+#endif
 	grabbing_point = -1;
-	track_menu = NULL;
-	automation_menu = NULL;
+	fw_cache = 0;
+	fh_cache = 0;
+	last_amplify_value = 100;
+	last_scale_value = 1.0;
+
+	p_bindings->action_activated.connect(sigc::mem_fun(*this, &PatternEditor::_on_action_activated));
 }
 
 PatternEditor::~PatternEditor() {
-	if (track_menu) {
-		delete track_menu;
-		for (int i = 0; i < track_menu_items.size(); i++) {
-			delete track_menu_items[i];
-		}
-	}
-	if (automation_menu) {
-		delete automation_menu;
-		for (int i = 0; i < automation_menu_items.size(); i++) {
-			delete automation_menu_items[i];
-		}
-	}
 }

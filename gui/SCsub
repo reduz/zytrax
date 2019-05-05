@@ -1,8 +1,96 @@
+
+import os
+
+try:
+	from StringIO import StringIO
+except ImportError:
+	from io import StringIO
+
 Import('env');
 Export('env');
 
+
 targets=[]
 
+def make_gui_icons_action(target, source, env):
+
+	dst = target[0]
+	png_icons = source
+
+	icons_string = StringIO()
+	icons_sizes = ""
+	for f in png_icons:
+
+		fname = str(f)
+
+		icons_string.write('\t"')
+		size=0
+		with open(fname, 'rb') as pngf:
+			b = pngf.read(1)
+			while(len(b) == 1):
+				icons_string.write("\\" + str(hex(ord(b)))[1:])
+				size+=1
+				b = pngf.read(1)
+		if (icons_sizes!=""):
+			icons_sizes+=","
+		icons_sizes+=str(size)
+
+
+		icons_string.write('"')
+		if fname != png_icons[-1]:
+			icons_string.write(",")
+		icons_string.write('\n')
+
+	s = StringIO()
+	s.write("/* THIS FILE IS GENERATED DO NOT EDIT */\n")
+	s.write("#ifndef _EDITOR_ICONS_H\n")
+	s.write("#define _EDITOR_ICONS_H\n")
+
+	s.write("static const int gui_icons_count = {};\n".format(len(png_icons)))
+	s.write("static const char *gui_icons_sources[] = {\n")
+	s.write(icons_string.getvalue())
+	s.write('};\n\n')
+
+	s.write("static const int gui_icons_sizes[] = {\n")
+	s.write("\t"+icons_sizes+"\n")
+	s.write('};\n\n')
+
+	s.write("static const char *gui_icons_names[] = {\n")
+
+	# this is used to store the indices of thumbnail icons
+	thumb_medium_indices = [];
+	index = 0
+	for f in png_icons:
+
+		fname = str(f)
+
+		icon_name = os.path.basename(fname)[5:-4].title().replace("_", "")
+		# some special cases
+		s.write('\t"{0}"'.format(icon_name))
+		if fname != png_icons[-1]:
+			s.write(",")
+		s.write('\n')
+
+		index += 1
+
+	s.write('};\n')
+
+	s.write("#endif\n")
+
+
+	with open(str(dst), "w") as f:
+		f.write(s.getvalue())
+
+	s.close()
+	icons_string.close()
+
 env.add_sources(targets,"*.cpp")
+
+make_gui_icons_builder = Builder(action=make_gui_icons_action,
+				    suffix='.h',
+				    src_suffix='.png')
+
+env['BUILDERS']['MakeEditorIconsBuilder'] = make_gui_icons_builder
+env.Alias('gui_icons', [env.MakeEditorIconsBuilder('#gui/gui_icons.gen.h', Glob("icons/*.png"))])
 
 env.libs+=env.Library('gui', targets);

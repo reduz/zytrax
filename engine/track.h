@@ -62,7 +62,8 @@ public:
 		enum {
 			EMPTY = 0xFF,
 			OFF = 0xFE,
-			MAX_VOLUME = 99
+			MAX_VOLUME = 99,
+			MAX_NOTE = 119 // 10 octaves
 		};
 
 		uint8_t note;
@@ -168,6 +169,8 @@ private:
 	ControlPortDefault volume;
 	ControlPortDefault pan;
 
+	float mix_volume;
+
 	String name;
 
 public:
@@ -221,6 +224,11 @@ public:
 	ControlPort *get_volume_port();
 	ControlPort *get_pan_port();
 	ControlPort *get_swing_port();
+
+	void set_mix_volume_db(float p_db);
+	float get_mix_volume_db() const;
+
+	float get_peak_volume_db() const;
 
 	Track();
 };
