@@ -622,6 +622,7 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 		}
 
 		track->set_name(name);
+		track->add_send(Track::SEND_SPEAKERS);
 
 		undo_redo->begin_action("Add Track");
 		undo_redo->do_method(

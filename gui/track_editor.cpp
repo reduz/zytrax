@@ -357,11 +357,120 @@ TrackRackVolume::~TrackRackVolume() {
 
 void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
-	Gdk::Rectangle posr(event->x, event->y, 1, 1);
+	if (event->button == 1) {
+
+		int new_mouse_over_area = -1;
+
+		for (int i = 0; i < areas.size(); i++) {
+			if (event->y >= areas[i].y && event->y < areas[i].y + areas[i].h) {
+				new_mouse_over_area = i;
+				break;
+			}
+		}
+
+		if (p_press) {
+
+			if (new_mouse_over_area == -1) {
+				return; //nothing to do here
+			}
+			if (areas[new_mouse_over_area].insert) {
+				//open dialog and insert
+				if (areas[new_mouse_over_area].is_fx) {
+					add_effect.emit(track_idx);
+				} else {
+					if (!send_menu) {
+						send_menu = new Gtk::Menu;
+					}
+					for (int i = 0; i < available_tracks.size(); i++) {
+						delete available_tracks[i];
+					}
+					available_tracks.clear();
+					for (int i = 0; i < song->get_track_count(); i++) {
+						String track_name = song->get_track(i)->get_name();
+						Gtk::MenuItem *item = new Gtk::MenuItem;
+						item->show();
+						item->set_label(track_name.utf8().get_data());
+						item->set_sensitive(track_idx != i);
+						item->signal_activate().connect(sigc::bind<int>(sigc::mem_fun(*this, &TrackRackEditor::_insert_send_to_track), i));
+						available_tracks.push_back(item);
+						send_menu->append(*item);
+					}
+
+					Gdk::Rectangle alloc;
+					alloc.set_x(0);
+					alloc.set_width(get_allocated_width());
+					alloc.set_y(areas[new_mouse_over_area].y);
+					alloc.set_height(areas[new_mouse_over_area].h);
+					send_menu->popup_at_rect(get_window(), alloc, Gdk::GRAVITY_NORTH_WEST, Gdk::GRAVITY_SOUTH_WEST, (GdkEvent *)event);
+				}
+			} else {
+				pressing_area = new_mouse_over_area;
+				queue_draw();
+			}
+		} else {
+			if (new_mouse_over_area < 0) {
+				return;
+			}
+
+			if (pressing_area == new_mouse_over_area) {
+
+				if (areas[pressing_area].is_fx) {
+
+				} else {
+
+					Gdk::Rectangle alloc;
+					alloc.set_x(0);
+					alloc.set_width(get_allocated_width());
+					alloc.set_y(areas[pressing_area].y);
+					alloc.set_height(areas[pressing_area].h);
+					send_amount.set_size_request(alloc.get_width(), 1);
+					send_amount.set_value(song->get_track(track_idx)->get_send_amount(areas[pressing_area].which) * 100);
+					send_popover_index = areas[pressing_area].which;
+					send_popover.set_pointing_to(alloc);
+					send_popover.popup();
+				}
+				printf("click on %i\n", pressing_area);
+				//press
+			}
+
+			pressing_area = -1;
+			queue_draw();
+		}
+	} else if (event->button == 3 && p_press) {
+
+		int at_idx = -1;
+
+		for (int i = 0; i < areas.size(); i++) {
+			if (event->y >= areas[i].y && event->y < areas[i].y + areas[i].h) {
+				at_idx = i;
+				break;
+			}
+		}
+
+		if (at_idx < 0) {
+			return;
+		}
+		if (areas[at_idx].insert) {
+			return;
+		}
+
+		menu_at_index = at_idx;
+
+		if (areas[at_idx].is_fx) {
+			bool skipped = song->get_track(track_idx)->get_audio_effect(areas[at_idx].which)->is_skipped();
+			_update_menu(skipped, true);
+		} else {
+
+			bool muted = song->get_track(track_idx)->is_send_muted(areas[at_idx].which);
+			_update_menu(muted, false);
+		}
+
+		menu->popup_at_pointer((GdkEvent *)event);
+	}
 }
 
 bool TrackRackEditor::on_button_press_event(GdkEventButton *event) {
-	grab_focus();
+
 	_mouse_button_event(event, true);
 	return false;
 }
@@ -371,8 +480,30 @@ bool TrackRackEditor::on_button_release_event(GdkEventButton *release_event) {
 	return false;
 }
 
+bool TrackRackEditor::on_leave_notify_event(GdkEventCrossing *crossing_event) {
+	if (mouse_over_area != -1) {
+		mouse_over_area = -1;
+		queue_draw();
+	}
+	return false;
+}
 bool TrackRackEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 
+	int new_mouse_over_area = -1;
+
+	for (int i = 0; i < areas.size(); i++) {
+		if (motion_event->y >= areas[i].y && motion_event->y < areas[i].y + areas[i].h) {
+			new_mouse_over_area = i;
+			break;
+		}
+	}
+
+	if (mouse_over_area != new_mouse_over_area) {
+		mouse_over_area = new_mouse_over_area;
+		queue_draw();
+	}
+
+	gdk_event_request_motions(motion_event);
 	return false;
 }
 
@@ -466,7 +597,7 @@ void TrackRackEditor::on_realize() {
 		attributes.width = allocation.get_width();
 		attributes.height = allocation.get_height();
 
-		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK |
+		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK | Gdk::POINTER_MOTION_MASK | Gdk::LEAVE_NOTIFY_MASK |
 								Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
 								Gdk::BUTTON1_MOTION_MASK | Gdk::KEY_PRESS_MASK |
 								Gdk::KEY_RELEASE_MASK;
@@ -577,52 +708,189 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	cr->rectangle(0, 0, w, h);
 	cr->fill();
 
-	String text = "Effects:";
-	int title_offset = (w - _get_text_width(cr, text)) / 2;
+	int idx = 0;
+	int y = 0;
+	int row_height = (font_height + separator);
 
-	_draw_fill_rect(cr, 0, 0, w, font_height + separator, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BAR]);
-	_draw_text(cr, title_offset, separator + font_ascent, text, selected ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE], false);
-	int visible_slots = (h - separator) / (font_height + separator) - 2;
-	if (visible_slots > 0) {
-		bool can_insert = true;
-		int ofs = 0;
-		for (int i = 0; i < visible_slots; i++) {
-			int y = (1 + i) * (font_height + separator);
-			_draw_rect(cr, 0, y, w, font_height + separator, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
-			int effect_idx = ofs + i;
-			if (effect_idx < song->get_track(track_idx)->get_audio_effect_count()) {
-				String title = song->get_track(track_idx)->get_audio_effect(effect_idx)->get_info()->caption;
+	int max_effects = song->get_track(track_idx)->get_audio_effect_count();
+	int max_sends = song->get_track(track_idx)->get_send_count();
 
-				_draw_text(cr, char_width, y + separator / 2 + font_ascent, title, theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE], false);
-			} else if (can_insert) {
-				String insert_text = "<Insert>";
-				int insert_ofs = (w - _get_text_width(cr, insert_text)) / 2;
-				_draw_text(cr, insert_ofs, y + separator / 2 + font_ascent, insert_text, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT], false);
-				can_insert = false;
+	areas.clear();
+
+	for (int i = 0; i <= max_effects; i++) {
+
+		if (idx >= v_offset) {
+
+			Area area;
+			area.index = idx;
+			area.which = i;
+			area.h = row_height;
+			area.y = y;
+			area.is_fx = true;
+
+			String text;
+			Gdk::RGBA color = (pressing_area == -1 && idx == mouse_over_area) ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE];
+
+			if (i == max_effects) {
+				text = "<Insert FX>";
+				color.set_alpha(color.get_alpha() * 0.7);
+				area.insert = true;
+			} else {
+				text = song->get_track(track_idx)->get_audio_effect(i)->get_info()->caption;
+				_draw_rect(cr, 0, y + row_height - 1, w, 0, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
+				if (song->get_track(track_idx)->get_audio_effect(i)->is_skipped()) {
+					color = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE_NOFIT];
+					color.set_alpha(color.get_alpha() * 0.7);
+				}
+
+				area.insert = false;
 			}
+
+			int insert_ofs = (w - _get_text_width(cr, text)) / 2;
+			_draw_text(cr, insert_ofs, y + separator / 2 + font_ascent, text, color, false);
+
+			y += row_height;
+
+			areas.push_back(area);
 		}
+
+		idx++;
 	}
 
-	_draw_fill_rect(cr, 0, h - font_height - separator * 2, w, font_height + separator * 2, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BAR]);
-	String out_text = "Output";
-	int out_offset = (w - _get_text_width(cr, out_text)) / 2;
+	//if enough room, just put sends at the end
+	if ((max_sends + max_effects + 2) * row_height < h) {
+		int from = h - (max_sends + 1) * row_height;
+		while (y + row_height < from) {
+			_draw_rect(cr, 0, y - 1, w, 0, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
+			y += row_height;
+		}
+		y = from;
+	}
 
-	_draw_text(cr, out_offset, h - font_height - separator + font_ascent, out_text, theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE], false);
-	_draw_arrow(cr, w - font_height, h - font_height - separator, font_height, font_height, theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE]);
+	_draw_rect(cr, 0, y - 1, w, 1, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BAR]);
+
+	for (int i = 0; i <= max_sends; i++) {
+
+		if (idx >= v_offset) {
+
+			String text;
+			Area area;
+			area.index = idx;
+			area.which = i;
+			area.h = row_height;
+			area.y = y;
+			area.is_fx = false;
+
+			Gdk::RGBA color = (pressing_area == -1 && idx == mouse_over_area) ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE];
+
+			if (i == max_sends) {
+				text = "<Insert Send>";
+				color.set_alpha(color.get_alpha() * 0.7);
+				area.insert = true;
+			} else {
+				bool muted = song->get_track(track_idx)->is_send_muted(i);
+				int to = song->get_track(track_idx)->get_send_track(i);
+				if (to < 0 || to >= song->get_track_count()) {
+					text = "Speakers: ";
+				} else {
+					text = song->get_track(to)->get_name() + ": ";
+				}
+				int amount_percent = int(song->get_track(track_idx)->get_send_amount(i) * 100);
+				if (muted) {
+					text += "Muted";
+				} else {
+					text += String::num(amount_percent) + "%";
+				}
+				_draw_rect(cr, 0, y + row_height - 1, w, 0, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
+				area.insert = false;
+
+				if (muted) {
+					color = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE_NOFIT];
+					color.set_alpha(color.get_alpha() * 0.7);
+				}
+			}
+
+			int insert_ofs = (w - _get_text_width(cr, text)) / 2;
+			_draw_text(cr, insert_ofs, y + separator / 2 + font_ascent, text, color, false);
+			y += row_height;
+
+			areas.push_back(area);
+		}
+
+		idx++;
+	}
 
 	if (selected) {
 		_draw_rect(cr, -1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
 	}
 }
 
+int TrackRackEditor::set_v_offset(int p_offset) {
+	v_offset = p_offset;
+}
+int TrackRackEditor::get_v_offset() const {
+	return v_offset;
+}
+
+Track *TrackRackEditor::get_track() const {
+	return track;
+}
+
+void TrackRackEditor::_update_menu(bool p_muted, bool p_is_fx) {
+
+	if (!menu) {
+		menu = new (Gtk::Menu);
+		menu->append(menu_item_mute);
+		menu->append(menu_item_separator);
+		menu->append(menu_item_remove);
+	}
+
+	if (p_is_fx) {
+		menu_item_mute.set_label("Skip");
+	} else {
+		menu_item_mute.set_label("Mute");
+	}
+
+	menu_item_mute.set_active(p_muted);
+}
+
+void TrackRackEditor::_insert_send_to_track(int p_idx) {
+
+	insert_send_to_track.emit(track_idx, p_idx);
+}
+void TrackRackEditor::_item_toggle_mute() {
+
+	if (areas[menu_at_index].is_fx) {
+		toggle_effect_skip.emit(track_idx, areas[menu_at_index].which);
+	} else {
+		toggle_send_mute.emit(track_idx, areas[menu_at_index].which);
+	}
+}
+void TrackRackEditor::_item_removed() {
+
+	if (areas[menu_at_index].is_fx) {
+		remove_effect.emit(track_idx, areas[menu_at_index].which);
+	} else {
+		remove_send.emit(track_idx, areas[menu_at_index].which);
+	}
+}
+
+void TrackRackEditor::_send_amount_changed() {
+	printf("send amount changed?");
+	send_amount_changed.emit(track_idx, send_popover_index, send_amount.get_adjustment()->get_value() / 100.0);
+}
+
 void TrackRackEditor::on_parsing_error(
 		const Glib::RefPtr<const Gtk::CssSection> &section,
 		const Glib::Error &error) {}
 TrackRackEditor::TrackRackEditor(int p_track, Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme,
-		KeyBindings *p_bindings) :
+		KeyBindings *p_bindings, Gtk::VScrollbar *p_v_scroll) :
 		// The GType name will actually be gtkmm__CustomObject_mywidget
 		Glib::ObjectBase("track_editor"),
-		Gtk::Widget() {
+		Gtk::Widget(),
+		send_popover(*this) {
+
+	v_scroll = p_v_scroll;
 
 	// This shows the GType name, which must be used in the CSS file.
 	// std::cout << "GType name: " << G_OBJECT_TYPE_NAME(gobj()) << std::endl;
@@ -632,6 +900,7 @@ TrackRackEditor::TrackRackEditor(int p_track, Song *p_song, UndoRedo *p_undo_red
 	// std::endl;
 
 	track_idx = p_track;
+	track = p_song->get_track(track_idx);
 	song = p_song;
 	undo_redo = p_undo_redo;
 	key_bindings = p_bindings;
@@ -646,14 +915,131 @@ TrackRackEditor::TrackRackEditor(int p_track, Song *p_song, UndoRedo *p_undo_red
 	min_width = 1;
 	min_height = 1;
 	min_width_chars = 8;
-	min_height_lines = 10;
+	min_height_lines = 8;
 	char_width = 1;
 	font_height = 1;
 	font_ascent = 1;
 	separator = 1;
+	v_offset = 0;
 
+	pressing_area = -1;
 	selected = false;
+	mouse_over_area = -1;
+
+	menu_item_mute.set_label("Skip");
+	menu_item_mute.signal_activate().connect(sigc::mem_fun(this, &TrackRackEditor::_item_toggle_mute));
+	menu_item_mute.show();
+
+	menu_item_separator.show();
+
+	menu_item_remove.set_label("Remove");
+	menu_item_remove.signal_activate().connect(sigc::mem_fun(this, &TrackRackEditor::_item_removed));
+	menu_item_remove.show();
+
+	menu = NULL;
+	send_menu = NULL;
+	menu_at_index = -1;
+
+	send_popover.add(send_amount);
+
+	send_amount.get_adjustment()->set_lower(0);
+	send_amount.get_adjustment()->set_upper(100);
+	send_amount.get_adjustment()->set_page_size(0);
+	send_amount.get_adjustment()->set_value(20);
+	send_amount.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(this, &TrackRackEditor::_send_amount_changed));
+
+	send_amount.show();
 }
 
 TrackRackEditor::~TrackRackEditor() {
+	if (menu) {
+		delete menu;
+	}
+
+	for (int i = 0; i < available_tracks.size(); i++) {
+		delete available_tracks[i];
+	}
+
+	if (send_menu) {
+		delete menu;
+	}
+}
+
+//////////////////////////
+
+void TrackRackFiller::on_size_allocate(Gtk::Allocation &allocation) {
+	// Do something with the space that we have actually been given:
+	//(We will not be given heights or widths less than we have requested, though
+	// we might get more)
+
+	// Use the offered allocation for this container:
+	set_allocation(allocation);
+
+	if (m_refGdkWindow) {
+		m_refGdkWindow->move_resize(allocation.get_x(), allocation.get_y(),
+				allocation.get_width(),
+				allocation.get_height());
+	}
+}
+
+void TrackRackFiller::on_realize() {
+	// Do not call base class Gtk::Widget::on_realize().
+	// It's intended only for widgets that set_has_window(false).
+
+	set_realized();
+
+	if (!m_refGdkWindow) {
+		// Create the GdkWindow:
+
+		GdkWindowAttr attributes;
+		memset(&attributes, 0, sizeof(attributes));
+
+		Gtk::Allocation allocation = get_allocation();
+
+		// Set initial position and size of the Gdk::Window:
+		attributes.x = allocation.get_x();
+		attributes.y = allocation.get_y();
+		attributes.width = allocation.get_width();
+		attributes.height = allocation.get_height();
+
+		attributes.event_mask = get_events() | Gdk::EXPOSURE_MASK |
+								Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
+								Gdk::BUTTON1_MOTION_MASK | Gdk::KEY_PRESS_MASK |
+								Gdk::KEY_RELEASE_MASK;
+		attributes.window_type = GDK_WINDOW_CHILD;
+		attributes.wclass = GDK_INPUT_OUTPUT;
+
+		m_refGdkWindow = Gdk::Window::create(get_parent_window(), &attributes,
+				GDK_WA_X | GDK_WA_Y);
+		set_window(m_refGdkWindow);
+
+		// make the widget receive expose events
+		m_refGdkWindow->set_user_data(gobj());
+	}
+}
+
+void TrackRackFiller::on_unrealize() {
+	m_refGdkWindow.reset();
+
+	// Call base class:
+	Gtk::Widget::on_unrealize();
+}
+
+bool TrackRackFiller::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
+	const Gtk::Allocation allocation = get_allocation();
+
+	int w = allocation.get_width();
+	int h = allocation.get_height();
+
+	Gdk::Cairo::set_source_rgba(cr, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG]);
+	cr->rectangle(0, 0, w, h);
+	cr->fill();
+}
+
+TrackRackFiller::TrackRackFiller(Theme *p_theme) :
+		// The GType name will actually be gtkmm__CustomObject_mywidget
+		Glib::ObjectBase("filler"),
+		Gtk::Widget() {
+
+	theme = p_theme;
 }

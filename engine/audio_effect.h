@@ -69,18 +69,18 @@ public:
 };
 
 class AudioEffect {
+
+	bool skip;
+
 public:
 	//process
 	virtual bool process(const Frame *p_in, Frame *p_out, const Event *p_events, bool p_prev_active) = 0;
 
 	//info
-	virtual bool has_synth() const = 0;
-
 	virtual const AudioEffectInfo *get_info() const = 0;
 
 	virtual int get_control_port_count() const = 0;
 	virtual ControlPort *get_control_port(int p_port) = 0;
-	const ControlPort *get_control_port(int p_port) const; //const
 
 	virtual void reset() = 0;
 
@@ -88,6 +88,9 @@ public:
 
 	virtual Error save(TreeSaver *p_tree) = 0;
 	virtual Error load(TreeLoader *p_tree) = 0;
+
+	void set_skip(bool p_skip);
+	bool is_skipped() const;
 
 	AudioEffect();
 	virtual ~AudioEffect();

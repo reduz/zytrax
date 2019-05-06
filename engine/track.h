@@ -155,6 +155,10 @@ public:
 		Event event;
 	};
 
+	enum {
+		SEND_SPEAKERS = -1
+	};
+
 private:
 	Map<int, ValueStream<Pos, Note> > note_data;
 	int note_columns;
@@ -165,6 +169,13 @@ private:
 	Vector<AudioEffect *> effects;
 	Vector<Automation *> automations;
 
+	struct Send {
+		int track;
+		float amount;
+		bool mute;
+	};
+
+	Vector<Send> sends;
 	ControlPortDefault swing;
 	ControlPortDefault volume;
 	ControlPortDefault pan;
@@ -229,6 +240,15 @@ public:
 	float get_mix_volume_db() const;
 
 	float get_peak_volume_db() const;
+
+	void add_send(int p_track, int p_pos = -1);
+	void set_send_amount(int p_send, float p_amount);
+	void set_send_mute(int p_send, bool p_mute);
+	int get_send_track(int p_send) const;
+	float get_send_amount(int p_send) const;
+	bool is_send_muted(int p_send) const;
+	int get_send_count();
+	void remove_send(int p_send);
 
 	Track();
 };

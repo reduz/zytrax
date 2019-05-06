@@ -1,16 +1,16 @@
 #include <gtkmm.h>
 
 #include "drivers/audio_effect_factory_lv2.h"
-#include "drivers/audio_effect_factory_vst.h"
+#include "drivers/factory_wrapper_vst2.h"
 #include "gui/interface.h"
 
 int main(int argc, char *argv[]) {
 
 	AudioEffectFactory effect_factory;
 
-	AudioEffectProviderVST2 provider_vst2;
-	provider_vst2.scan_effects(&effect_factory);
-	effect_factory.add_provider(&provider_vst2);
+	AudioEffectProvider *provider_vst2 = create_vst2_provider();
+	provider_vst2->scan_effects(&effect_factory);
+	effect_factory.add_provider(provider_vst2);
 
 #ifdef UNIX_ENABLED
 
@@ -29,5 +29,9 @@ int main(int argc, char *argv[]) {
 	Interface window(app.operator->(), &effect_factory);
 	window.set_default_size(800, 600);
 
-	return app->run(window);
+	int ret = app->run(window);
+
+	delete provider_vst2;
+
+	return ret;
 }

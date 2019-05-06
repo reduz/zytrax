@@ -104,6 +104,8 @@ class Interface : public Gtk::ApplicationWindow {
 	Glib::RefPtr<Gio::Menu> settings_menu_cheat;
 	Glib::RefPtr<Gio::Menu> settings_menu_about;
 
+	AddEffectDialog add_effect_dialog;
+
 	Gtk::MenuItem menu_item_file_open;
 
 	Vector<Gtk::MenuItem *> menu_items;
@@ -146,7 +148,6 @@ class Interface : public Gtk::ApplicationWindow {
 
 	KeyBindings key_bindings;
 
-	TrackSettings track_settings;
 	/* Editors */
 
 	UndoRedo undo_redo;
@@ -159,14 +160,15 @@ class Interface : public Gtk::ApplicationWindow {
 	struct TrackRacks {
 		TrackRackVolume *volume;
 		TrackRackEditor *rack;
+		Gtk::VScrollbar *v_scroll;
 	};
 
 	Vector<TrackRacks> racks;
+	TrackRackFiller *rack_filler;
 
 	/* Data */
 
 	void _add_track();
-	void _track_edited(int p_track);
 
 	void _pattern_changed();
 	void _octave_changed();
@@ -193,6 +195,15 @@ class Interface : public Gtk::ApplicationWindow {
 	void _update_pattern();
 	void _update_step();
 	void _update_zoom();
+
+	void _redraw_track_edits();
+	void _on_add_effect(int p_track);
+	void _on_toggle_effect_skip(int p_track, int p_effect);
+	void _on_toggle_send_mute(int p_track, int p_send);
+	void _on_remove_effect(int p_track, int p_effect);
+	void _on_remove_send(int p_track, int p_send);
+	void _on_track_insert_send(int p_track, int p_to_track);
+	void _on_track_send_amount_changed(int p_track, int p_send, float p_amount);
 
 public:
 	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory);

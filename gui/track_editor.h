@@ -100,8 +100,25 @@ protected:
 	int font_ascent;
 	int separator;
 
+	struct Area {
+		bool is_fx;
+		int which;
+		int index;
+		int y;
+		int h;
+		bool insert;
+	};
+
+	Vector<Area> areas;
+	int mouse_over_area;
+	int pressing_area;
+	int menu_at_index;
+
+	int v_offset;
+
 	// Overrides:
-	Gtk::SizeRequestMode get_request_mode_vfunc() const override;
+	Gtk::SizeRequestMode
+	get_request_mode_vfunc() const override;
 	void get_preferred_width_vfunc(int &minimum_width,
 			int &natural_width) const override;
 	void get_preferred_height_for_width_vfunc(int width, int &minimum_height,
@@ -125,6 +142,7 @@ protected:
 
 	bool on_button_press_event(GdkEventButton *event);
 	bool on_button_release_event(GdkEventButton *event);
+	bool on_leave_notify_event(GdkEventCrossing *crossing_event);
 	bool on_motion_notify_event(GdkEventMotion *motion_event);
 	bool on_key_press_event(GdkEventKey *key_event);
 	bool on_key_release_event(GdkEventKey *key_event);
@@ -154,15 +172,63 @@ protected:
 
 	bool selected;
 
+	Gtk::VScrollbar *v_scroll;
+	Track *track;
+
+	void _update_menu(bool p_muted, bool p_is_fx);
+
+	Gtk::Menu *menu;
+	Gtk::CheckMenuItem menu_item_mute;
+	Gtk::SeparatorMenuItem menu_item_separator;
+	Gtk::MenuItem menu_item_remove;
+
+	Gtk::Menu *send_menu;
+	Vector<Gtk::MenuItem *> available_tracks;
+
+	void _insert_send_to_track(int p_idx);
+	void _item_toggle_mute();
+	void _item_removed();
+	void _send_amount_changed();
+
+	Gtk::Popover send_popover;
+	Gtk::HScale send_amount;
+	int send_popover_index;
+
 public:
+	sigc::signal1<void, int> add_effect;
+	sigc::signal2<void, int, int> toggle_effect_skip;
+	sigc::signal2<void, int, int> toggle_send_mute;
+	sigc::signal2<void, int, int> remove_effect;
+	sigc::signal2<void, int, int> remove_send;
+	sigc::signal2<void, int, int> insert_send_to_track;
+	sigc::signal3<void, int, int, float> send_amount_changed;
+
 	void set_selected(bool p_selected) {
 		selected = p_selected;
 		queue_draw();
 	}
 
+	int set_v_offset(int p_offset);
+	int get_v_offset() const;
+	Track *get_track() const;
+
 	TrackRackEditor(int p_track, Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme,
-			KeyBindings *p_bindings);
+			KeyBindings *p_bindings, Gtk::VScrollbar *p_v_scroll);
 	~TrackRackEditor();
+};
+
+class TrackRackFiller : public Gtk::Widget {
+
+	Theme *theme;
+	Glib::RefPtr<Gdk::Window> m_refGdkWindow;
+
+public:
+	void on_size_allocate(Gtk::Allocation &allocation) override;
+	void on_realize() override;
+	void on_unrealize() override;
+	bool on_draw(const Cairo::RefPtr<Cairo::Context> &cr) override;
+
+	TrackRackFiller(Theme *p_theme);
 };
 
 #endif // TRACK_EDITOR_H

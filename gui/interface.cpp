@@ -5,9 +5,6 @@ void Interface::_add_track() {
 
 	key_bindings.action_activated.emit(KeyBindings::TRACK_ADD_TRACK);
 }
-void Interface::_track_edited(int p_track) {
-	track_settings.show();
-}
 
 void Interface::_pattern_changed() {
 	pattern_editor.set_current_pattern(pattern.get_adjustment()->get_value());
@@ -233,24 +230,49 @@ void Interface::_update_tracks() {
 	double previous_scroll = track_scroll.get_hadjustment()->get_value();
 	int current_track = pattern_editor.get_current_track();
 
+	Map<Track *, int> offsets;
+
 	for (int i = 0; i < racks.size(); i++) {
+
+		offsets[racks[i].rack->get_track()] = racks[i].rack->get_v_offset();
 		delete racks[i].rack;
 		delete racks[i].volume;
+	}
+
+	if (rack_filler) {
+		delete rack_filler;
+		rack_filler = NULL;
 	}
 	racks.clear();
 	for (int i = 0; i < song.get_track_count(); i++) {
 		TrackRacks rack;
 		rack.volume = new TrackRackVolume(i, &song, &undo_redo, &theme, &key_bindings);
-		rack.rack = new TrackRackEditor(i, &song, &undo_redo, &theme, &key_bindings);
+		rack.v_scroll = new Gtk::VScrollbar;
+		rack.rack = new TrackRackEditor(i, &song, &undo_redo, &theme, &key_bindings, rack.v_scroll);
+		rack.rack->add_effect.connect(sigc::mem_fun(*this, &Interface::_on_add_effect));
+		rack.rack->toggle_effect_skip.connect(sigc::mem_fun(*this, &Interface::_on_toggle_effect_skip));
+		rack.rack->toggle_send_mute.connect(sigc::mem_fun(*this, &Interface::_on_toggle_send_mute));
+		rack.rack->remove_effect.connect(sigc::mem_fun(*this, &Interface::_on_remove_effect));
+		rack.rack->remove_send.connect(sigc::mem_fun(*this, &Interface::_on_remove_send));
+		rack.rack->insert_send_to_track.connect(sigc::mem_fun(*this, &Interface::_on_track_insert_send));
+		rack.rack->send_amount_changed.connect(sigc::mem_fun(*this, &Interface::_on_track_send_amount_changed));
 
+		if (offsets.has(song.get_track(i))) {
+			rack.rack->set_v_offset(offsets[song.get_track(i)]);
+		}
 		track_hbox.pack_start(*rack.volume, Gtk::PACK_SHRINK);
 		track_hbox.pack_start(*rack.rack, Gtk::PACK_SHRINK);
+		track_hbox.pack_start(*rack.v_scroll, Gtk::PACK_SHRINK);
 		rack.rack->set_selected(i == current_track);
 		rack.volume->set_selected(i == current_track);
 		rack.volume->show();
 		rack.rack->show();
 		racks.push_back(rack);
 	}
+
+	rack_filler = new TrackRackFiller(&theme);
+	rack_filler->show();
+	track_hbox.pack_start(*rack_filler, Gtk::PACK_EXPAND_WIDGET);
 
 	track_scroll.get_hadjustment()->set_value(previous_scroll);
 	_ensure_selected_track_visible();
@@ -288,6 +310,117 @@ void Interface::_update_zoom() {
 	updating_editors = true;
 	zoom.set_active(pattern_editor.get_beat_zoom());
 	updating_editors = false;
+}
+
+void Interface::_on_add_effect(int p_track) {
+
+	add_effect_dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+	add_effect_dialog.update_effect_list();
+	if (add_effect_dialog.run() == Gtk::RESPONSE_OK) {
+
+		int idx = add_effect_dialog.get_selected_effect_index();
+		ERR_FAIL_COND(idx == -1);
+		const AudioEffectInfo *fx_info = fx_factory->get_audio_effect(idx);
+		AudioEffect *effect = fx_info->creation_func(fx_info);
+		undo_redo.begin_action("Create Effect: " + fx_info->caption);
+		Track *track = song.get_track(p_track);
+		undo_redo.do_method(track, Track::add_audio_effect, effect, -1);
+		undo_redo.undo_method(track, Track::remove_audio_effect, track->get_audio_effect_count());
+		undo_redo.do_data(effect);
+		undo_redo.do_method(this, Interface::_update_tracks);
+		undo_redo.undo_method(this, Interface::_update_tracks);
+		undo_redo.commit_action();
+	}
+	add_effect_dialog.hide();
+}
+
+void Interface::_redraw_track_edits() {
+
+	for (int i = 0; i < racks.size(); i++) {
+		racks[i].rack->queue_draw();
+	}
+}
+void Interface::_on_toggle_effect_skip(int p_track, int p_effect) {
+
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	ERR_FAIL_INDEX(p_effect, song.get_track(p_track)->get_audio_effect_count());
+
+	undo_redo.begin_action("Toggle Effect Skip");
+	bool skip = song.get_track(p_track)->get_audio_effect(p_effect)->is_skipped();
+	undo_redo.do_method(song.get_track(p_track)->get_audio_effect(p_effect), AudioEffect::set_skip, !skip);
+	undo_redo.undo_method(song.get_track(p_track)->get_audio_effect(p_effect), AudioEffect::set_skip, skip);
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+void Interface::_on_toggle_send_mute(int p_track, int p_send) {
+
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	ERR_FAIL_INDEX(p_send, song.get_track(p_track)->get_send_count());
+
+	undo_redo.begin_action("Toggle Send Mute");
+	bool mute = song.get_track(p_track)->is_send_muted(p_send);
+	undo_redo.do_method(song.get_track(p_track), Track::set_send_mute, p_send, !mute);
+	undo_redo.undo_method(song.get_track(p_track), Track::set_send_mute, p_send, mute);
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+void Interface::_on_remove_effect(int p_track, int p_effect) {
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	ERR_FAIL_INDEX(p_effect, song.get_track(p_track)->get_audio_effect_count());
+
+	undo_redo.begin_action("Remove Effect");
+	undo_redo.do_method(song.get_track(p_track), Track::remove_audio_effect, p_effect);
+	AudioEffect *effect = song.get_track(p_track)->get_audio_effect(p_effect);
+	undo_redo.undo_method(song.get_track(p_track), Track::add_audio_effect, effect, p_effect);
+	undo_redo.undo_data(effect);
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+void Interface::_on_remove_send(int p_track, int p_send) {
+
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	ERR_FAIL_INDEX(p_send, song.get_track(p_track)->get_send_count());
+
+	undo_redo.begin_action("Remove Send");
+	Track *track = song.get_track(p_track);
+	undo_redo.do_method(track, Track::remove_send, p_send);
+	undo_redo.undo_method(track, Track::add_send, track->get_send_track(p_send), p_send);
+	undo_redo.undo_method(track, Track::set_send_amount, p_send, track->get_send_amount(p_send));
+	undo_redo.undo_method(track, Track::set_send_mute, p_send, track->is_send_muted(p_send));
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+
+void Interface::_on_track_insert_send(int p_track, int p_to_track) {
+
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	ERR_FAIL_INDEX(p_to_track, song.get_track_count());
+	ERR_FAIL_COND(p_to_track == p_track);
+
+	undo_redo.begin_action("Add Send");
+	Track *track = song.get_track(p_track);
+	undo_redo.do_method(track, Track::add_send, p_to_track, -1);
+	undo_redo.undo_method(track, Track::remove_send, track->get_send_count());
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+
+void Interface::_on_track_send_amount_changed(int p_track, int p_send, float p_amount) {
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	Track *track = song.get_track(p_track);
+	ERR_FAIL_INDEX(p_send, track->get_send_count());
+
+	undo_redo.begin_action("Set Send Amount", true);
+	undo_redo.do_method(track, Track::set_send_amount, p_send, p_amount);
+	undo_redo.undo_method(track, Track::set_send_amount, p_send, track->get_send_amount(p_send));
+	undo_redo.do_method(this, Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.commit_action();
 }
 
 void Interface::_on_application_startup() {
@@ -438,7 +571,7 @@ void Interface::_on_application_startup() {
 
 Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory) :
 		key_bindings(p_application, this),
-		track_settings(p_fx_factory),
+		add_effect_dialog(p_fx_factory),
 		pattern_editor(&song, &undo_redo, &theme, &key_bindings) {
 
 	application = p_application;
@@ -587,7 +720,6 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	main_hbox.pack_start(pattern_vbox, Gtk::PACK_EXPAND_WIDGET);
 	pattern_vbox.pack_start(pattern_editor, Gtk::PACK_EXPAND_WIDGET);
-	pattern_editor.track_edited.connect(sigc::mem_fun(this, &Interface::_track_edited));
 	main_hbox.pack_start(pattern_vscroll, Gtk::PACK_SHRINK);
 	pattern_vbox.pack_start(pattern_hscroll, Gtk::PACK_SHRINK);
 
@@ -596,7 +728,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	track_scroll.set_propagate_natural_height(true);
 	track_scroll.set_policy(Gtk::POLICY_ALWAYS, Gtk::POLICY_NEVER);
 
-	pattern_editor.track_edited.connect(sigc::mem_fun(this, &Interface::_track_edited));
+	//pattern_editor.track_edited.connect(sigc::mem_fun(this, &Interface::_track_edited));
 	pattern_editor.track_layout_changed.connect(sigc::mem_fun(this, &Interface::_update_tracks));
 	pattern_editor.current_track_changed.connect(sigc::mem_fun(this, &Interface::_update_selected_track));
 	pattern_editor.volume_mask_changed.connect(sigc::mem_fun(this, &Interface::_update_volume_mask));
@@ -609,6 +741,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	pattern_editor.set_vscroll(pattern_vscroll.get_adjustment());
 
 	show_all_children();
+	rack_filler = NULL;
 
 	//pattern_editor.init();
 	_update_editors();
@@ -622,5 +755,8 @@ Interface::~Interface() {
 	for (int i = 0; i < racks.size(); i++) {
 		delete racks[i].rack;
 		delete racks[i].volume;
+	}
+	if (rack_filler) {
+		delete rack_filler;
 	}
 }

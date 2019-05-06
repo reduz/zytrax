@@ -577,6 +577,56 @@ float Track::get_peak_volume_db() const {
 	return -40;
 }
 
+void Track::add_send(int p_track, int p_pos) {
+
+	for (int i = 0; i < sends.size(); i++) {
+		ERR_FAIL_COND(sends[i].track == p_track);
+	}
+
+	Send send;
+	send.amount = 1.0;
+	send.track = p_track;
+	send.mute = false;
+	if (p_pos < 0 || p_pos >= sends.size()) {
+		sends.push_back(send);
+	} else {
+		sends.insert(p_pos, send);
+	}
+}
+void Track::set_send_amount(int p_send, float p_amount) {
+
+	ERR_FAIL_INDEX(p_send, sends.size());
+	sends[p_send].amount = p_amount;
+}
+
+void Track::set_send_mute(int p_send, bool p_mute) {
+
+	ERR_FAIL_INDEX(p_send, sends.size());
+	sends[p_send].mute = p_mute;
+}
+
+int Track::get_send_track(int p_send) const {
+	ERR_FAIL_INDEX_V(p_send, sends.size(), SEND_SPEAKERS);
+	return sends[p_send].track;
+}
+float Track::get_send_amount(int p_send) const {
+	ERR_FAIL_INDEX_V(p_send, sends.size(), SEND_SPEAKERS);
+	return sends[p_send].amount;
+}
+
+bool Track::is_send_muted(int p_send) const {
+	ERR_FAIL_INDEX_V(p_send, sends.size(), false);
+	return sends[p_send].mute;
+}
+
+int Track::get_send_count() {
+	return sends.size();
+}
+void Track::remove_send(int p_send) {
+	ERR_FAIL_INDEX(p_send, sends.size());
+	sends.remove(p_send);
+}
+
 Track::Track() {
 
 	swing.name = "Swing";

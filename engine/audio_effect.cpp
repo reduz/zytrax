@@ -35,15 +35,18 @@ ControlPort::ControlPort() {
 ControlPort::~ControlPort() {
 }
 
+void AudioEffect::set_skip(bool p_skip) {
+	skip = p_skip;
+}
+bool AudioEffect::is_skipped() const {
+	return skip;
+}
+
 AudioEffect::AudioEffect() {
+	skip = false;
 }
 
 AudioEffect::~AudioEffect() {
-}
-
-const ControlPort *AudioEffect::get_control_port(int p_idx) const {
-
-	return const_cast<AudioEffect *>(this)->get_control_port(p_idx);
 }
 
 void AudioEffectFactory::add_audio_effect(AudioEffectInfo p_info) {
