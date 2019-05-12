@@ -113,6 +113,10 @@ protected:
 	int mouse_over_area;
 	int pressing_area;
 	int menu_at_index;
+	int press_y;
+	bool dragging;
+	bool drag_fx;
+	int dragging_y;
 
 	int v_offset;
 
@@ -202,6 +206,9 @@ public:
 	sigc::signal2<void, int, int> remove_send;
 	sigc::signal2<void, int, int> insert_send_to_track;
 	sigc::signal3<void, int, int, float> send_amount_changed;
+	sigc::signal3<void, int, int, int> track_swap_effects;
+	sigc::signal3<void, int, int, int> track_swap_sends;
+	sigc::signal2<void, int, int> effect_request_editor;
 
 	void set_selected(bool p_selected) {
 		selected = p_selected;

@@ -14,6 +14,7 @@ struct Theme {
 		COLOR_PATTERN_EDITOR_ROW_BEAT,
 		COLOR_PATTERN_EDITOR_ROW_SUB_BEAT,
 		COLOR_PATTERN_EDITOR_BG,
+		COLOR_PATTERN_EDITOR_BG_RACK_SELECTED,
 		COLOR_PATTERN_EDITOR_NOTE,
 		COLOR_PATTERN_EDITOR_HL_BAR,
 		COLOR_PATTERN_EDITOR_HL_BEAT,
@@ -35,21 +36,12 @@ struct Theme {
 		COLOR_MAX
 	};
 
+	static const char *color_names[COLOR_MAX];
+
 	Gdk::RGBA colors[COLOR_MAX];
 
-	enum {
-		FONT_PATTERN,
-		FONT_TRACK_EDIT,
-		FONT_MAX
-	};
-
-	struct Font {
-		String face;
-		float size;
-		bool bold;
-	};
-
-	Font fonts[FONT_MAX];
+	String font;
+	void select_font_face(const Cairo::RefPtr<Cairo::Context> &cr);
 
 	enum {
 
@@ -61,6 +53,13 @@ struct Theme {
 	int constants[CONSTANT_MAX];
 
 	static Gdk::RGBA make_rgba(uint8_t p_red, uint8_t p_green, uint8_t p_blue, uint8_t p_alpha = 255);
+
+	enum ColorScheme {
+		COLOR_SCHEME_DEFAULT,
+		COLOR_SCHEME_DARK,
+	};
+
+	ColorScheme color_scheme;
 
 	Theme();
 };

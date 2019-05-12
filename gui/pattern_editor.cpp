@@ -738,7 +738,10 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 						false /* use_markup */, Gtk::MESSAGE_QUESTION,
 						Gtk::BUTTONS_OK_CANCEL);
 				dialog.set_title("Rename Track");
-				dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+
+				dialog.set_transient_for(*static_cast<Gtk::Window *>(get_toplevel()));
+				dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+
 				Gtk::Entry entry;
 				entry.set_text(song->get_track(current_track)->get_name().utf8().get_data());
 				dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
@@ -1116,7 +1119,9 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 						false /* use_markup */, Gtk::MESSAGE_QUESTION,
 						Gtk::BUTTONS_OK_CANCEL);
 				dialog.set_title("Amplify Volume / Automation");
-				dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+				dialog.set_transient_for(*static_cast<Gtk::Window *>(get_toplevel()));
+				dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+
 				Gtk::Entry entry;
 				entry.set_text(String::num(last_amplify_value).ascii().get_data());
 				dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
@@ -1200,7 +1205,8 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 								false /* use_markup */, Gtk::MESSAGE_QUESTION,
 								Gtk::BUTTONS_OK_CANCEL);
 						dialog.set_title("Scale Selection Length");
-						dialog.set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+						dialog.set_transient_for(*static_cast<Gtk::Window *>(get_toplevel()));
+						dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
 						Gtk::Entry entry;
 						entry.set_text(String::num(last_scale_value).ascii().get_data());
 						dialog.get_vbox()->pack_start(entry, Gtk::PACK_SHRINK);
@@ -2028,6 +2034,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		if (current_pattern > 0) {
 			current_pattern--;
 			pattern_changed.emit();
+			_validate_cursor();
 			queue_draw();
 		}
 
@@ -2035,6 +2042,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		if (current_pattern < Song::MAX_PATTERN - 1) {
 			current_pattern++;
 			pattern_changed.emit();
+			_validate_cursor();
 			queue_draw();
 		}
 
@@ -2562,10 +2570,8 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	cr->rectangle(0, 0, w, h);
 	cr->fill();
 
-	cr->select_font_face(theme->fonts[Theme::FONT_PATTERN].face.utf8().get_data(),
-			Cairo::FONT_SLANT_NORMAL,
-			theme->fonts[Theme::FONT_PATTERN].bold ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
-	cr->set_font_size(theme->fonts[Theme::FONT_PATTERN].size);
+	theme->select_font_face(cr);
+
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
 
@@ -2602,12 +2608,17 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	visible_rows = (h - top_ofs) / fh;
 
 	int beats_per_bar = song->pattern_get_beats_per_bar(current_pattern);
+	int pattern_length = song->pattern_get_beats(current_pattern) * _get_rows_per_beat();
 
 	for (int i = 0; i < visible_rows; i++) {
 
 		int row = v_offset + i;
 		int beat = row / _get_rows_per_beat();
 		int subbeat = row % _get_rows_per_beat();
+
+		if (row >= pattern_length) {
+			break;
+		}
 
 		if (subbeat == 0 || i == 0) {
 			if (beat % beats_per_bar == 0)
@@ -2680,6 +2691,11 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				char rowstr[7] = { '.', '.', '.', ' ', '.', '.', 0 };
 
 				int row = v_offset + k;
+
+				if (row >= pattern_length) {
+					break;
+				}
+
 				int beat = row / _get_rows_per_beat();
 				int subbeat = row % _get_rows_per_beat();
 				Tick from_tick = row * TICKS_PER_BEAT / _get_rows_per_beat();
@@ -2879,6 +2895,11 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						char rowstr[3] = { '.', '.', 0 };
 
 						int row = v_offset + k;
+
+						if (row >= pattern_length) {
+							break;
+						}
+
 						int beat = row / _get_rows_per_beat();
 						int subbeat = row % _get_rows_per_beat();
 						Tick from = row * TICKS_PER_BEAT / _get_rows_per_beat();
@@ -3020,6 +3041,11 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 					for (int k = 0; k < visible_rows; k++) {
 
 						int row = v_offset + k;
+
+						if (row >= pattern_length) {
+							break;
+						}
+
 						int beat = row / _get_rows_per_beat();
 						int subbeat = row % _get_rows_per_beat();
 						Tick from = row * TICKS_PER_BEAT / _get_rows_per_beat();
@@ -3219,6 +3245,10 @@ void PatternEditor::set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll) {
 	v_scroll->signal_value_changed().connect(sigc::mem_fun(*this, &PatternEditor::_v_scroll_changed));
 }
 
+void PatternEditor::redraw_and_validate_cursor() {
+	_validate_cursor();
+	queue_draw();
+}
 void PatternEditor::on_parsing_error(
 		const Glib::RefPtr<const Gtk::CssSection> &section,
 		const Glib::Error &error) {}

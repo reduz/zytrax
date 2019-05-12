@@ -12,12 +12,20 @@
 #include "sound_driver_manager.h"
 #include "error_macros.h"
 
-SoundDriver *SoundDriverManager::sound_drivers[MAX_SOUND_DRIVERS] = { 0, 0, 0, 0, 0 };
+int SoundDriverManager::buffer_size_frames[SoundDriverManager::BUFFER_SIZE_MAX] = {
+	64, 128, 256, 512, 1024, 2048, 4096
+};
+int SoundDriverManager::mix_frequenzy_hz[SoundDriverManager::MIX_FREQ_MAX] = {
+	22050, 44100, 48000, 96000, 192000
+};
+
+SoundDriver *SoundDriverManager::sound_drivers[MAX_SOUND_DRIVERS];
 int SoundDriverManager::sound_driver_count = 0;
 int SoundDriverManager::current_driver = 0;
-int SoundDriverManager::mixing_hz = 44100;
-int SoundDriverManager::buffer_size = 1024;
-SoundDriverManager::MixStepSize SoundDriverManager::mix_step = SoundDriverManager::MIX_STEP_1024;
+
+SoundDriverManager::MixFrequency SoundDriverManager::mixing_hz = SoundDriverManager::MIX_FREQ_48000;
+SoundDriverManager::BufferSize SoundDriverManager::buffer_size = SoundDriverManager::BUFFER_SIZE_1024;
+SoundDriverManager::BufferSize SoundDriverManager::step_size = SoundDriverManager::BUFFER_SIZE_256;
 
 int SoundDriverManager::get_current_driver_index() {
 
@@ -62,7 +70,7 @@ bool SoundDriverManager::init_driver(int p_driver) {
 
 	current_driver = p_driver;
 
-	return sound_drivers[current_driver]->init(mixing_hz,1024);
+	return sound_drivers[current_driver]->init();
 }
 void SoundDriverManager::finish_driver() {
 
@@ -88,29 +96,34 @@ SoundDriver *SoundDriverManager::get_driver(int p_which) {
 	return sound_drivers[p_which];
 }
 
-void SoundDriverManager::set_mixing_hz(int p_hz) {
+void SoundDriverManager::set_mix_frequency(MixFrequency p_frequency) {
 
-	mixing_hz = p_hz;
+	mixing_hz = p_frequency;
 }
-
-int SoundDriverManager::get_mixing_hz() const {
-
+SoundDriverManager::MixFrequency SoundDriverManager::get_mix_frequency() {
 	return mixing_hz;
 }
 
-void SoundDriverManager::set_buffer_size(int p_size) {
+void SoundDriverManager::set_buffer_size(BufferSize p_size) {
+
 	buffer_size = p_size;
 }
-int SoundDriverManager::get_buffer_size() const {
+SoundDriverManager::BufferSize SoundDriverManager::get_buffer_size() {
 	return buffer_size;
 }
 
-void SoundDriverManager::set_mix_step_size(MixStepSize p_step) {
-
-	mix_step = p_step;
+void SoundDriverManager::set_step_buffer_size(BufferSize p_size) {
+	step_size = p_size;
 }
-SoundDriverManager::MixStepSize SoundDriverManager::get_mix_step_size() const {
-	return mix_step;
+SoundDriverManager::BufferSize SoundDriverManager::get_step_buffer_size() {
+	return step_size;
+}
+
+int SoundDriverManager::get_mix_frequency_hz(MixFrequency p_frequency) {
+	return mix_frequenzy_hz[p_frequency];
+}
+int SoundDriverManager::get_buffer_size_frames(BufferSize p_size) {
+	return buffer_size_frames[p_size];
 }
 
 void SoundDriverManager::register_driver(SoundDriver *p_driver) {

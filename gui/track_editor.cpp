@@ -192,10 +192,8 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	{
 		//update min width
-		cr->select_font_face(theme->fonts[Theme::FONT_TRACK_EDIT].face.utf8().get_data(),
-				Cairo::FONT_SLANT_NORMAL,
-				theme->fonts[Theme::FONT_TRACK_EDIT].bold ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
-		cr->set_font_size(theme->fonts[Theme::FONT_TRACK_EDIT].size);
+		theme->select_font_face(cr);
+
 		Cairo::FontExtents fe;
 		cr->get_font_extents(fe);
 
@@ -303,9 +301,9 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	//cr->line_to(vu_x + vu_w, vu_y + db_handle + 1.5);
 	cr->stroke();
 
-	if (selected) {
+	/*if (selected) {
 		_draw_rect(cr, 1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
-	}
+	}*/
 }
 
 void TrackRackVolume::on_parsing_error(
@@ -405,17 +403,18 @@ void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				}
 			} else {
 				pressing_area = new_mouse_over_area;
+				press_y = event->y;
 				queue_draw();
 			}
 		} else {
-			if (new_mouse_over_area < 0) {
-				return;
-			}
 
-			if (pressing_area == new_mouse_over_area) {
+			if (new_mouse_over_area < 0) {
+				//none?
+			} else if (pressing_area == new_mouse_over_area) {
 
 				if (areas[pressing_area].is_fx) {
 
+					effect_request_editor.emit(track_idx, areas[pressing_area].which);
 				} else {
 
 					Gdk::Rectangle alloc;
@@ -433,7 +432,23 @@ void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 				//press
 			}
 
+			if (dragging && pressing_area != -1 && mouse_over_area != -1) {
+				if (drag_fx == areas[mouse_over_area].is_fx) {
+					int from = areas[pressing_area].which;
+					int to = areas[mouse_over_area].which;
+					if (from != to) {
+						if (drag_fx) {
+							track_swap_effects.emit(track_idx, from, to);
+						} else {
+							track_swap_sends.emit(track_idx, from, to);
+						}
+					}
+				}
+			}
 			pressing_area = -1;
+			dragging = false;
+			drag_fx = false;
+			dragging_y = -1;
 			queue_draw();
 		}
 	} else if (event->button == 3 && p_press) {
@@ -500,6 +515,17 @@ bool TrackRackEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 
 	if (mouse_over_area != new_mouse_over_area) {
 		mouse_over_area = new_mouse_over_area;
+		queue_draw();
+	}
+
+	if (pressing_area >= 0 && !dragging) {
+		dragging = true;
+		queue_draw();
+	}
+
+	if (dragging) {
+		dragging_y = motion_event->y;
+		drag_fx = areas[pressing_area].is_fx;
 		queue_draw();
 	}
 
@@ -678,10 +704,8 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	{
 		//update min width
-		cr->select_font_face(theme->fonts[Theme::FONT_TRACK_EDIT].face.utf8().get_data(),
-				Cairo::FONT_SLANT_NORMAL,
-				theme->fonts[Theme::FONT_TRACK_EDIT].bold ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
-		cr->set_font_size(theme->fonts[Theme::FONT_TRACK_EDIT].size);
+		theme->select_font_face(cr);
+
 		Cairo::FontExtents fe;
 		cr->get_font_extents(fe);
 
@@ -703,7 +727,7 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		}
 	}
 
-	Gdk::Cairo::set_source_rgba(cr, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG]);
+	Gdk::Cairo::set_source_rgba(cr, selected ? theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_RACK_SELECTED] : theme->colors[Theme::COLOR_PATTERN_EDITOR_BG]);
 
 	cr->rectangle(0, 0, w, h);
 	cr->fill();
@@ -736,7 +760,11 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				color.set_alpha(color.get_alpha() * 0.7);
 				area.insert = true;
 			} else {
-				text = song->get_track(track_idx)->get_audio_effect(i)->get_info()->caption;
+
+				if (dragging && drag_fx && mouse_over_area == idx) {
+					_draw_rect(cr, 0, y, w, row_height - 2, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_SELECTED]);
+				}
+				text = song->get_track(track_idx)->get_audio_effect(i)->get_name();
 				_draw_rect(cr, 0, y + row_height - 1, w, 0, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
 				if (song->get_track(track_idx)->get_audio_effect(i)->is_skipped()) {
 					color = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE_NOFIT];
@@ -747,7 +775,12 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			}
 
 			int insert_ofs = (w - _get_text_width(cr, text)) / 2;
-			_draw_text(cr, insert_ofs, y + separator / 2 + font_ascent, text, color, false);
+
+			int draw_y = y + separator / 2 + font_ascent;
+			if (dragging && pressing_area == idx) {
+				draw_y += dragging_y - press_y;
+			}
+			_draw_text(cr, insert_ofs, draw_y, text, color, false);
 
 			y += row_height;
 
@@ -788,6 +821,11 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				color.set_alpha(color.get_alpha() * 0.7);
 				area.insert = true;
 			} else {
+
+				if (dragging && !drag_fx && mouse_over_area == idx) {
+					_draw_rect(cr, 0, y, w, row_height - 2, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG_SELECTED]);
+				}
+
 				bool muted = song->get_track(track_idx)->is_send_muted(i);
 				int to = song->get_track(track_idx)->get_send_track(i);
 				if (to < 0 || to >= song->get_track_count()) {
@@ -801,6 +839,7 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 				} else {
 					text += String::num(amount_percent) + "%";
 				}
+
 				_draw_rect(cr, 0, y + row_height - 1, w, 0, theme->colors[Theme::COLOR_PATTERN_EDITOR_HL_BEAT]);
 				area.insert = false;
 
@@ -811,7 +850,11 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			}
 
 			int insert_ofs = (w - _get_text_width(cr, text)) / 2;
-			_draw_text(cr, insert_ofs, y + separator / 2 + font_ascent, text, color, false);
+			int draw_y = y + separator / 2 + font_ascent;
+			if (dragging && pressing_area == idx) {
+				draw_y += dragging_y - press_y;
+			}
+			_draw_text(cr, insert_ofs, draw_y, text, color, false);
 			y += row_height;
 
 			areas.push_back(area);
@@ -820,9 +863,9 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		idx++;
 	}
 
-	if (selected) {
+	/*if (selected) {
 		_draw_rect(cr, -1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
-	}
+	}*/
 }
 
 int TrackRackEditor::set_v_offset(int p_offset) {
@@ -925,6 +968,9 @@ TrackRackEditor::TrackRackEditor(int p_track, Song *p_song, UndoRedo *p_undo_red
 	pressing_area = -1;
 	selected = false;
 	mouse_over_area = -1;
+	dragging = false;
+	dragging_y = 0;
+	drag_fx = false;
 
 	menu_item_mute.set_label("Skip");
 	menu_item_mute.signal_activate().connect(sigc::mem_fun(this, &TrackRackEditor::_item_toggle_mute));

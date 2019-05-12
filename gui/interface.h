@@ -2,13 +2,17 @@
 #define INTERFACE_H
 
 #include "engine/song.h"
+#include "engine/song_file.h"
+#include "gui/add_effect_dialog.h"
+#include "gui/effect_editor.h"
+#include "gui/orderlist_editor.h"
 #include "gui/pattern_editor.h"
+#include "gui/settings_dialog.h"
 #include "gui/track_editor.h"
-#include "gui/track_settings.h"
 #include <gtkmm.h>
 
 class Interface : public Gtk::ApplicationWindow {
-
+private:
 	enum {
 		FILE_NEW,
 		FILE_OPEN,
@@ -74,6 +78,7 @@ class Interface : public Gtk::ApplicationWindow {
 	Glib::RefPtr<Gio::Menu> play_menu_extra;
 
 	Glib::RefPtr<Gio::Menu> edit_menu;
+	Glib::RefPtr<Gio::Menu> edit_menu_info;
 	Glib::RefPtr<Gio::Menu> edit_menu_undo;
 	Glib::RefPtr<Gio::Menu> edit_menu_focus;
 
@@ -129,6 +134,7 @@ class Interface : public Gtk::ApplicationWindow {
 	/* Scrolls */
 	Gtk::VScrollbar pattern_vscroll;
 	Gtk::HScrollbar pattern_hscroll;
+	Gtk::VScrollbar orderlist_vscroll;
 
 	Gtk::SpinButton pattern;
 	Gtk::Image pattern_settings_icon;
@@ -146,15 +152,22 @@ class Interface : public Gtk::ApplicationWindow {
 	Gtk::ScrolledWindow track_scroll;
 	Gtk::HBox track_hbox;
 
-	KeyBindings key_bindings;
+	KeyBindings *key_bindings;
 
 	/* Editors */
 
 	UndoRedo undo_redo;
 	Song song;
+	SongFile song_file;
 
-	Theme theme;
+	String song_path;
+	int save_version;
+
+	void _update_title();
+
+	Theme *theme;
 	PatternEditor pattern_editor;
+	OrderlistEditor orderlist_editor;
 	AudioEffectFactory *fx_factory;
 
 	struct TrackRacks {
@@ -165,6 +178,7 @@ class Interface : public Gtk::ApplicationWindow {
 
 	Vector<TrackRacks> racks;
 	TrackRackFiller *rack_filler;
+	SettingsDialog settings_dialog;
 
 	/* Data */
 
@@ -204,9 +218,44 @@ class Interface : public Gtk::ApplicationWindow {
 	void _on_remove_send(int p_track, int p_send);
 	void _on_track_insert_send(int p_track, int p_to_track);
 	void _on_track_send_amount_changed(int p_track, int p_send, float p_amount);
+	void _on_track_swap_effects(int p_track, int p_effect, int p_with_effect);
+	void _on_track_swap_sends(int p_track, int p_send, int p_with_send);
+	void _on_effect_request_editor(int p_track, int p_effect);
+	void _update_editor_automations_for_effect(AudioEffect *p_effect);
+	void _on_toggle_automation_visibility(Track *p_track, AudioEffect *p_effect, int p_automation, bool p_visible);
+
+	enum {
+		MAX_EFFECT_EDITOR_PLUGINS = 1024
+	};
+
+	EffectEditorPluginFunc plugin_editor_create_functions[MAX_EFFECT_EDITOR_PLUGINS];
+	int plugin_editor_function_count;
+
+	Map<AudioEffect *, EffectEditor *> active_effect_editors;
+
+	Gtk::Popover pattern_settings_popover;
+	Gtk::Grid pattern_settings_grid;
+	Gtk::HSeparator pattern_settings_vsep;
+	Gtk::SpinButton pattern_settings_length;
+	Gtk::SpinButton bar_length;
+	Gtk::SpinButton change_next;
+	Gtk::Label pattern_settings_length_label;
+	Gtk::Label bar_length_label;
+	Gtk::Label change_next_label;
+	Gtk::Button pattern_settings_change_button;
+
+	void _on_pattern_settings_open();
+	void _on_pattern_settings_change();
+
+	void _update_colors();
+	static void _undo_redo_action(const String &p_name, void *p_userdata);
+
+	bool _close_request(GdkEventAny *event);
 
 public:
-	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory);
+	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);
+
+	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings);
 
 	~Interface();
 };

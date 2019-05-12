@@ -225,6 +225,7 @@ public:
 	void set_hscroll(Glib::RefPtr<Gtk::Adjustment> p_h_scroll);
 	void set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll);
 
+	void redraw_and_validate_cursor();
 	PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);
 	~PatternEditor();
 };

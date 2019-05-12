@@ -1,4 +1,4 @@
-#include "track_settings.h"
+#include "add_effect_dialog.h"
 
 void AddEffectDialog::_selection_changed() {
 
@@ -12,7 +12,7 @@ void AddEffectDialog::_selection_changed() {
 	String text;
 	text = "Name: " + info->caption + "\n";
 	text += String() + "Type: " + (info->synth ? "Synth" : "Effect") + "\n";
-	text += "Provider: " + info->provider->get_name() + "\n";
+	text += "Provider: " + info->provider_caption + "\n";
 	if (info->category != String())
 		text += "Category: " + info->category + "\n";
 	if (info->author != String())
@@ -50,7 +50,7 @@ void AddEffectDialog::update_effect_list() {
 		Gtk::TreeModel::Row row = *iter;
 
 		row[model_columns.name] = fx_factory->get_audio_effect(i)->caption.utf8().get_data();
-		row[model_columns.provider] = fx_factory->get_audio_effect(i)->provider->get_name().utf8().get_data();
+		row[model_columns.provider] = fx_factory->get_audio_effect(i)->provider_caption.utf8().get_data();
 		row[model_columns.index] = i;
 	}
 }
@@ -60,7 +60,7 @@ AddEffectDialog::AddEffectDialog(AudioEffectFactory *p_fx_factory) :
 	set_title("Choose Effect");
 	fx_factory = p_fx_factory;
 	Gtk::Box &vbox = *get_vbox();
-	add(vbox);
+	//add(vbox);
 	description_text = Gtk::TextBuffer::create();
 	vbox.pack_start(scroll, Gtk::PACK_EXPAND_WIDGET);
 	scroll.add(tree);

@@ -8,7 +8,8 @@ public:
 	enum {
 		DEFAULT_BEATS_PER_BAR = 4,
 		DEFAULT_PATTERN_BEATS = 16,
-		ORDER_MAX = (1 << 16),
+		DEFAULT_BPM = 125,
+		ORDER_MAX = 999,
 		ORDER_EMPTY = 0xFFFFF,
 		ORDER_SKIP = 0xFFFFE,
 		MAX_PATTERN = 999
@@ -34,6 +35,10 @@ private:
 
 	float bpm;
 	float swing;
+
+	String name;
+	String author;
+	String description;
 
 public:
 	void pattern_set_beats_per_bar(int p_pattern, int p_beats_per_bar);
@@ -68,6 +73,17 @@ public:
 
 	void set_swing(float p_value);
 	float get_swing() const;
+
+	void set_name(String p_name);
+	String get_name() const;
+
+	void set_author(String p_author);
+	String get_author() const;
+
+	void set_description(String p_description);
+	String get_description() const;
+
+	void clear();
 
 	~Song();
 	Song();

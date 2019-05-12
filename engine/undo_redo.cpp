@@ -65,6 +65,10 @@ void UndoRedo::begin_action(String p_name, bool p_mergeable) {
 	}
 
 	group_rc++;
+
+	if (action_callback) {
+		action_callback(group_list[current_group]->name, action_callback_userdata);
+	}
 }
 
 void UndoRedo::commit_action() {
@@ -91,6 +95,10 @@ void UndoRedo::undo() {
 		for (List<CommandBase *>::Element *E = group_list[current_group]->undo_method_list.front(); E; E = E->next()) {
 			E->get()->call();
 		}
+		if (action_callback) {
+			action_callback(group_list[current_group]->name, action_callback_userdata);
+		}
+
 	} while (current_group > 0 && group_list[current_group]->merge_backward);
 }
 
@@ -100,14 +108,21 @@ void UndoRedo::redo() {
 		return;
 
 	do {
+
 		for (List<CommandBase *>::Element *E = group_list[current_group]->do_method_list.front(); E; E = E->next()) {
 			E->get()->call();
 		}
 
 		current_group++;
+		if (action_callback) {
+			action_callback(group_list[current_group - 1]->name, action_callback_userdata);
+		}
 	} while (group_list[current_group - 1]->merge_forward);
 }
 
+int UndoRedo::get_current_version() {
+	return current_group;
+}
 void UndoRedo::clean() {
 
 	for (int i = 0; i < group_list.size(); i++) {
@@ -116,9 +131,15 @@ void UndoRedo::clean() {
 	current_group = 0;
 }
 
+void UndoRedo::set_action_callback(ActionCallback p_action_callback, void *p_action_callback_userdata) {
+	action_callback = p_action_callback;
+	action_callback_userdata = p_action_callback_userdata;
+}
 UndoRedo::UndoRedo() {
 	current_group = 0;
 	group_rc = 0;
+	action_callback = NULL;
+	action_callback_userdata = NULL;
 }
 
 UndoRedo::~UndoRedo() {

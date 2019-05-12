@@ -10,6 +10,41 @@ Gdk::RGBA Theme::make_rgba(uint8_t p_red, uint8_t p_green, uint8_t p_blue, uint8
 	return rgba;
 }
 
+const char *Theme::color_names[Theme::COLOR_MAX]{
+	"Background",
+	"Focus",
+	"TrackSeparator",
+	"Cursor",
+	"RowBar",
+	"RowBeat",
+	"RowSubBeat",
+	"PatterbBg",
+	"PatternBgRackSelected",
+	"Note",
+	"HlBar",
+	"HlBeat",
+	"HlBarSelected",
+	"HlBeatSelected",
+	"MainBgSelected",
+	"NoteSelected",
+	"NoteNofit",
+	"AutomationValue",
+	"AutomationValueSelected",
+	"AutomationHlBar",
+	"AutomationHlBeat",
+	"AutomationHlBarSelected",
+	"AutomationHlBeatSelected",
+	"AutomationValueNofit",
+	"AutomationPoint",
+	"TrackName",
+	"AutomationName"
+};
+
+void Theme::select_font_face(const Cairo::RefPtr<Cairo::Context> &cr) {
+	Pango::FontDescription font_desc(font.utf8().get_data());
+	cr->select_font_face(font_desc.get_family(), Cairo::FONT_SLANT_NORMAL, font_desc.get_weight() > Pango::WEIGHT_MEDIUM ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
+	cr->set_font_size(font_desc.get_size() / Pango::SCALE);
+}
 Theme::Theme() {
 
 	colors[COLOR_BACKGROUND] = make_rgba(0, 0, 0);
@@ -20,6 +55,7 @@ Theme::Theme() {
 	colors[COLOR_PATTERN_EDITOR_ROW_BEAT] = make_rgba(110, 110, 140);
 	colors[COLOR_PATTERN_EDITOR_ROW_SUB_BEAT] = make_rgba(60, 60, 80);
 	colors[COLOR_PATTERN_EDITOR_BG] = make_rgba(26, 26, 42);
+	colors[COLOR_PATTERN_EDITOR_BG_RACK_SELECTED] = make_rgba(36, 36, 52);
 	colors[COLOR_PATTERN_EDITOR_NOTE] = make_rgba(181, 181, 234);
 	colors[COLOR_PATTERN_EDITOR_BG_SELECTED] = make_rgba(80, 80, 100);
 	colors[COLOR_PATTERN_EDITOR_NOTE_SELECTED] = make_rgba(255, 255, 255);
@@ -40,14 +76,10 @@ Theme::Theme() {
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_NAME] = make_rgba(217, 217, 180);
 
 	//	fonts[FONT_PATTERN].face = "FreeMono";
-	fonts[FONT_PATTERN].face = "Consolas";
-	fonts[FONT_PATTERN].size = 15;
-	fonts[FONT_PATTERN].bold = true;
-
-	fonts[FONT_TRACK_EDIT].face = "Consolas";
-	fonts[FONT_TRACK_EDIT].size = 15;
-	fonts[FONT_TRACK_EDIT].bold = true;
+	font = "Consolas Bold 15";
 
 	constants[CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION] = 5;
 	constants[CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION] = 10;
+
+	color_scheme = COLOR_SCHEME_DEFAULT;
 }

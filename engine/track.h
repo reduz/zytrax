@@ -52,6 +52,7 @@ public:
 	void set_display_mode(DisplayMode p_mode);
 	DisplayMode get_display_mode() const;
 
+	bool is_empty() const;
 	Automation(ControlPort *p_port, AudioEffect *p_owner = NULL);
 };
 
@@ -168,6 +169,7 @@ private:
 
 	Vector<AudioEffect *> effects;
 	Vector<Automation *> automations;
+	Vector<Automation *> disabled_automations;
 
 	struct Send {
 		int track;
@@ -194,6 +196,7 @@ public:
 	void add_audio_effect(AudioEffect *p_effect, int p_pos = -1);
 	void remove_audio_effect(int p_pos);
 	AudioEffect *get_audio_effect(int p_pos);
+	void swap_audio_effects(int p_effect, int p_with_effect);
 
 	/* automations */
 
@@ -202,6 +205,13 @@ public:
 	void remove_automation(int p_pos);
 	Automation *get_automation(int p_pos) const;
 	void swap_automations(int p_which, int p_by_which);
+
+	/* disabled automations (user may want to keep it, even if it was disabled)*/
+
+	int get_disabled_automation_count() const;
+	void add_disabled_automation(Automation *p_automation, int p_pos = -1);
+	void remove_disabled_automation(int p_pos);
+	Automation *get_disabled_automation(int p_pos) const;
 
 	/* notes */
 
@@ -249,8 +259,10 @@ public:
 	bool is_send_muted(int p_send) const;
 	int get_send_count();
 	void remove_send(int p_send);
+	void swap_sends(int p_send, int p_with_send);
 
 	Track();
+	~Track();
 };
 
 #endif // TRACK_H

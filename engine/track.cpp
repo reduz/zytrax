@@ -174,6 +174,10 @@ Automation::DisplayMode Automation::get_display_mode() const {
 	return display_mode;
 }
 
+bool Automation::is_empty() const {
+	return (visible && display_mode == DISPLAY_ROWS && data.empty());
+}
+
 Automation::Automation(ControlPort *p_port, AudioEffect *p_owner) {
 
 	port = p_port;
@@ -227,6 +231,12 @@ void Track::remove_audio_effect(int p_pos) {
 	effects.remove(p_pos);
 }
 
+void Track::swap_audio_effects(int p_effect, int p_with_effect) {
+	_AUDIO_LOCK_
+	ERR_FAIL_INDEX(p_effect, effects.size());
+	ERR_FAIL_INDEX(p_with_effect, effects.size());
+	SWAP(effects[p_effect], effects[p_with_effect]);
+}
 AudioEffect *Track::get_audio_effect(int p_pos) {
 
 	ERR_FAIL_INDEX_V(p_pos, effects.size(), NULL);
@@ -264,7 +274,34 @@ void Track::swap_automations(int p_which, int p_by_which) {
 
 	SWAP(automations[p_which], automations[p_by_which]);
 }
+// disabled automations
 
+int Track::get_disabled_automation_count() const {
+
+	return disabled_automations.size();
+}
+void Track::add_disabled_automation(Automation *p_automation, int p_pos) {
+
+	_AUDIO_LOCK_
+	if (p_pos < 0) {
+		p_pos = disabled_automations.size();
+	}
+	ERR_FAIL_COND(p_pos > disabled_automations.size());
+	disabled_automations.insert(p_pos, p_automation);
+}
+void Track::remove_disabled_automation(int p_pos) {
+
+	_AUDIO_LOCK_
+	ERR_FAIL_INDEX(p_pos, disabled_automations.size());
+	disabled_automations.remove(p_pos);
+}
+Automation *Track::get_disabled_automation(int p_pos) const {
+
+	ERR_FAIL_INDEX_V(p_pos, disabled_automations.size(), NULL);
+	return disabled_automations[p_pos];
+}
+
+////
 void Track::set_columns(int p_columns) {
 
 	_AUDIO_LOCK_
@@ -627,6 +664,13 @@ void Track::remove_send(int p_send) {
 	sends.remove(p_send);
 }
 
+void Track::swap_sends(int p_send, int p_with_send) {
+	_AUDIO_LOCK_
+	ERR_FAIL_INDEX(p_send, sends.size());
+	ERR_FAIL_INDEX(p_with_send, sends.size());
+	SWAP(sends[p_send], sends[p_with_send]);
+}
+
 Track::Track() {
 
 	swing.name = "Swing";
@@ -657,4 +701,16 @@ Track::Track() {
 	mix_volume = -12;
 
 	muted = false;
+}
+
+Track::~Track() {
+	for (int i = 0; i < effects.size(); i++) {
+		delete effects[i];
+	}
+	for (int i = 0; i < automations.size(); i++) {
+		delete automations[i];
+	}
+	for (int i = 0; i < disabled_automations.size(); i++) {
+		delete disabled_automations[i];
+	}
 }

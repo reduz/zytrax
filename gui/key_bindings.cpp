@@ -1,4 +1,5 @@
 #include "key_bindings.h"
+#include "error_macros.h"
 
 bool KeyBindings::is_keybind(GdkEventKey *ev, KeyBind p_bind) const {
 
@@ -33,6 +34,7 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 
 	"EditUndo",
 	"EditRedo",
+	"EditSongSettings",
 	"EditFocusPattern",
 	"EditFocusOrderlist",
 	"EditFocusLastEffect",
@@ -180,55 +182,77 @@ const char *KeyBindings::get_keybind_name(KeyBind p_bind) {
 	return bind_names[p_bind];
 }
 
+int KeyBindings::get_keybind_key(KeyBind p_bind) {
+
+	return binds[p_bind].keyval;
+}
+int KeyBindings::get_keybind_mod(KeyBind p_bind) {
+	return binds[p_bind].state;
+}
+
 void KeyBindings::_add_keybind(KeyBind p_bind, KeyState p_state) {
 
 	binds[p_bind] = p_state;
+}
 
-	if (p_state.shortcut) {
+void KeyBindings::initialize(Gtk::Application *p_application, Gtk::ApplicationWindow *p_window) {
 
-		if (!actions[p_bind].operator->()) {
+	initialized = true;
+	application = p_application;
+	window = p_window;
 
-			if (p_state.mode == KeyState::MODE_TOGGLE) {
-				actions[p_bind] = window->add_action_bool(bind_names[p_bind], sigc::bind<KeyBind>(sigc::mem_fun(*this, &KeyBindings::_on_action), p_bind));
-			} else if (p_state.mode == KeyState::MODE_RADIO) {
-				if (p_bind == p_state.radio_base) {
-					//only add if it's the base one
-
-					printf("radio base for %s\n", bind_names[p_bind]);
-					actions[p_bind] = window->add_action_radio_string(bind_names[p_bind], sigc::mem_fun(*this, &KeyBindings::_on_action_string), bind_names[p_bind]);
-				} else {
-					printf("radio extra for %s uses %s\n", bind_names[p_bind], bind_names[p_state.radio_base]);
-					actions[p_bind] = actions[p_state.radio_base];
-				}
-			} else {
-				actions[p_bind] = window->add_action(bind_names[p_bind], sigc::bind<KeyBind>(sigc::mem_fun(*this, &KeyBindings::_on_action), p_bind));
-			}
+	for (int i = 0; i < BIND_MAX; i++) {
+		if (!binds[i].shortcut) {
+			continue;
 		}
 
-		if (p_state.mode == KeyState::MODE_RADIO) {
+		KeyState &state = binds[i];
+		//create action
 
-			gchar *text = gtk_accelerator_name(p_state.keyval, GdkModifierType(p_state.state));
+		if (state.mode == KeyState::MODE_TOGGLE) {
+			actions[i] = window->add_action_bool(bind_names[i], sigc::bind<KeyBind>(sigc::mem_fun(*this, &KeyBindings::_on_action), KeyBind(i)));
+		} else if (state.mode == KeyState::MODE_RADIO) {
+			if (i == state.radio_base) {
+				//only add if it's the base one
 
-			GVariant *v = g_variant_new_string(bind_names[p_bind]);
-			gchar *detailed_name = g_action_print_detailed_name(bind_names[p_state.radio_base], v);
+				actions[i] = window->add_action_radio_string(bind_names[i], sigc::mem_fun(*this, &KeyBindings::_on_action_string), bind_names[i]);
+			} else {
+				actions[i] = actions[state.radio_base];
+			}
+		} else {
+			actions[i] = window->add_action(bind_names[i], sigc::bind<KeyBind>(sigc::mem_fun(*this, &KeyBindings::_on_action), KeyBind(i)));
+		}
+
+		//create accelerator
+
+		if (state.mode == KeyState::MODE_RADIO) {
+
+			gchar *text = gtk_accelerator_name(state.keyval, GdkModifierType(state.state));
+
+			GVariant *v = g_variant_new_string(bind_names[i]);
+			gchar *detailed_name = g_action_print_detailed_name(bind_names[state.radio_base], v);
 			g_variant_unref(v);
 
 			String dname = String("win.") + detailed_name;
 
 			free(detailed_name);
 
-			application->set_accel_for_action(dname.ascii().get_data(), text);
-			binds[p_bind].detailed_name = dname;
+			if (state.keyval > 0) {
+				application->set_accel_for_action(dname.ascii().get_data(), text);
+			}
+			binds[i].detailed_name = dname;
 
 			free(text);
 
 		} else {
 
-			String dname = "win." + String(bind_names[p_bind]);
-			gchar *text = gtk_accelerator_name(p_state.keyval, GdkModifierType(p_state.state));
-			//printf("action %s, accel %s\n", bind_names[p_bind], text);
-			application->set_accel_for_action(dname.ascii().get_data(), text);
-			binds[p_bind].detailed_name = dname;
+			String dname = "win." + String(bind_names[i]);
+			gchar *text = gtk_accelerator_name(state.keyval, GdkModifierType(state.state));
+
+			if (state.keyval > 0) {
+				application->set_accel_for_action(dname.ascii().get_data(), text);
+			}
+			binds[i].detailed_name = dname;
 			free(text);
 		}
 	}
@@ -259,7 +283,56 @@ void KeyBindings::set_action_state(KeyBind p_bind, const String &p_state) {
 Glib::RefPtr<Gio::SimpleAction> KeyBindings::get_keybind_action(KeyBind p_bind) {
 	return actions[p_bind];
 }
-void KeyBindings::initialize() {
+
+void KeyBindings::set_keybind(KeyBind p_bind, guint p_keyval, guint p_state) {
+	ERR_FAIL_INDEX(p_bind, BIND_MAX);
+
+	binds[p_bind].keyval = p_keyval;
+	binds[p_bind].state = p_state;
+
+	if (!initialized || !binds[p_bind].shortcut) {
+		return;
+	}
+
+	//unset existing
+
+	application->unset_accels_for_action(binds[p_bind].detailed_name.ascii().get_data());
+
+	if (p_keyval == 0) {
+		return;
+	}
+	//set new
+
+	gchar *text = gtk_accelerator_name(p_keyval, GdkModifierType(p_state));
+	application->set_accel_for_action(binds[p_bind].detailed_name.ascii().get_data(), text);
+	free(text);
+}
+
+void KeyBindings::reset_keybind(KeyBind p_bind) {
+	ERR_FAIL_INDEX(p_bind, BIND_MAX);
+	set_keybind(p_bind, binds[p_bind].initial_keyval, binds[p_bind].initial_state);
+}
+void KeyBindings::clear_keybind(KeyBind p_bind) {
+	ERR_FAIL_INDEX(p_bind, BIND_MAX);
+	set_keybind(p_bind, 0, 0);
+}
+
+void KeyBindings::_on_action(KeyBind p_bind) {
+
+	action_activated.emit(p_bind);
+}
+
+void KeyBindings::_on_action_string(Glib::ustring p_string) {
+	for (int i = 0; i < BIND_MAX; i++) {
+		if (p_string == bind_names[i]) {
+			_on_action(KeyBind(i));
+		}
+	}
+}
+
+KeyBindings::KeyBindings() {
+
+	initialized = false;
 
 	_add_keybind(FILE_NEW, KeyState(GDK_KEY_n, GDK_CONTROL_MASK, true));
 	_add_keybind(FILE_OPEN, KeyState(GDK_KEY_o, GDK_CONTROL_MASK, true));
@@ -278,6 +351,7 @@ void KeyBindings::initialize() {
 
 	_add_keybind(EDIT_UNDO, KeyState(GDK_KEY_z, GDK_CONTROL_MASK, true));
 	_add_keybind(EDIT_REDO, KeyState(GDK_KEY_z, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
+	_add_keybind(EDIT_SONG_INFO, KeyState(GDK_KEY_i, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(EDIT_FOCUS_PATTERN, KeyState(GDK_KEY_F2, 0, true));
 	_add_keybind(EDIT_FOCUS_ORDERLIST, KeyState(GDK_KEY_F11, 0, true));
 	_add_keybind(EDIT_FOCUS_LAST_EDITED_EFFECT, KeyState(GDK_KEY_F3, 0, true));
@@ -403,24 +477,4 @@ void KeyBindings::initialize() {
 	_add_keybind(PIANO_D2, KeyState(GDK_KEY_o));
 	_add_keybind(PIANO_Ds2, KeyState(GDK_KEY_0));
 	_add_keybind(PIANO_E2, KeyState(GDK_KEY_p));
-}
-
-void KeyBindings::_on_action(KeyBind p_bind) {
-	printf("action: %s\n", bind_names[p_bind]);
-	action_activated.emit(p_bind);
-}
-
-void KeyBindings::_on_action_string(Glib::ustring p_string) {
-	for (int i = 0; i < BIND_MAX; i++) {
-		if (p_string == bind_names[i]) {
-			_on_action(KeyBind(i));
-		}
-	}
-	printf("action string: %s\n", p_string.c_str());
-}
-
-KeyBindings::KeyBindings(Gtk::Application *p_application, Gtk::ApplicationWindow *p_window) {
-
-	application = p_application;
-	window = p_window;
 }

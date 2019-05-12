@@ -24,6 +24,7 @@ public:
 
 		EDIT_UNDO,
 		EDIT_REDO,
+		EDIT_SONG_INFO,
 		EDIT_FOCUS_PATTERN,
 		EDIT_FOCUS_ORDERLIST,
 		EDIT_FOCUS_LAST_EDITED_EFFECT,
@@ -172,12 +173,17 @@ private:
 		int radio_base;
 		String detailed_name; //cache
 
+		guint initial_keyval;
+		guint initial_state;
+
 		KeyState(guint p_keyval = 0, guint p_state = 0, bool p_shortcut = false, Mode p_mode = MODE_NORMAL, int p_radio_base = 0) {
 			keyval = p_keyval;
 			state = p_state;
 			shortcut = p_shortcut;
 			mode = p_mode;
 			radio_base = p_radio_base;
+			initial_keyval = p_keyval;
+			initial_state = p_state;
 		}
 	};
 
@@ -189,6 +195,8 @@ private:
 	void _on_action(KeyBind p_bind);
 	void _on_action_string(Glib::ustring p_string);
 
+	bool initialized;
+
 public:
 	//done this way so each UI can capture whathever action it wants
 	sigc::signal1<void, KeyBind> action_activated;
@@ -197,6 +205,8 @@ public:
 	String get_keybind_action_name(KeyBind p_bind);
 	String get_keybind_text(KeyBind p_bind);
 	const char *get_keybind_name(KeyBind p_bind);
+	int get_keybind_key(KeyBind p_bind);
+	int get_keybind_mod(KeyBind p_bind);
 
 	Glib::RefPtr<Gio::SimpleAction> get_keybind_action(KeyBind p_bind);
 	void set_action_enabled(KeyBind p_bind, bool p_enabled);
@@ -206,8 +216,12 @@ public:
 	bool is_keybind(GdkEventKey *ev, KeyBind p_bind) const;
 	bool is_keybind_noshift(GdkEventKey *ev, KeyBind p_bind) const;
 
-	void initialize();
-	KeyBindings(Gtk::Application *p_application, Gtk::ApplicationWindow *p_window);
+	void set_keybind(KeyBind p_bind, guint p_keyval, guint p_state);
+	void reset_keybind(KeyBind p_bind);
+	void clear_keybind(KeyBind p_bind);
+
+	void initialize(Gtk::Application *p_application, Gtk::ApplicationWindow *p_window);
+	KeyBindings();
 };
 
 #endif // KEY_BINDINGS_H

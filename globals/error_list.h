@@ -25,29 +25,27 @@ enum Error {
 	ERR_FILE_CANT_WRITE,
 	ERR_FILE_CANT_READ,
 	ERR_FILE_UNRECOGNIZED,
+	ERR_FILE_TOO_NEW,
 	ERR_FILE_CORRUPT,
 	ERR_FILE_EOF,
 	ERR_CANT_OPEN, ///< Can't open a resource/socket/file
- 	ERROR_QUERY_FAILED,
+	ERROR_QUERY_FAILED,
 	ERR_ALREADY_IN_USE,
- 	ERR_LOCKED, ///< resource is locked
- 	ERR_TIMEOUT,
- 	ERR_CANT_AQUIRE_RESOURCE,
+	ERR_LOCKED, ///< resource is locked
+	ERR_TIMEOUT,
+	ERR_CANT_AQUIRE_RESOURCE,
 	ERR_INVALID_DATA, ///< Data passed is invalid
 	ERR_INVALID_PARAMETER, ///< Parameter passed is invalid
 	ERR_ALREADY_EXISTS, ///< When adding, item already exists
 	ERR_DOES_NOT_EXIST, ///< When retrieving/erasing, it item does not exist
 	ERR_DATABASE_CANT_READ, ///< database is full
 	ERR_DATABASE_CANT_WRITE, ///< database is full
- 	ERR_COMPILATION_FAILED,
-  	ERR_LINK_FAILED,
-  	ERR_VERSION_MISMATCH,
+	ERR_COMPILATION_FAILED,
+	ERR_LINK_FAILED,
+	ERR_VERSION_MISMATCH,
 	ERR_BUG, ///< a bug in the software certainly happened, due to a double check failing or unexpected behavior.
 	ERR_OMFG_THIS_IS_VERY_VERY_BAD, ///< shit happens, has never been used, though
 	ERR_WTF = ERR_OMFG_THIS_IS_VERY_VERY_BAD ///< short version of the above
 };
 
-
-
 #endif
-

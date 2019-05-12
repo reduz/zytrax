@@ -12,36 +12,48 @@
 #ifndef SOUND_DRIVER_MANAGER_H
 #define SOUND_DRIVER_MANAGER_H
 
-#include "engine/sound_driver.h"
 #include "dsp/frame.h"
+#include "engine/sound_driver.h"
 /**
 	@author Juan Linietsky <reduzio@gmail.com>
 */
 class SoundDriverManager {
 
 	enum {
-		MAX_SOUND_DRIVERS = 5
+		MAX_SOUND_DRIVERS = 64
 	};
 
 public:
-	enum MixStepSize {
-		MIX_STEP_256,
-		MIX_STEP_512,
-		MIX_STEP_1024,
-		MIX_STEP_2048,
+	enum BufferSize {
+		BUFFER_SIZE_64,
+		BUFFER_SIZE_128,
+		BUFFER_SIZE_256,
+		BUFFER_SIZE_512,
+		BUFFER_SIZE_1024,
+		BUFFER_SIZE_2048,
+		BUFFER_SIZE_4096,
+		BUFFER_SIZE_MAX
+	};
+
+	enum MixFrequency {
+		MIX_FREQ_22050,
+		MIX_FREQ_44100,
+		MIX_FREQ_48000,
+		MIX_FREQ_96000,
+		MIX_FREQ_192000,
+		MIX_FREQ_MAX
 	};
 
 private:
+	static int buffer_size_frames[BUFFER_SIZE_MAX];
+	static int mix_frequenzy_hz[MIX_FREQ_MAX];
+
 	static SoundDriver *sound_drivers[MAX_SOUND_DRIVERS];
 	static int sound_driver_count;
 	static int current_driver;
-	static int mixing_hz;
-	static int buffer_size;
-
-	static Frame *internal_buffer;
-	static int internal_buffer_size;
-
-	static MixStepSize mix_step;
+	static MixFrequency mixing_hz;
+	static BufferSize buffer_size;
+	static BufferSize step_size;
 
 public:
 	static void lock_driver(); ///< Protect audio thread variables from ui,game,etc (non-audio) threads
@@ -54,18 +66,20 @@ public:
 	static SoundDriver *get_driver(int p_which = -1); ///< -1 is current
 
 	static int get_current_driver_index();
-	static int get_internal_buffer_size();
 
-	void set_mixing_hz(int p_hz);
-	int get_mixing_hz() const;
+	static void set_mix_frequency(MixFrequency p_frequency);
+	static MixFrequency get_mix_frequency();
 
-	void set_buffer_size(int p_size);
-	int get_buffer_size() const;
+	static void set_buffer_size(BufferSize p_size);
+	static BufferSize get_buffer_size();
 
-	void set_mix_step_size(MixStepSize p_step);
-	MixStepSize get_mix_step_size() const;
+	static void set_step_buffer_size(BufferSize p_size);
+	static BufferSize get_step_buffer_size();
 
 	static void register_driver(SoundDriver *p_driver);
+
+	static int get_mix_frequency_hz(MixFrequency p_frequency);
+	static int get_buffer_size_frames(BufferSize p_size);
 };
 
 #endif

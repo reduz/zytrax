@@ -20,6 +20,9 @@
 	@author Juan Linietsky <reduzio@gmail.com>
 */
 class UndoRedo {
+public:
+	typedef void (*ActionCallback)(const String &, void *);
+
 protected:
 	struct CommandDataBase {
 
@@ -247,6 +250,9 @@ private:
 	int current_group;
 	int group_rc;
 
+	ActionCallback action_callback;
+	void *action_callback_userdata;
+
 public:
 	void begin_action(String p_name, bool p_mergeable = false);
 
@@ -327,6 +333,10 @@ public:
 	void undo();
 	void redo();
 	void clean();
+
+	int get_current_version();
+
+	void set_action_callback(ActionCallback p_action_callback, void *p_action_callback_userdata);
 
 	UndoRedo();
 	~UndoRedo();

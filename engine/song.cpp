@@ -258,13 +258,48 @@ float Song::get_swing() const {
 	return swing;
 }
 
-Song::~Song() {
+void Song::set_name(String p_name) {
+	name = p_name;
+}
+String Song::get_name() const {
 
+	return name;
+}
+
+void Song::set_author(String p_author) {
+	author = p_author;
+}
+String Song::get_author() const {
+	return author;
+}
+
+void Song::set_description(String p_description) {
+	description = p_description;
+}
+String Song::get_description() const {
+	return description;
+}
+
+void Song::clear() {
 	for (int i = 0; i < tracks.size(); i++)
 		delete tracks[i];
+
+	tracks.clear();
+	bpm = DEFAULT_BPM;
+	swing = 0;
+	name = "";
+	author = "";
+	description = "";
+	order_list.clear();
+	pattern_config.clear();
+}
+
+Song::~Song() {
+
+	clear();
 }
 
 Song::Song() {
-	bpm = 125;
+	bpm = DEFAULT_BPM;
 	swing = 0;
 }
