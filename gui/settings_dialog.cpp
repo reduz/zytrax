@@ -198,6 +198,8 @@ bool ThemeColorList::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 			_draw_text(cr, x_ofs, y_ofs, theme->color_names[i], white, false);
 		}
 	}
+
+	return false;
 }
 
 ThemeColorList::ThemeColorList(Theme *p_theme) :
@@ -237,7 +239,7 @@ void SettingsDialog::_scan_callback(const String &p_name, void *p_ud) {
 }
 void SettingsDialog::_scan_plugins() {
 
-	MessageDialog scan("", false /* use_markup */, Gtk::MESSAGE_QUESTION, Gtk::BUTTONS_NONE);
+	MessageDialog scan("", false /* use_markup */, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_NONE);
 	scan.get_vbox()->get_children()[0]->hide();
 	scan.get_vbox()->set_spacing(0);
 
@@ -253,6 +255,7 @@ void SettingsDialog::_scan_plugins() {
 
 	scan.set_default_size(width / 5, height / 3);
 	scan.show_all_children();
+	scan.get_vbox()->get_children()[0]->hide();
 	scan.set_deletable(false);
 	scan.set_transient_for(*this);
 	scan.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
@@ -538,8 +541,8 @@ void SettingsDialog::_save_settings() {
 }
 
 SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, AudioEffectFactory *p_fx_factory) :
-		MessageDialog("", false /* use_markup */, Gtk::MESSAGE_QUESTION, Gtk::BUTTONS_CLOSE),
-		key_remap_dialog("", false, Gtk::MESSAGE_QUESTION, Gtk::BUTTONS_OK_CANCEL),
+		MessageDialog("", false /* use_markup */, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_CLOSE),
+		key_remap_dialog("", false, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_OK_CANCEL),
 		theme_color_list(p_theme) {
 
 	fx_factory = p_fx_factory;
@@ -632,7 +635,6 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 
 	////// zoom
 
-	get_vbox()->get_children()[0]->hide();
 	get_vbox()->set_spacing(0);
 
 	get_vbox()->pack_start(notebook, Gtk::PACK_EXPAND_WIDGET);
@@ -775,7 +777,7 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	theme_settings_frame.set_label("Settings:");
 	theme_settings_frame.add(theme_settings_grid);
 	theme_force_dark.set_label("Force Dark Theme (needs restart)");
-	theme_force_dark.signal_clicked().connect(sigc::mem_fun(*this, _on_dark_theme_chosen));
+	theme_force_dark.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDialog::_on_dark_theme_chosen));
 
 	theme_settings_grid.attach(theme_force_dark, 0, 0, 1, 1);
 	theme_force_dark.set_active(theme->color_scheme == Theme::COLOR_SCHEME_DARK);
@@ -848,6 +850,7 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	set_default_size(width / 4, height / 2);
 
 	show_all_children();
+	get_vbox()->get_children()[0]->hide();
 
 	set_title("Settings");
 }
@@ -887,7 +890,7 @@ String SettingsDialog::get_settings_path() {
 #ifdef WINDOWS_ENABLED
 		_wmkdir(path.c_str());
 #else
-		mkdir(path.utf8().get_data());
+		mkdir(path.utf8().get_data(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 #endif
 		created_path = true;
 	}

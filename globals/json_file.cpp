@@ -28,8 +28,7 @@ Error load_json(const String &p_path, JSON::Node &p_node) {
 	std::string str;
 
 	fseek(f, 0, SEEK_END);
-	fpos_t pos;
-	fgetpos(f, &pos);
+	size_t pos = ftell(f);
 	str.resize(pos);
 	fseek(f, 0, SEEK_SET);
 	fread(&str[0], pos, 1, f);

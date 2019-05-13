@@ -1,7 +1,9 @@
 #include <gtkmm.h>
 
-#include "drivers/lv2/audio_effect_factory_lv2.h"
+#ifdef VST2_ENABLED
 #include "drivers/vst2/factory_wrapper_vst2.h"
+#endif
+
 #include "engine/song.h"
 #include "globals/json_file.h"
 #include "gui/interface.h"
@@ -13,19 +15,13 @@
 int main(int argc, char *argv[]) {
 
 	AudioEffectFactory effect_factory;
-
+#ifdef VST2_ENABLED
 	AudioEffectProvider *provider_vst2 = create_vst2_provider();
 	effect_factory.add_provider(provider_vst2);
+#endif
 
 #ifdef RTAUDIO_ENABLED
 	register_rtaudio_driver();
-#endif
-
-#ifdef UNIX_ENABLED
-
-	AudioEffectProviderLV2 provider_lv2(&argc, &argv); //lv2 madness
-	provider_lv2.scan_effects(&effect_factory);
-	effect_factory.add_provider(&provider_lv2);
 #endif
 
 	auto app = Gtk::Application::create(argc, argv, "org.gtkmm.examples.base");
@@ -190,12 +186,14 @@ int main(int argc, char *argv[]) {
 
 	Interface window(app.operator->(), &effect_factory, &theme, &key_bindings);
 	window.set_default_size(800, 600);
-
+#ifdef VST2_ENABLED
 	window.add_editor_plugin_function(get_vst2_editor_function());
-
+#endif
 	int ret = app->run(window);
 
+#ifdef VST2_ENABLED
 	delete provider_vst2;
+#endif
 
 #ifdef RTAUDIO_ENABLED
 	cleanup_rtaudio_driver();

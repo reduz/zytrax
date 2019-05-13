@@ -26,7 +26,10 @@ public:
 	/* Load/Save */
 
 	virtual JSON::Node to_json() const { return json; }
-	virtual Error from_json(const JSON::Node &node) { json = node; }
+	virtual Error from_json(const JSON::Node &node) {
+		json = node;
+		return OK;
+	}
 
 	AudioEffectDummy() {}
 };
@@ -181,7 +184,7 @@ Error SongFile::save(const String &p_path) {
 						JSON::Node note = JSON::object();
 						Track::Pos p = t->get_note_pos_by_index(i, k);
 
-						note.add("tick", p.tick);
+						note.add("tick", (int)p.tick);
 						note.add("column", p.column);
 
 						Track::Note n = t->get_note_by_index(i, k);
@@ -217,7 +220,7 @@ Error SongFile::save(const String &p_path) {
 
 							Tick t = a->get_point_tick_by_index(i, l);
 
-							point.add("tick", t);
+							point.add("tick", (int)t);
 
 							int value = a->get_point_by_index(i, l);
 

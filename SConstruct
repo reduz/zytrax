@@ -1,4 +1,5 @@
 import os
+import sys
 EnsureSConsVersion(0,14);
 
 env = Environment(CPPPATH=['#/globals','#gui','#.'],ENV=os.environ)
@@ -6,20 +7,27 @@ env = Environment(CPPPATH=['#/globals','#gui','#.'],ENV=os.environ)
 
 
 env.ParseConfig("pkg-config gtkmm-3.0 --libs --cflags")
-#env.ParseConfig("pkg-config lilv-0 --libs --cflags")
-#env.ParseConfig("pkg-config suil-0 --libs --cflags")
 env.Append(CXXFLAGS=["-g3"])
-env.Append(CXXFLAGS=["-DWINDOWS_ENABLED"])
 
 opts = Variables(ARGUMENTS)
 
-detected_platform = "windows"
+if (os.getenv("XDG_CURRENT_DESKTOP")!=None):
+	detected_platform="freedesktop"
+elif (os.getenv("APPDATA")!=None):
+	detected_platform = "windows"
+else:
+	detected_platform = ""
 
-opts.Add(EnumVariable("platform","Platform to build",detected_platform,("windows","osx","x11")))
+opts.Add(EnumVariable("platform","Platform to build",detected_platform,("windows","osx","freedesktop")))
 opts.Add(BoolVariable("enable_rtaudio","Use RtAudio as Sound Driver",True))
+opts.Add(BoolVariable("enable_vst2","Enable VST2",True))
 
 opts.Update(env)  # update environment
 Help(opts.GenerateHelpText(env))  # generate help
+
+if (detected_platform==""):
+	print("No build platform detected, available platforms: windows, freedesktop,osx")
+	sys.exit()
 
 if (env["enable_rtaudio"]):
 
@@ -30,7 +38,15 @@ if (env["enable_rtaudio"]):
 		#env.Append(CXXFLAGS=["-D__WINDOWS_ASIO__"])
 		env.Append(LIBS=["dsound","mfplat","mfuuid","wmcodecdspuuid","ksuser"])
 
+if (env["platform"]=="windows"):
+	env.Append(CXXFLAGS=["-DWINDOWS_ENABLED"])
+	if (env["enable_vst2"]):	
+		env.Append(CXXFLAGS=["-DVST2_ENABLED"])
 
+
+if (env["platform"]=="freedesktop"):
+	env["enable_vst2"]=False # not supported
+	env.Append(CXXFLAGS=["-DFREEDESKTOP_ENABLED"])
 
 def add_sources(self, sources, filetype, lib_env = None, shared = False):
 	import glob;

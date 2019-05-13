@@ -3,7 +3,8 @@ Export('env');
 
 targets=[]
 
-env.add_sources(targets,"vst2/*.cpp")
+if (env["enable_vst2"]):
+	env.add_sources(targets,"vst2/*.cpp")
 if (env["enable_rtaudio"]):
 	env.add_sources(targets,"rtaudio/*.cpp")
 	env.add_sources(targets,"rtaudio/rtaudio/*.cpp")

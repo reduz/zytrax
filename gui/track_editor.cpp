@@ -304,6 +304,8 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	/*if (selected) {
 		_draw_rect(cr, 1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
 	}*/
+
+	return false;
 }
 
 void TrackRackVolume::on_parsing_error(
@@ -866,9 +868,11 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	/*if (selected) {
 		_draw_rect(cr, -1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
 	}*/
+
+	return false;
 }
 
-int TrackRackEditor::set_v_offset(int p_offset) {
+void TrackRackEditor::set_v_offset(int p_offset) {
 	v_offset = p_offset;
 }
 int TrackRackEditor::get_v_offset() const {
@@ -1080,6 +1084,7 @@ bool TrackRackFiller::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Gdk::Cairo::set_source_rgba(cr, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG]);
 	cr->rectangle(0, 0, w, h);
 	cr->fill();
+	return false;
 }
 
 TrackRackFiller::TrackRackFiller(Theme *p_theme) :

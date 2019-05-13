@@ -324,7 +324,6 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			info_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
 			info_box.set_title("Song Information");
 
-			info_box.get_vbox()->get_children()[0]->hide();
 			info_box.get_vbox()->set_spacing(4);
 
 			Gtk::Label label_name;
@@ -363,6 +362,7 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			info_box.set_default_size(width / 5, height / 3);
 
 			info_box.show_all_children();
+			info_box.get_vbox()->get_children()[0]->hide();
 			info_box.run();
 			info_box.hide();
 
@@ -605,11 +605,11 @@ void Interface::_on_add_effect(int p_track) {
 		ERR_FAIL_COND(!effect); //cant create
 		undo_redo.begin_action("Create Effect: " + effect->get_name());
 		Track *track = song.get_track(p_track);
-		undo_redo.do_method(track, Track::add_audio_effect, effect, -1);
-		undo_redo.undo_method(track, Track::remove_audio_effect, track->get_audio_effect_count());
+		undo_redo.do_method(track, &Track::add_audio_effect, effect, -1);
+		undo_redo.undo_method(track, &Track::remove_audio_effect, track->get_audio_effect_count());
 		undo_redo.do_data(effect);
-		undo_redo.do_method(this, Interface::_update_tracks);
-		undo_redo.undo_method(this, Interface::_update_tracks);
+		undo_redo.do_method(this, &Interface::_update_tracks);
+		undo_redo.undo_method(this, &Interface::_update_tracks);
 		undo_redo.commit_action();
 	}
 	add_effect_dialog.hide();
@@ -628,10 +628,10 @@ void Interface::_on_toggle_effect_skip(int p_track, int p_effect) {
 
 	undo_redo.begin_action("Toggle Effect Skip");
 	bool skip = song.get_track(p_track)->get_audio_effect(p_effect)->is_skipped();
-	undo_redo.do_method(song.get_track(p_track)->get_audio_effect(p_effect), AudioEffect::set_skip, !skip);
-	undo_redo.undo_method(song.get_track(p_track)->get_audio_effect(p_effect), AudioEffect::set_skip, skip);
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(song.get_track(p_track)->get_audio_effect(p_effect), &AudioEffect::set_skip, !skip);
+	undo_redo.undo_method(song.get_track(p_track)->get_audio_effect(p_effect), &AudioEffect::set_skip, skip);
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 void Interface::_on_toggle_send_mute(int p_track, int p_send) {
@@ -641,10 +641,10 @@ void Interface::_on_toggle_send_mute(int p_track, int p_send) {
 
 	undo_redo.begin_action("Toggle Send Mute");
 	bool mute = song.get_track(p_track)->is_send_muted(p_send);
-	undo_redo.do_method(song.get_track(p_track), Track::set_send_mute, p_send, !mute);
-	undo_redo.undo_method(song.get_track(p_track), Track::set_send_mute, p_send, mute);
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(song.get_track(p_track), &Track::set_send_mute, p_send, !mute);
+	undo_redo.undo_method(song.get_track(p_track), &Track::set_send_mute, p_send, mute);
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 void Interface::_on_remove_effect(int p_track, int p_effect) {
@@ -652,12 +652,12 @@ void Interface::_on_remove_effect(int p_track, int p_effect) {
 	ERR_FAIL_INDEX(p_effect, song.get_track(p_track)->get_audio_effect_count());
 
 	undo_redo.begin_action("Remove Effect");
-	undo_redo.do_method(song.get_track(p_track), Track::remove_audio_effect, p_effect);
+	undo_redo.do_method(song.get_track(p_track), &Track::remove_audio_effect, p_effect);
 	AudioEffect *effect = song.get_track(p_track)->get_audio_effect(p_effect);
-	undo_redo.undo_method(song.get_track(p_track), Track::add_audio_effect, effect, p_effect);
+	undo_redo.undo_method(song.get_track(p_track), &Track::add_audio_effect, effect, p_effect);
 	undo_redo.undo_data(effect);
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 void Interface::_on_remove_send(int p_track, int p_send) {
@@ -667,12 +667,12 @@ void Interface::_on_remove_send(int p_track, int p_send) {
 
 	undo_redo.begin_action("Remove Send");
 	Track *track = song.get_track(p_track);
-	undo_redo.do_method(track, Track::remove_send, p_send);
-	undo_redo.undo_method(track, Track::add_send, track->get_send_track(p_send), p_send);
-	undo_redo.undo_method(track, Track::set_send_amount, p_send, track->get_send_amount(p_send));
-	undo_redo.undo_method(track, Track::set_send_mute, p_send, track->is_send_muted(p_send));
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(track, &Track::remove_send, p_send);
+	undo_redo.undo_method(track, &Track::add_send, track->get_send_track(p_send), p_send);
+	undo_redo.undo_method(track, &Track::set_send_amount, p_send, track->get_send_amount(p_send));
+	undo_redo.undo_method(track, &Track::set_send_mute, p_send, track->is_send_muted(p_send));
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 
@@ -684,10 +684,10 @@ void Interface::_on_track_insert_send(int p_track, int p_to_track) {
 
 	undo_redo.begin_action("Add Send");
 	Track *track = song.get_track(p_track);
-	undo_redo.do_method(track, Track::add_send, p_to_track, -1);
-	undo_redo.undo_method(track, Track::remove_send, track->get_send_count());
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(track, &Track::add_send, p_to_track, -1);
+	undo_redo.undo_method(track, &Track::remove_send, track->get_send_count());
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 
@@ -697,10 +697,10 @@ void Interface::_on_track_send_amount_changed(int p_track, int p_send, float p_a
 	ERR_FAIL_INDEX(p_send, track->get_send_count());
 
 	undo_redo.begin_action("Set Send Amount", true);
-	undo_redo.do_method(track, Track::set_send_amount, p_send, p_amount);
-	undo_redo.undo_method(track, Track::set_send_amount, p_send, track->get_send_amount(p_send));
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(track, &Track::set_send_amount, p_send, p_amount);
+	undo_redo.undo_method(track, &Track::set_send_amount, p_send, track->get_send_amount(p_send));
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 
@@ -709,10 +709,10 @@ void Interface::_on_track_swap_effects(int p_track, int p_effect, int p_with_eff
 	ERR_FAIL_INDEX(p_track, song.get_track_count());
 	Track *track = song.get_track(p_track);
 	undo_redo.begin_action("Swap Effects");
-	undo_redo.do_method(track, Track::swap_audio_effects, p_effect, p_with_effect);
-	undo_redo.undo_method(track, Track::swap_audio_effects, p_effect, p_with_effect);
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(track, &Track::swap_audio_effects, p_effect, p_with_effect);
+	undo_redo.undo_method(track, &Track::swap_audio_effects, p_effect, p_with_effect);
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 void Interface::_on_track_swap_sends(int p_track, int p_send, int p_with_send) {
@@ -721,10 +721,10 @@ void Interface::_on_track_swap_sends(int p_track, int p_send, int p_with_send) {
 	Track *track = song.get_track(p_track);
 
 	undo_redo.begin_action("Swap Sends");
-	undo_redo.do_method(track, Track::swap_sends, p_send, p_with_send);
-	undo_redo.undo_method(track, Track::swap_sends, p_send, p_with_send);
-	undo_redo.do_method(this, Interface::_redraw_track_edits);
-	undo_redo.undo_method(this, Interface::_redraw_track_edits);
+	undo_redo.do_method(track, &Track::swap_sends, p_send, p_with_send);
+	undo_redo.undo_method(track, &Track::swap_sends, p_send, p_with_send);
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
 
@@ -793,20 +793,20 @@ void Interface::_on_toggle_automation_visibility(Track *p_track, AudioEffect *p_
 
 		if (disabled_index >= 0) { //move from disabled to enabled
 			Automation *a = p_track->get_disabled_automation(disabled_index);
-			undo_redo.do_method(p_track, Track::remove_disabled_automation, disabled_index);
-			undo_redo.do_method(p_track, Track::add_automation, a, -1);
+			undo_redo.do_method(p_track, &Track::remove_disabled_automation, disabled_index);
+			undo_redo.do_method(p_track, &Track::add_automation, a, -1);
 
-			undo_redo.undo_method(p_track, Track::remove_automation, p_track->get_automation_count());
-			undo_redo.undo_method(p_track, Track::add_disabled_automation, a, disabled_index);
+			undo_redo.undo_method(p_track, &Track::remove_automation, p_track->get_automation_count());
+			undo_redo.undo_method(p_track, &Track::add_disabled_automation, a, disabled_index);
 		} else {
 			Automation *a = new Automation(p_effect->get_control_port(p_automation), p_effect);
-			undo_redo.do_method(p_track, Track::add_automation, a, -1);
-			undo_redo.undo_method(p_track, Track::remove_automation, p_track->get_automation_count());
+			undo_redo.do_method(p_track, &Track::add_automation, a, -1);
+			undo_redo.undo_method(p_track, &Track::remove_automation, p_track->get_automation_count());
 			undo_redo.do_data(a);
 		}
 
-		undo_redo.do_method(this, Interface::_update_editor_automations_for_effect, p_effect);
-		undo_redo.undo_method(this, Interface::_update_editor_automations_for_effect, p_effect);
+		undo_redo.do_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
+		undo_redo.undo_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
 
 		undo_redo.commit_action();
 
@@ -826,15 +826,15 @@ void Interface::_on_toggle_automation_visibility(Track *p_track, AudioEffect *p_
 		Automation *a = p_track->get_automation(index);
 
 		undo_redo.begin_action("Remove Automation");
-		undo_redo.do_method(p_track, Track::remove_automation, index);
+		undo_redo.do_method(p_track, &Track::remove_automation, index);
 
 		if (!a->is_empty()) {
-			undo_redo.do_method(p_track, Track::add_disabled_automation, a, -1);
-			undo_redo.undo_method(p_track, Track::remove_disabled_automation, p_track->get_disabled_automation_count());
+			undo_redo.do_method(p_track, &Track::add_disabled_automation, a, -1);
+			undo_redo.undo_method(p_track, &Track::remove_disabled_automation, p_track->get_disabled_automation_count());
 		}
-		undo_redo.undo_method(p_track, Track::add_automation, a, index);
-		undo_redo.do_method(this, Interface::_update_editor_automations_for_effect, p_effect);
-		undo_redo.undo_method(this, Interface::_update_editor_automations_for_effect, p_effect);
+		undo_redo.undo_method(p_track, &Track::add_automation, a, index);
+		undo_redo.do_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
+		undo_redo.undo_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
 
 		undo_redo.commit_action();
 	}
@@ -1010,13 +1010,13 @@ void Interface::_on_pattern_settings_change() {
 	int beats_per_bar = bar_length.get_adjustment()->get_value();
 	for (int i = 0; i < patterns; i++) {
 		int pattern = pattern_editor.get_current_pattern() + i;
-		undo_redo.do_method(&song, Song::pattern_set_beats, pattern, beats);
-		undo_redo.undo_method(&song, Song::pattern_set_beats, pattern, song.pattern_get_beats(pattern));
-		undo_redo.do_method(&song, Song::pattern_set_beats_per_bar, pattern, beats_per_bar);
-		undo_redo.undo_method(&song, Song::pattern_set_beats_per_bar, pattern, song.pattern_get_beats_per_bar(pattern));
+		undo_redo.do_method(&song, &Song::pattern_set_beats, pattern, beats);
+		undo_redo.undo_method(&song, &Song::pattern_set_beats, pattern, song.pattern_get_beats(pattern));
+		undo_redo.do_method(&song, &Song::pattern_set_beats_per_bar, pattern, beats_per_bar);
+		undo_redo.undo_method(&song, &Song::pattern_set_beats_per_bar, pattern, song.pattern_get_beats_per_bar(pattern));
 
-		undo_redo.do_method(&pattern_editor, PatternEditor::redraw_and_validate_cursor);
-		undo_redo.undo_method(&pattern_editor, PatternEditor::redraw_and_validate_cursor);
+		undo_redo.do_method(&pattern_editor, &PatternEditor::redraw_and_validate_cursor);
+		undo_redo.undo_method(&pattern_editor, &PatternEditor::redraw_and_validate_cursor);
 	}
 	undo_redo.commit_action();
 	pattern_settings_popover.popdown();

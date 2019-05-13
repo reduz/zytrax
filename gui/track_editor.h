@@ -215,7 +215,7 @@ public:
 		queue_draw();
 	}
 
-	int set_v_offset(int p_offset);
+	void set_v_offset(int p_offset);
 	int get_v_offset() const;
 	Track *get_track() const;
 

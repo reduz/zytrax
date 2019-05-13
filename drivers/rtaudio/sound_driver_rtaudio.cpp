@@ -43,6 +43,7 @@ public:
 			unsigned int nFrames,
 			double streamTime,
 			RtAudioStreamStatus status) {
+		return 0;
 	}
 
 	virtual void lock() {
