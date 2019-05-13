@@ -860,6 +860,7 @@ String SettingsDialog::get_settings_path() {
 	bool created_path = false;
 
 	String path;
+	String dir = "ZyTrax";
 #ifdef WINDOWS_ENABLED
 	path = _wgetenv(L"APPDATA");
 #endif
@@ -869,6 +870,7 @@ String SettingsDialog::get_settings_path() {
 		path.parse_utf8(getenv("XDG_CONFIG_HOME"));
 	} else {
 		path.parse_utf8(getenv("HOME"));
+		dir = "." + dir;
 	}
 #endif
 
@@ -884,7 +886,7 @@ String SettingsDialog::get_settings_path() {
 		path += "/";
 	}
 
-	path += "Zytrax";
+	path += dir;
 
 	if (!created_path) {
 #ifdef WINDOWS_ENABLED
