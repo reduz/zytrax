@@ -20,6 +20,9 @@ else:
 
 opts.Add(EnumVariable("platform","Platform to build",detected_platform,("windows","osx","freedesktop")))
 opts.Add(BoolVariable("enable_rtaudio","Use RtAudio as Sound Driver",True))
+opts.Add(BoolVariable("use_jack","Use Jack with RtAudio",False))
+opts.Add(BoolVariable("use_pulseaudio","Use Pulseaudio with RtAudio",True))
+opts.Add(BoolVariable("use_alsa","Use Alsa with RtAudio",True))
 opts.Add(BoolVariable("enable_vst2","Enable VST2",True))
 
 opts.Update(env)  # update environment
@@ -37,6 +40,19 @@ if (env["enable_rtaudio"]):
 		env.Append(CXXFLAGS=["-D__WINDOWS_DS__"])
 		#env.Append(CXXFLAGS=["-D__WINDOWS_ASIO__"])
 		env.Append(LIBS=["dsound","mfplat","mfuuid","wmcodecdspuuid","ksuser"])
+
+	if (env["platform"]=="freedesktop"):
+
+		if (env["use_pulseaudio"]):
+			env.Append(CXXFLAGS=["-D__LINUX_PULSE__"])
+			env.ParseConfig("pkg-config libpulse --libs --cflags")
+			env.ParseConfig("pkg-config libpulse-simple --libs --cflags")
+		if (env["use_alsa"]):
+			env.Append(CXXFLAGS=["-D__LINUX_ALSA__"])
+			env.ParseConfig("pkg-config alsa --libs --cflags")
+		if (env["use_jack"]):
+			env.Append(CXXFLAGS=["-D__LINUX_JACK__"])
+			env.ParseConfig("pkg-config jack --libs --cflags")
 
 if (env["platform"]=="windows"):
 	env.Append(CXXFLAGS=["-DWINDOWS_ENABLED"])
