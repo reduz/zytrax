@@ -75,8 +75,8 @@ public:
 
 	/* Load/Save */
 
-	virtual JSON::Node to_json() const;
-	virtual Error from_json(const JSON::Node &node);
+	virtual JSON::Node _internal_to_json() const;
+	virtual Error _internal_from_json(const JSON::Node &node);
 
 	void set_resize_callback(ResizeCallback p_callback, void *p_userdata);
 

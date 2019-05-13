@@ -42,6 +42,9 @@ protected:
 	virtual int _get_internal_control_port_count() const = 0;
 	virtual ControlPort *_get_internal_control_port(int p_index) = 0;
 
+	virtual JSON::Node _internal_to_json() const = 0;
+	virtual Error _internal_from_json(const JSON::Node &node) = 0;
+
 public:
 	void set_cc_visible(MIDIEvent::CC p_cc, bool p_visible);
 	bool is_cc_visible(MIDIEvent::CC p_cc) const;
@@ -53,6 +56,9 @@ public:
 
 	virtual int get_control_port_count() const;
 	virtual ControlPort *get_control_port(int p_port);
+
+	virtual JSON::Node to_json() const;
+	virtual Error from_json(const JSON::Node &node);
 
 	AudioEffectMIDI();
 };

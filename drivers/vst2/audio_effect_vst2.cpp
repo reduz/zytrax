@@ -1,5 +1,6 @@
 #include "audio_effect_vst2.h"
 #include "audio_effect_provider_vst2.h"
+#include "base64.h"
 
 int AudioEffectVST2::_get_internal_control_port_count() const {
 	return control_ports.size();
@@ -470,10 +471,61 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 
 /* Load/Save */
 
-JSON::Node AudioEffectVST2::to_json() const {
-	return JSON::object();
+JSON::Node AudioEffectVST2::_internal_to_json() const {
+	JSON::Node node = JSON::object();
+
+	node.add("type", "vst2");
+	//save the program first, if programs exist
+	if (effect->numPrograms > 0) {
+		int program_number = effect->dispatcher(effect, effGetProgram, 0, 0, NULL, 0.0f);
+		node.add("program", program_number);
+	}
+	//check whether to use chunks or params
+	if (effect->flags & effFlagsProgramChunks) {
+		unsigned char *data;
+		int data_size = effect->dispatcher(effect, effGetChunk, 1, 0, &data, 0);
+		if (data_size) {
+			Vector<uint8_t> datav;
+			datav.resize(data_size);
+			memcpy(&datav[0], data, data_size);
+			node.add("chunk", base64_encode(datav));
+		}
+	} else {
+		//I guess VST warrants that these keep their indices
+		JSON::Node states = JSON::array();
+		for (int i = 0; i < control_ports.size(); i++) {
+			states.append(control_ports[i].get());
+		}
+		node.add("param_states", states);
+	}
+
+	return node;
 }
-Error AudioEffectVST2::from_json(const JSON::Node &node) {
+Error AudioEffectVST2::_internal_from_json(const JSON::Node &node) {
+
+	ERR_FAIL_COND_V(!node.has("type"), ERR_FILE_CORRUPT);
+	ERR_FAIL_COND_V(node.get("type").toString() != "vst2", ERR_FILE_CORRUPT);
+
+	if (node.has("program")) {
+		int program = node.get("program").toInt();
+		effect->dispatcher(effect, effSetProgram, 0, program, NULL, 0.0f);
+	}
+
+	if (node.has("chunk")) {
+		std::string chunk_str = node.get("chunk").toString();
+		Vector<uint8_t> data = base64_decode(chunk_str);
+		effect->dispatcher(effect, effSetChunk, 1, data.size(), &data[0], 0);
+	} else if (node.has("param_states")) {
+		JSON::Node states = node.get("param_states");
+
+		for (int i = 0; i < states.getCount(); i++) {
+			if (i >= control_ports.size()) {
+				break;
+			}
+			float value = states.get(i).toFloat();
+			control_ports[i].set(value);
+		}
+	}
 	return OK;
 }
 
