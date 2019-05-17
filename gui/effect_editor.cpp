@@ -1,5 +1,5 @@
 #include "effect_editor.h"
-
+#include "settings_dialog.h"
 void EffectEditor::edit(AudioEffect *p_effect, Track *p_track, Gtk::Widget *p_editor) {
 
 	effect = p_effect;
@@ -54,13 +54,82 @@ void EffectEditor::update_automations() {
 			}
 		}
 
-		//printf("ADDING: %s\n", port->get_name().utf8().get_data());
 		row[model_columns.name] = port->get_name().utf8().get_data();
 		row[model_columns.visible] = visible;
+		//row[model_columns.commands] = command_list_store;
+		if (port->get_command() == 0) {
+			row[model_columns.command] = "<assign>";
+		} else {
+			char s[2] = { char('A' + (port->get_command() - 'a')), 0 };
+			row[model_columns.command] = s;
+		}
 		row[model_columns.index] = i;
 	}
 
 	updating_automation = false;
+}
+
+void EffectEditor::_command_edited(const Glib::ustring &path, const Glib::ustring &value) {
+
+	Gtk::TreeIter iter = list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+
+	Glib::ustring us = value;
+	if (value.length() == 0) {
+		return;
+	}
+
+	updating_automation = true;
+	char valc = value[0];
+	if (valc == '<') {
+		valc = 0; //unselected
+		(*iter)[model_columns.command] = "<assign>";
+	} else {
+		valc = 'a' + (valc - 'A'); //unselected
+		(*iter)[model_columns.command] = value;
+	}
+
+	select_automation_command.emit(track, effect, (*iter)[model_columns.index], int(valc));
+	updating_automation = false;
+}
+
+bool EffectEditor::_automation_menu_timeout() {
+
+	Gtk::TreeModel::iterator iter = tree_selection->get_selected();
+	if (!iter)
+		return false;
+	Gtk::TreeModel::Row row = *iter;
+	int selected = row[model_columns.index];
+	if (effect->get_control_port(selected)->get_command() == 0) {
+		automation_popup_item.set_sensitive(false);
+	} else {
+		automation_popup_item.set_sensitive(true);
+	}
+
+	return false;
+}
+void EffectEditor::_automation_rmb(GdkEventButton *button_event) {
+
+	if ((button_event->type == GDK_BUTTON_PRESS) && (button_event->button == 3)) {
+
+		automation_popup.popup_at_pointer((GdkEvent *)button_event);
+		//we can only override this only BEFORE the event, so selection is wrong, adjust sensitivity in a timer :(
+		menu_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectEditor::_automation_menu_timeout),
+				1, Glib::PRIORITY_DEFAULT);
+	}
+}
+
+void EffectEditor::_automation_menu_action() {
+
+	Gtk::TreeModel::iterator iter = tree_selection->get_selected();
+	if (!iter)
+		return;
+	Gtk::TreeModel::Row row = *iter;
+	int selected = row[model_columns.index];
+	ERR_FAIL_COND(effect->get_control_port(selected)->get_command() == 0);
+	String identifier = effect->get_control_port(selected)->get_identifier();
+
+	SettingsDialog::add_default_command(identifier, effect->get_control_port(selected)->get_command());
 }
 
 EffectEditor::EffectEditor() {
@@ -76,7 +145,9 @@ EffectEditor::EffectEditor() {
 	automation_scroll.add(tree);
 
 	list_store = Gtk::ListStore::create(model_columns);
-	//	tree_selection = tree.get_selection();
+	tree_selection = tree.get_selection();
+
+	tree.set_model(list_store);
 
 	column.set_title("Automations");
 	column.pack_start(cell_render_check, false);
@@ -87,12 +158,59 @@ EffectEditor::EffectEditor() {
 	tree.set_model(list_store);
 	tree.append_column(column);
 	tree.get_column(0)->set_expand(true);
-	///
+
+	command_list_store = Gtk::ListStore::create(model_columns.command_model_columns);
+	{
+		{
+			Gtk::TreeModel::iterator iter = command_list_store->append();
+			Gtk::TreeModel::Row row = *iter;
+			row[model_columns.command_model_columns.name] = "<unassigned>";
+			row[model_columns.command_model_columns.index] = 0;
+		}
+		for (int i = 'a'; i <= 'z'; i++) {
+
+			Gtk::TreeModel::iterator iter = command_list_store->append();
+			Gtk::TreeModel::Row row = *iter;
+
+			const char s[2] = { char('A' + (i - 'a')), 0 };
+			row[model_columns.command_model_columns.name] = s;
+			row[model_columns.command_model_columns.index] = i;
+		}
+	}
+
+	column2.set_title("Command");
+	column2.pack_start(cell_render_command, false);
+	column2.add_attribute(cell_render_command.property_text(), model_columns.command);
+	cell_render_command.signal_edited().connect(sigc::mem_fun(*this, &EffectEditor::_command_edited));
+
+	cell_render_command.property_model() = command_list_store;
+	cell_render_command.property_text_column() = 0;
+	cell_render_command.property_editable() = true;
+	cell_render_command.property_has_entry() = false;
+
+	cell_render_command.set_visible(true);
+
+	tree.append_column(column2);
+	tree.get_column(1)->set_expand(false);
+	tree.set_can_focus(false);
+	//tree_selection->set_mode(Gtk::SELECTION_NONE);
+
+	tree.signal_button_press_event().connect_notify(sigc::mem_fun(*this, &EffectEditor::_automation_rmb));
+
+	automation_popup_item.set_label("Make Command Default");
+	automation_popup_item.signal_activate().connect(sigc::mem_fun(*this, &EffectEditor::_automation_menu_action));
+	automation_popup_item.show();
+	automation_popup.append(automation_popup_item);
+
+	////////////////
 	split.pack2(effect_vbox, true, false);
 
 	show_all_children();
 
 	Glib::RefPtr<Gdk::Screen> screen = Gdk::Screen::get_default();
-	automation_scroll.set_size_request(screen->get_height() / 6, screen->get_height() / 4);
+	//automation_scroll.set_size_request(screen->get_height() / 5, screen->get_height() / 4);
+	automation_scroll.set_propagate_natural_width(true);
+	automation_scroll.set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_ALWAYS);
+
 	updating_automation = false;
 }

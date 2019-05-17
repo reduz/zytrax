@@ -27,6 +27,8 @@ SoundDriverManager::MixFrequency SoundDriverManager::mixing_hz = SoundDriverMana
 SoundDriverManager::BufferSize SoundDriverManager::buffer_size = SoundDriverManager::BUFFER_SIZE_1024;
 SoundDriverManager::BufferSize SoundDriverManager::step_size = SoundDriverManager::BUFFER_SIZE_256;
 
+SoundDriverManager::MixCallback SoundDriverManager::mix_callback = NULL;
+
 int SoundDriverManager::get_current_driver_index() {
 
 	return current_driver;
@@ -124,6 +126,10 @@ int SoundDriverManager::get_mix_frequency_hz(MixFrequency p_frequency) {
 }
 int SoundDriverManager::get_buffer_size_frames(BufferSize p_size) {
 	return buffer_size_frames[p_size];
+}
+
+void SoundDriverManager::set_mix_callback(MixCallback p_callback) {
+	mix_callback = p_callback;
 }
 
 void SoundDriverManager::register_driver(SoundDriver *p_driver) {

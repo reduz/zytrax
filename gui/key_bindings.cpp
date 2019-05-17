@@ -21,6 +21,7 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"FileOpen",
 	"FileSave",
 	"FileSaveAs",
+	"FileExportWav",
 	"FileQuit",
 
 	"PlaybackPlay",
@@ -42,6 +43,8 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"TrackAddTrack",
 	"TrackAddColumn",
 	"TrackRemoveColumn",
+	"TrackAddCommandColumn",
+	"TrackRemoveCommandColumn",
 	"TrackMoveLeft",
 	"TrackMoveRight",
 	"TrackMute",
@@ -49,8 +52,7 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"TrackRename",
 	"TrackRemove",
 
-	"AutomationToggleVisible",
-	"AutomationRadioEnvelopeNumbers",
+	"AutomationRadioDiscreteRows",
 	"AutomationRadioEnvelopeSmall",
 	"AutomationRadioEnvelopeLarge",
 	"AutomationMoveLeft",
@@ -76,6 +78,8 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"CursorFieldClear",
 	"CursorInsert",
 	"CursorDelete",
+	"CursorTrackInsert",
+	"CursorTrackDelete",
 	"CursorCopyVolumeMask",
 	"CursorToggleVolumeMask",
 	"CursorPlayNote",
@@ -338,6 +342,7 @@ KeyBindings::KeyBindings() {
 	_add_keybind(FILE_OPEN, KeyState(GDK_KEY_o, GDK_CONTROL_MASK, true));
 	_add_keybind(FILE_SAVE, KeyState(GDK_KEY_s, GDK_CONTROL_MASK, true));
 	_add_keybind(FILE_SAVE_AS, KeyState(0, 0, true));
+	_add_keybind(FILE_EXPORT_WAV, KeyState(0, 0, true));
 	_add_keybind(FILE_QUIT, KeyState(GDK_KEY_q, GDK_CONTROL_MASK, true));
 
 	_add_keybind(PLAYBACK_PLAY, KeyState(GDK_KEY_F5, 0, true));
@@ -359,6 +364,8 @@ KeyBindings::KeyBindings() {
 	_add_keybind(TRACK_ADD_TRACK, KeyState(GDK_KEY_a, GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_ADD_COLUMN, KeyState(GDK_KEY_bracketright, GDK_MOD1_MASK, true));
 	_add_keybind(TRACK_REMOVE_COLUMN, KeyState(GDK_KEY_bracketleft, GDK_MOD1_MASK, true));
+	_add_keybind(TRACK_ADD_COMMAND_COLUMN, KeyState(GDK_KEY_bracketright, GDK_MOD1_MASK | GDK_CONTROL_MASK, true));
+	_add_keybind(TRACK_REMOVE_COMMAND_COLUMN, KeyState(GDK_KEY_bracketleft, GDK_MOD1_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_MOVE_LEFT, KeyState(GDK_KEY_Left, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_MOVE_RIGHT, KeyState(GDK_KEY_Right, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_MUTE, KeyState(GDK_KEY_F9, 0, true, KeyState::MODE_TOGGLE));
@@ -366,10 +373,9 @@ KeyBindings::KeyBindings() {
 	_add_keybind(TRACK_RENAME, KeyState(GDK_KEY_r, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_REMOVE, KeyState(GDK_KEY_x, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 
-	_add_keybind(AUTOMATION_TOGGLE_VISIBLE, KeyState(GDK_KEY_v, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_TOGGLE));
-	_add_keybind(AUTOMATION_RADIO_ENVELOPE_NUMBERS, KeyState(GDK_KEY_n, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_ENVELOPE_NUMBERS));
-	_add_keybind(AUTOMATION_RADIO_ENVELOPE_SMALL, KeyState(GDK_KEY_s, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_ENVELOPE_NUMBERS));
-	_add_keybind(AUTOMATION_RADIO_ENVELOPE_LARGE, KeyState(GDK_KEY_l, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_ENVELOPE_NUMBERS));
+	_add_keybind(AUTOMATION_RADIO_DISCRETE_ROWS, KeyState(GDK_KEY_n, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_DISCRETE_ROWS));
+	_add_keybind(AUTOMATION_RADIO_ENVELOPE_SMALL, KeyState(GDK_KEY_s, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_DISCRETE_ROWS));
+	_add_keybind(AUTOMATION_RADIO_ENVELOPE_LARGE, KeyState(GDK_KEY_l, GDK_CONTROL_MASK | GDK_SHIFT_MASK, true, KeyState::MODE_RADIO, AUTOMATION_RADIO_DISCRETE_ROWS));
 	_add_keybind(AUTOMATION_MOVE_LEFT, KeyState(GDK_KEY_Left, GDK_MOD1_MASK | GDK_CONTROL_MASK | GDK_SHIFT_MASK, true));
 	_add_keybind(AUTOMATION_MOVE_RIGHT, KeyState(GDK_KEY_Right, GDK_MOD1_MASK | GDK_CONTROL_MASK | GDK_SHIFT_MASK, true));
 	_add_keybind(AUTOMATION_REMOVE, KeyState(GDK_KEY_x, GDK_MOD1_MASK | GDK_CONTROL_MASK | GDK_SHIFT_MASK, true));
@@ -393,6 +399,8 @@ KeyBindings::KeyBindings() {
 	_add_keybind(CURSOR_FIELD_CLEAR, KeyState(GDK_KEY_period));
 	_add_keybind(CURSOR_INSERT, KeyState(GDK_KEY_Insert));
 	_add_keybind(CURSOR_DELETE, KeyState(GDK_KEY_Delete));
+	_add_keybind(CURSOR_TRACK_INSERT, KeyState(GDK_KEY_Insert, GDK_SHIFT_MASK));
+	_add_keybind(CURSOR_TRACK_DELETE, KeyState(GDK_KEY_Delete, GDK_SHIFT_MASK));
 	_add_keybind(CURSOR_COPY_VOLUME_MASK, KeyState(GDK_KEY_Return));
 	_add_keybind(CURSOR_TOGGLE_VOLUME_MASK, KeyState(GDK_KEY_comma));
 	_add_keybind(CURSOR_PLAY_NOTE, KeyState(GDK_KEY_4));

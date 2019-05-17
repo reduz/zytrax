@@ -2,7 +2,19 @@
 
 void TrackRackVolume::_mouse_button_event(GdkEventButton *event, bool p_press) {
 
-	Gdk::Rectangle posr(event->x, event->y, 1, 1);
+	if (event->button == 1) {
+		if (p_press && event->x >= grabber_x && event->x < grabber_x + grabber_w && event->y >= grabber_y && event->y < grabber_y + grabber_h) {
+			grabbing_y = event->y;
+			grabbing_db = song->get_track(track_idx)->get_mix_volume_db();
+			grabbing = true;
+			queue_draw();
+		}
+
+		if (!p_press) {
+			grabbing = false;
+			queue_draw();
+		}
+	}
 }
 
 bool TrackRackVolume::on_button_press_event(GdkEventButton *event) {
@@ -18,6 +30,12 @@ bool TrackRackVolume::on_button_release_event(GdkEventButton *release_event) {
 
 bool TrackRackVolume::on_motion_notify_event(GdkEventMotion *motion_event) {
 
+	if (grabbing) {
+		float new_db = grabbing_db - (motion_event->y - grabbing_y) * (TRACK_MAX_DB - TRACK_MIN_DB) / vu_h;
+		new_db = CLAMP(new_db, TRACK_MIN_DB, TRACK_MAX_DB);
+		volume_db_changed.emit(track_idx, new_db);
+		queue_draw();
+	}
 	return false;
 }
 
@@ -203,7 +221,7 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		cr->get_text_extents("XX", te);
 		fw -= te.width;
 
-		int new_width = fw * min_width_chars + font_height + separator * 2;
+		int new_width = fw * min_width_chars + fe.height + separator * 2;
 		int new_height = fe.height;
 
 		if (new_width != min_width || new_height != min_height) {
@@ -228,10 +246,8 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	_draw_text(cr, separator, separator, song->get_track(track_idx)->get_name(), selected ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE], true);
 
-	float track_max_db = 12;
-	float track_min_db = -60;
-
 	vu_x = font_height + separator;
+
 	vu_y = font_height / 2;
 	vu_w = char_width * min_width_chars;
 	vu_h = h - vu_y * 2;
@@ -239,7 +255,7 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Gdk::Cairo::set_source_rgba(cr, theme->colors[Theme::COLOR_BACKGROUND]);
 
 	Gdk::Cairo::set_source_rgba(cr, Theme::make_rgba(0, 0, 0));
-	cr->rectangle(font_height + separator, 0, w - (font_height + separator), h);
+	cr->rectangle(font_height + separator - 1, 0, w - (font_height + separator) + 1, h);
 	cr->fill();
 
 	Gdk::RGBA rgba;
@@ -247,40 +263,66 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	cr->set_line_width(1);
 
-	float peak_db = song->get_track(track_idx)->get_peak_volume_db();
-
 	for (int i = 0; i < vu_h; i += 2) {
-		float db = track_max_db - i * (track_max_db - track_min_db) / vu_h;
+		float db = TRACK_MAX_DB - float(i) * (TRACK_MAX_DB - TRACK_MIN_DB) / vu_h;
 		float r = 0, g = 0, b = 0;
 		if (db > 0) {
 			r = 1.0;
-			g = 1.0 - db / track_max_db;
+			g = 1.0 - db / TRACK_MAX_DB;
 		} else {
-			r = 1.0 - db / track_min_db;
+			r = 1.0 - db / TRACK_MIN_DB;
 			g = 1.0;
 		}
 
-		if (db > peak_db) {
-			r *= 0.3;
-			g *= 0.3;
-			b *= 0.3;
+		float lr = r;
+		float lg = g;
+		float lb = b;
+		float rr = r;
+		float rg = g;
+		float rb = b;
+		{
+
+			if (db > peak_db_l) {
+				lr *= 0.3;
+				lg *= 0.3;
+				lb *= 0.3;
+			}
+
+			if (db > peak_db_r) {
+				rr *= 0.3;
+				rg *= 0.3;
+				rb *= 0.3;
+			}
+			int middle = vu_x + vu_w / 2;
+			{
+				rgba.set_red(lr);
+				rgba.set_green(lg);
+				rgba.set_blue(lb);
+				Gdk::Cairo::set_source_rgba(cr, rgba);
+				cr->move_to(vu_x, vu_y + i + 0.5);
+				cr->line_to(middle - 1, vu_y + i + 0.5);
+				cr->stroke();
+			}
+			{
+				rgba.set_red(rr);
+				rgba.set_green(rg);
+				rgba.set_blue(rb);
+				Gdk::Cairo::set_source_rgba(cr, rgba);
+				cr->move_to(middle + 1, vu_y + i + 0.5);
+				cr->line_to(vu_x + vu_w, vu_y + i + 0.5);
+				cr->stroke();
+			}
 		}
-		rgba.set_red(r);
-		rgba.set_green(g);
-		rgba.set_blue(b);
-		Gdk::Cairo::set_source_rgba(cr, rgba);
-		cr->move_to(vu_x, vu_y + i + 0.5);
-		cr->line_to(vu_x + vu_w, vu_y + i + 0.5);
-		cr->stroke();
 	}
 
 	//white line at 0db
 	rgba.set_red(1);
 	rgba.set_green(1);
 	rgba.set_blue(1);
+	rgba.set_alpha(0.5);
 	Gdk::Cairo::set_source_rgba(cr, rgba);
 
-	int db0 = track_max_db * vu_h / (track_max_db - track_min_db);
+	int db0 = TRACK_MAX_DB * float(vu_h) / float(TRACK_MAX_DB - TRACK_MIN_DB);
 	cr->move_to(vu_x, vu_y + db0 + 0.5);
 	cr->line_to(vu_x + vu_w, vu_y + db0 + 0.5);
 	cr->move_to(vu_x, vu_y + db0 + 1.5);
@@ -290,22 +332,89 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	//draw handle
 
 	float track_db = song->get_track(track_idx)->get_mix_volume_db();
-	int db_handle = (track_max_db - track_db) * vu_h / (track_max_db - track_min_db);
+	int db_handle = (TRACK_MAX_DB - track_db) * vu_h / float(TRACK_MAX_DB - TRACK_MIN_DB);
 
-	_draw_rect(cr, vu_x, db_handle, vu_w - 1, font_height, rgba);
-	rgba.set_alpha(0.7);
+	rgba.set_red(1);
+	rgba.set_green(0.5);
+	rgba.set_blue(0.5);
+	rgba.set_alpha(1.0);
+	Gdk::Cairo::set_source_rgba(cr, rgba);
 
-	cr->move_to(vu_x, vu_y + db_handle + 0.5);
-	cr->line_to(vu_x + vu_w, vu_y + db_handle + 0.5);
+	cr->move_to(vu_x, vu_y + db_handle - 0.5);
+	cr->line_to(vu_x + vu_w, vu_y + db_handle - 0.5);
 	//cr->move_to(vu_x, vu_y + db_handle + 1.5);
 	//cr->line_to(vu_x + vu_w, vu_y + db_handle + 1.5);
 	cr->stroke();
+
+	rgba.set_red(1);
+	rgba.set_green(1);
+	rgba.set_blue(1);
+	rgba.set_alpha(1.0);
+
+	cr->set_line_width(2);
+	_draw_rect(cr, vu_x + 0.5, db_handle + font_height / 4 + 0.5, vu_w - 1, font_height / 2, rgba);
+
+	grabber_x = vu_x;
+	grabber_y = db_handle;
+	grabber_w = vu_w - 1;
+	grabber_h = font_height;
 
 	/*if (selected) {
 		_draw_rect(cr, 1, 0, w + 1, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR]);
 	}*/
 
 	return false;
+}
+
+void TrackRackVolume::update_peak() {
+
+	uint64_t current_time = g_get_monotonic_time();
+	double diff = double(current_time - last_time) / 1000000.0;
+	last_time = current_time;
+
+	{
+
+		float current_peak_l = song->get_track(track_idx)->get_peak_volume_db_l();
+
+		float new_peak_l;
+		if (current_peak_l > peak_db_l) {
+			new_peak_l = current_peak_l;
+		} else {
+			//decrement
+			new_peak_l = peak_db_l - 48 * diff; //24db per second?
+		}
+
+		if (new_peak_l < TRACK_MIN_DB) { //so it stops redrawing eventually;
+			new_peak_l = TRACK_MIN_DB;
+		}
+
+		if (new_peak_l != peak_db_l) {
+			peak_db_l = new_peak_l;
+			queue_draw();
+		}
+	}
+
+	{
+
+		float current_peak_r = song->get_track(track_idx)->get_peak_volume_db_r();
+
+		float new_peak_r;
+		if (current_peak_r > peak_db_r) {
+			new_peak_r = current_peak_r;
+		} else {
+			//decrement
+			new_peak_r = peak_db_r - 48 * diff; //24db per second?
+		}
+
+		if (new_peak_r < TRACK_MIN_DB) { //so it stops redrawing eventually;
+			new_peak_r = TRACK_MIN_DB;
+		}
+
+		if (new_peak_r != peak_db_r) {
+			peak_db_r = new_peak_r;
+			queue_draw();
+		}
+	}
 }
 
 void TrackRackVolume::on_parsing_error(
@@ -345,6 +454,12 @@ TrackRackVolume::TrackRackVolume(int p_track, Song *p_song, UndoRedo *p_undo_red
 	font_ascent = 1;
 	separator = 2;
 	selected = false;
+	grabbing = false;
+
+	grabber_x = grabber_y = grabber_w = grabber_h = -1;
+	last_time = 0;
+	peak_db_l = -100;
+	peak_db_r = -100;
 }
 
 TrackRackVolume::~TrackRackVolume() {
@@ -390,8 +505,31 @@ void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 						Gtk::MenuItem *item = new Gtk::MenuItem;
 						item->show();
 						item->set_label(track_name.utf8().get_data());
-						item->set_sensitive(track_idx != i);
+						bool can_add = track_idx != i;
+						if (song->get_track(i)->has_send(i)) {
+							can_add = false;
+						}
+
+						item->set_sensitive(can_add);
 						item->signal_activate().connect(sigc::bind<int>(sigc::mem_fun(*this, &TrackRackEditor::_insert_send_to_track), i));
+						available_tracks.push_back(item);
+						send_menu->append(*item);
+					}
+					{
+						//sep
+						Gtk::MenuItem *sep = new Gtk::SeparatorMenuItem;
+						sep->show();
+						send_menu->append(*sep);
+						available_tracks.push_back(sep);
+						//main
+						Gtk::MenuItem *item = new Gtk::MenuItem;
+						item->show();
+						item->set_label("Speakers");
+						bool can_add = !song->get_track(track_idx)->has_send(Track::SEND_SPEAKERS);
+						item->set_sensitive(can_add);
+						if (can_add) {
+							item->signal_activate().connect(sigc::bind<int>(sigc::mem_fun(*this, &TrackRackEditor::_insert_send_to_track), Track::SEND_SPEAKERS));
+						}
 						available_tracks.push_back(item);
 						send_menu->append(*item);
 					}
@@ -430,7 +568,6 @@ void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 					send_popover.set_pointing_to(alloc);
 					send_popover.popup();
 				}
-				printf("click on %i\n", pressing_area);
 				//press
 			}
 
@@ -923,7 +1060,6 @@ void TrackRackEditor::_item_removed() {
 }
 
 void TrackRackEditor::_send_amount_changed() {
-	printf("send amount changed?");
 	send_amount_changed.emit(track_idx, send_popover_index, send_amount.get_adjustment()->get_value() / 100.0);
 }
 

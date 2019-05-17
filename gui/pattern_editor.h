@@ -76,7 +76,7 @@ protected:
 		int row;
 		int column;
 		int field;
-		int skip;
+		//int skip;
 	} cursor;
 
 	struct Selection {
@@ -163,7 +163,7 @@ protected:
 
 	void _cursor_advance();
 
-	void get_cursor_column_data(Track **r_track, int &r_automation, int &r_track_column);
+	void get_cursor_column_data(Track **r_track, int &r_command_column, int &r_automation, int &r_track_column);
 
 	void _draw_text(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, const String &p_text, const Gdk::RGBA &p_color, bool p_down = false);
 	void _draw_fill_rect(const Cairo::RefPtr<Cairo::Context> &cr, int x, int y, int w, int h, const Gdk::RGBA &p_color);
@@ -193,6 +193,31 @@ protected:
 	void _v_scroll_changed();
 	void _h_scroll_changed();
 
+	int playback_pattern;
+	int playback_row;
+
+	Glib::RefPtr<Gio::Menu> new_track_menu;
+	Gtk::Menu new_track_popup;
+
+	Glib::RefPtr<Gio::Menu> track_menu;
+	Glib::RefPtr<Gio::Menu> track_menu_add;
+	Glib::RefPtr<Gio::Menu> track_menu_column;
+	Glib::RefPtr<Gio::Menu> track_menu_command;
+	Glib::RefPtr<Gio::Menu> track_menu_solo;
+	Glib::RefPtr<Gio::Menu> track_menu_edit;
+	Glib::RefPtr<Gio::Menu> track_menu_remove;
+	Gtk::Menu track_popup;
+
+	Glib::RefPtr<Gio::Menu> automation_menu;
+	Glib::RefPtr<Gio::MenuItem> automation_menu_item;
+	Glib::RefPtr<Gio::Menu> automation_menu_mode;
+	Glib::RefPtr<Gio::Menu> automation_menu_move;
+	Glib::RefPtr<Gio::Menu> automation_menu_remove;
+	Gtk::Menu automation_popup;
+
+	int _cursor_get_track_begin_column();
+	int _cursor_get_track_end_column();
+
 public:
 	sigc::signal1<void, int> track_edited;
 	sigc::signal0<void> track_layout_changed;
@@ -221,11 +246,18 @@ public:
 	BeatZoom get_beat_zoom() const;
 
 	int get_current_track() const;
+	Tick get_cursor_tick() const;
 
 	void set_hscroll(Glib::RefPtr<Gtk::Adjustment> p_h_scroll);
 	void set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll);
 
+	void set_playback_pos(int p_pattern, Tick p_tick);
+	void set_playback_cursor(int p_pattern, Tick p_tick);
+
 	void redraw_and_validate_cursor();
+
+	void initialize_menus();
+
 	PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);
 	~PatternEditor();
 };

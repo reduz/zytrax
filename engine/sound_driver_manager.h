@@ -44,6 +44,8 @@ public:
 		MIX_FREQ_MAX
 	};
 
+	typedef void (*MixCallback)(AudioFrame *p_buffer, int p_frames);
+
 private:
 	static int buffer_size_frames[BUFFER_SIZE_MAX];
 	static int mix_frequenzy_hz[MIX_FREQ_MAX];
@@ -54,6 +56,9 @@ private:
 	static MixFrequency mixing_hz;
 	static BufferSize buffer_size;
 	static BufferSize step_size;
+	friend class SoundDriver;
+
+	static MixCallback mix_callback;
 
 public:
 	static void lock_driver(); ///< Protect audio thread variables from ui,game,etc (non-audio) threads
@@ -80,6 +85,8 @@ public:
 
 	static int get_mix_frequency_hz(MixFrequency p_frequency);
 	static int get_buffer_size_frames(BufferSize p_size);
+
+	static void set_mix_callback(MixCallback p_callback);
 };
 
 #endif

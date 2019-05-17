@@ -15,6 +15,7 @@
 int main(int argc, char *argv[]) {
 
 	AudioEffectFactory effect_factory;
+
 #ifdef VST2_ENABLED
 	AudioEffectProvider *provider_vst2 = create_vst2_provider();
 	effect_factory.add_provider(provider_vst2);
@@ -136,7 +137,26 @@ int main(int argc, char *argv[]) {
 					}
 				}
 			}
+
+			if (node.has("default_commands")) { //default commands
+
+				JSON::Node def_commands = node.get("default_commands");
+
+				for (int i = 0; i < def_commands.getCount(); i++) {
+
+					JSON::Node command = def_commands.get(i);
+
+					int index = command.get("index").toInt();
+					String name;
+					name.parse_utf8(command.get("identifier").toString().c_str());
+					char c = char(command.get("command").toInt());
+
+					SettingsDialog::set_default_command(index, name, c);
+				}
+			}
 		}
+
+		SoundDriverManager::init_driver(use_driver_index);
 	}
 
 	/* make it dark */
@@ -185,11 +205,13 @@ int main(int argc, char *argv[]) {
 	/* Initialize the UI */
 
 	Interface window(app.operator->(), &effect_factory, &theme, &key_bindings);
-	window.set_default_size(800, 600);
+	window.set_default_size(1280, 720);
 #ifdef VST2_ENABLED
 	window.add_editor_plugin_function(get_vst2_editor_function());
 #endif
 	int ret = app->run(window);
+
+	SoundDriverManager::finish_driver();
 
 #ifdef VST2_ENABLED
 	delete provider_vst2;

@@ -110,6 +110,36 @@ void Interface::_update_title() {
 	set_title(title.utf8().get_data());
 }
 
+void Interface::_export_dialog_callback(int p_order, void *p_userdata) {
+	Gtk::ProgressBar *pb = (Gtk::ProgressBar *)p_userdata;
+	int last_order = -1;
+	for (int i = 0; i < Song::ORDER_MAX; i++) {
+		last_order = i;
+		if (singleton->song.order_get(i) == Song::ORDER_EMPTY) {
+			break;
+		}
+	}
+
+	if (last_order <= 0) {
+		last_order = 1;
+	}
+	float progress = float(p_order) / float(last_order);
+	pb->set_fraction(progress);
+	singleton->export_wav_label.set_text(String(String("Exporting Order ") + String::num(p_order) + "/" + String::num(last_order) + " (" + String::num(int(progress * 100)) + "%)").utf8().get_data());
+	while (gtk_events_pending()) {
+		gtk_main_iteration_do(false);
+	}
+}
+
+bool Interface::_export_dialog_key(GdkEvent *p_key) {
+	//avoid closing scan with escape key
+	if (p_key->type == GDK_KEY_PRESS && ((GdkEventKey *)(p_key))->keyval == GDK_KEY_Escape) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
 void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 
 	switch (p_bind) {
@@ -293,22 +323,145 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			application->quit();
 
 		} break;
+		case KeyBindings::FILE_EXPORT_WAV: {
+
+			if (!song.can_play()) {
+				Gtk::MessageDialog error_box("Songs without an order list can't be exported.", false, Gtk::MESSAGE_INFO, Gtk::BUTTONS_CLOSE);
+				error_box.set_transient_for(*this);
+				error_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+				error_box.run();
+				error_box.hide();
+				break;
+			}
+			Gtk::FileChooserDialog dialog("Select a Microsoft Waveform(tm) file to export",
+					Gtk::FILE_CHOOSER_ACTION_SAVE);
+			dialog.set_transient_for(*this);
+			dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+
+			//Add response buttons the the dialog:
+			gboolean swap_buttons;
+			g_object_get(gtk_settings_get_default(), "gtk-alternative-button-order", &swap_buttons, NULL);
+			if (swap_buttons) {
+				dialog.add_button("Select", Gtk::RESPONSE_OK);
+				dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+			} else {
+				dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+				dialog.add_button("Select", Gtk::RESPONSE_OK);
+			}
+
+			auto filter_zt = Gtk::FileFilter::create();
+			filter_zt->set_name("Microsoft Waveform");
+			filter_zt->add_pattern("*.wav");
+			dialog.add_filter(filter_zt);
+
+			if (last_wav_export_path != String()) {
+				dialog.set_filename(last_wav_export_path.utf8().get_data());
+			}
+
+			int result = dialog.run();
+			dialog.hide();
+
+			if (result == Gtk::RESPONSE_OK) {
+
+				String path;
+				path.parse_utf8(dialog.get_filename().c_str());
+				if (path.to_lower().get_extension() != "wav") {
+					path += ".wav";
+				}
+
+				Error err;
+				{
+					Gtk::MessageDialog export_dialog("", false /* use_markup */, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_NONE);
+					export_dialog.get_vbox()->get_children()[0]->hide();
+					export_dialog.get_vbox()->set_spacing(0);
+
+					Gtk::Button *response_button = export_dialog.add_button("Close", Gtk::RESPONSE_OK);
+					response_button->set_sensitive(false);
+
+					Gtk::ProgressBar progress;
+					export_dialog.get_vbox()->pack_start(progress, Gtk::PACK_EXPAND_WIDGET);
+					export_dialog.get_vbox()->pack_start(export_wav_label, Gtk::PACK_EXPAND_WIDGET);
+
+					Glib::RefPtr<Gdk::Screen> screen = Gdk::Screen::get_default();
+					int width = screen->get_width();
+					int height = screen->get_height();
+					export_dialog.set_default_size(width / 5, 1);
+
+					export_dialog.show_all_children();
+					export_dialog.get_vbox()->get_children()[0]->hide();
+					export_dialog.set_deletable(false);
+					export_dialog.set_transient_for(*this);
+					export_dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+					export_dialog.set_title("Exporting Song..");
+					export_dialog.signal_event().connect(sigc::mem_fun(*this, &Interface::_export_dialog_key));
+					export_dialog.show();
+
+					err = song_file.export_wav(path, 96000, _export_dialog_callback, &progress);
+
+					response_button->set_sensitive(true);
+					export_dialog.set_deletable(true);
+					export_dialog.set_title("Exporting Done");
+
+					export_wav_label.set_text("All Done!");
+					export_dialog.run();
+					export_dialog.hide();
+				}
+
+				if (err != OK) {
+					Gtk::MessageDialog error_box("Error exporting file", false, Gtk::MESSAGE_INFO, Gtk::BUTTONS_CLOSE);
+					error_box.set_transient_for(*this);
+					error_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+					error_box.run();
+					error_box.hide();
+				} else {
+					last_wav_export_path = path;
+				}
+			}
+
+		} break;
 
 		case KeyBindings::PLAYBACK_PLAY: {
+
+			song.play();
+
 		} break;
 		case KeyBindings::PLAYBACK_STOP: {
+			song.stop();
+
 		} break;
 		case KeyBindings::PLAYBACK_NEXT_PATTERN: {
+			song.play_next_pattern();
 		} break;
 		case KeyBindings::PLAYBACK_PREV_PATTERN: {
+			song.play_prev_pattern();
 		} break;
 		case KeyBindings::PLAYBACK_PLAY_PATTERN: {
+			song.play_pattern(pattern_editor.get_current_pattern());
+
 		} break;
 		case KeyBindings::PLAYBACK_PLAY_FROM_CURSOR: {
+			int current_pattern = pattern_editor.get_current_pattern();
+			int current_order = -1;
+			for (int i = 0; i <= Song::ORDER_MAX; i++) {
+				if (song.order_get(i) == current_pattern) {
+					current_order = i;
+					break;
+				}
+			}
+			if (current_order >= 0) {
+				song.play(current_order, pattern_editor.get_cursor_tick());
+			} else {
+				song.play_pattern(current_pattern, pattern_editor.get_cursor_tick());
+			}
+
 		} break;
 		case KeyBindings::PLAYBACK_PLAY_FROM_ORDER: {
+			song.play(orderlist_editor.get_cursor_order());
+
 		} break;
 		case KeyBindings::PLAYBACK_CURSOR_FOLLOW: {
+			playback_cursor_follow = !playback_cursor_follow;
+			key_bindings->set_action_checked(KeyBindings::PLAYBACK_CURSOR_FOLLOW, playback_cursor_follow);
 		} break;
 
 		case KeyBindings::EDIT_UNDO: {
@@ -535,6 +688,7 @@ void Interface::_update_tracks() {
 		rack.rack->track_swap_effects.connect(sigc::mem_fun(*this, &Interface::_on_track_swap_effects));
 		rack.rack->track_swap_sends.connect(sigc::mem_fun(*this, &Interface::_on_track_swap_sends));
 		rack.rack->effect_request_editor.connect(sigc::mem_fun(*this, &Interface::_on_effect_request_editor));
+		rack.volume->volume_db_changed.connect(sigc::mem_fun(*this, &Interface::_on_track_volume_changed));
 
 		if (offsets.has(song.get_track(i))) {
 			rack.rack->set_v_offset(offsets[song.get_track(i)]);
@@ -603,6 +757,21 @@ void Interface::_on_add_effect(int p_track) {
 		ERR_FAIL_COND(idx == -1);
 		AudioEffect *effect = fx_factory->instantiate_effect(idx);
 		ERR_FAIL_COND(!effect); //cant create
+
+		{
+			//configure default commands if they exist
+			for (int j = 0; j < effect->get_control_port_count(); j++) {
+				ControlPort *cp = effect->get_control_port(j);
+
+				for (int i = 0; i < SettingsDialog::MAX_DEFAULT_COMMANDS; i++) {
+					if (SettingsDialog::get_default_command_name(i) == cp->get_identifier()) {
+						cp->set_command(SettingsDialog::get_default_command_command(i));
+						break;
+					}
+				}
+			}
+		}
+
 		undo_redo.begin_action("Create Effect: " + effect->get_name());
 		Track *track = song.get_track(p_track);
 		undo_redo.do_method(track, &Track::add_audio_effect, effect, -1);
@@ -619,7 +788,10 @@ void Interface::_redraw_track_edits() {
 
 	for (int i = 0; i < racks.size(); i++) {
 		racks[i].rack->queue_draw();
+		racks[i].volume->queue_draw();
 	}
+
+	main_vu.queue_draw();
 }
 void Interface::_on_toggle_effect_skip(int p_track, int p_effect) {
 
@@ -676,16 +848,39 @@ void Interface::_on_remove_send(int p_track, int p_send) {
 	undo_redo.commit_action();
 }
 
+void Interface::_update_song_process_order() {
+
+	song.update_process_order();
+}
+
 void Interface::_on_track_insert_send(int p_track, int p_to_track) {
 
 	ERR_FAIL_INDEX(p_track, song.get_track_count());
-	ERR_FAIL_INDEX(p_to_track, song.get_track_count());
+	ERR_FAIL_COND(p_to_track != Track::SEND_SPEAKERS && (p_to_track < 0 || p_to_track >= song.get_track_count()));
 	ERR_FAIL_COND(p_to_track == p_track);
 
-	undo_redo.begin_action("Add Send");
+	//first try this
 	Track *track = song.get_track(p_track);
+	SoundDriverManager::lock_driver();
+	track->add_send(p_to_track);
+	bool valid = song.update_process_order();
+	track->remove_send(track->get_send_count() - 1);
+	SoundDriverManager::unlock_driver();
+	if (!valid) {
+		Gtk::MessageDialog error_box("Unable to add send, cyclic reference?", false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+		error_box.set_transient_for(*this);
+		error_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+		error_box.run();
+		error_box.hide();
+
+		return;
+	}
+
+	undo_redo.begin_action("Add Send");
 	undo_redo.do_method(track, &Track::add_send, p_to_track, -1);
 	undo_redo.undo_method(track, &Track::remove_send, track->get_send_count());
+	undo_redo.do_method(this, &Interface::_update_song_process_order);
+	undo_redo.undo_method(this, &Interface::_update_song_process_order);
 	undo_redo.do_method(this, &Interface::_redraw_track_edits);
 	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
@@ -728,6 +923,19 @@ void Interface::_on_track_swap_sends(int p_track, int p_send, int p_with_send) {
 	undo_redo.commit_action();
 }
 
+void Interface::_on_track_volume_changed(int p_track, float p_volume_db) {
+
+	ERR_FAIL_INDEX(p_track, song.get_track_count());
+	Track *track = song.get_track(p_track);
+
+	undo_redo.begin_action("Change Track #" + String::num(p_track) + " volume.", true);
+	undo_redo.do_method(track, &Track::set_mix_volume_db, p_volume_db);
+	undo_redo.undo_method(track, &Track::set_mix_volume_db, track->get_mix_volume_db());
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+
 void Interface::_on_effect_request_editor(int p_track, int p_effect) {
 	ERR_FAIL_INDEX(p_track, song.get_track_count());
 	Track *track = song.get_track(p_track);
@@ -763,6 +971,7 @@ void Interface::_on_effect_request_editor(int p_track, int p_effect) {
 
 		effect_editor->edit(effect, track, editor);
 		effect_editor->toggle_automation_visibility.connect(sigc::mem_fun(*this, &Interface::_on_toggle_automation_visibility));
+		effect_editor->select_automation_command.connect(sigc::mem_fun(*this, &Interface::_on_select_automation_command));
 
 		active_effect_editors[effect] = effect_editor;
 	}
@@ -776,6 +985,19 @@ void Interface::_update_editor_automations_for_effect(AudioEffect *p_effect) {
 	}
 	pattern_editor.redraw_and_validate_cursor();
 }
+
+void Interface::_on_select_automation_command(Track *p_track, AudioEffect *p_effect, int p_automation, int p_command) {
+
+	ControlPort *port = p_effect->get_control_port(p_automation);
+
+	undo_redo.begin_action("Change Automation Command");
+	undo_redo.do_method(port, &ControlPort::set_command, (char)p_command);
+	undo_redo.undo_method(port, &ControlPort::set_command, port->get_command());
+	undo_redo.do_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
+	undo_redo.undo_method(this, &Interface::_update_editor_automations_for_effect, p_effect);
+	undo_redo.commit_action();
+}
+
 void Interface::_on_toggle_automation_visibility(Track *p_track, AudioEffect *p_effect, int p_automation, bool p_visible) {
 
 	if (p_visible) {
@@ -852,6 +1074,9 @@ void Interface::_on_application_startup() {
 	file_menu_file->append("Open", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_OPEN).ascii().get_data());
 	file_menu_file->append("Save", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_SAVE).ascii().get_data());
 	file_menu_file->append("Save As", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_SAVE_AS).ascii().get_data());
+	file_menu_export = Gio::Menu::create();
+	file_menu->append_section(file_menu_export);
+	file_menu_export->append("Export to WAV", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_EXPORT_WAV).ascii().get_data());
 	file_menu_exit = Gio::Menu::create();
 	file_menu->append_section(file_menu_exit);
 	file_menu_exit->append("Quit", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_QUIT).ascii().get_data());
@@ -891,54 +1116,6 @@ void Interface::_on_application_startup() {
 	edit_menu_focus->append("Focus on Orderlist", key_bindings->get_keybind_detailed_name(KeyBindings::EDIT_FOCUS_ORDERLIST).ascii().get_data());
 	edit_menu_focus->append("Open Last Edited Effect", key_bindings->get_keybind_detailed_name(KeyBindings::EDIT_FOCUS_LAST_EDITED_EFFECT).ascii().get_data());
 	menu->append_submenu("Edit", edit_menu);
-
-	track_menu = Gio::Menu::create();
-	track_menu_add = Gio::Menu::create();
-	track_menu->append_section(track_menu_add);
-	track_menu_add->append("New Track", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_ADD_TRACK).ascii().get_data());
-	track_menu_column = Gio::Menu::create();
-	track_menu->append_section(track_menu_column);
-	track_menu_column->append("Add Column", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_ADD_COLUMN).ascii().get_data());
-	track_menu_column->append("Remove Column", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_REMOVE_COLUMN).ascii().get_data());
-	track_menu_solo = Gio::Menu::create();
-	track_menu->append_section(track_menu_solo);
-	track_menu_solo->append("Mute", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_MUTE).ascii().get_data());
-	track_menu_solo->append("Solo", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_SOLO).ascii().get_data());
-	track_menu_edit = Gio::Menu::create();
-	track_menu->append_section(track_menu_edit);
-	track_menu_edit->append("Move Left", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_MOVE_LEFT).ascii().get_data());
-	track_menu_edit->append("Move Right", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_MOVE_RIGHT).ascii().get_data());
-	track_menu_edit->append("Rename", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_RENAME).ascii().get_data());
-	track_menu_remove = Gio::Menu::create();
-	track_menu->append_section(track_menu_remove);
-	track_menu_remove->append("Remove", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_REMOVE).ascii().get_data());
-	menu->append_submenu("Track", track_menu);
-
-	automation_action = add_action_bool("AutomationMenu", false);
-	automation_action->set_enabled(false);
-	automation_menu = Gio::Menu::create();
-	automation_menu_item = Gio::MenuItem::create("Automation", automation_menu);
-	//automation_menu_item->set_attribute_value("submenu-action", Glib::Variant<Glib::ustring>::create("gui.AutomationMenu"));
-	g_menu_item_set_attribute(automation_menu_item->gobj(), "submenu-action", "s",
-			"win.AutomationMenu");
-	menu->append_item(automation_menu_item);
-
-	automation_menu_visible = Gio::Menu::create();
-	automation_menu->append_section(automation_menu_visible);
-	automation_menu_visible->append("Visible", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_TOGGLE_VISIBLE).ascii().get_data());
-	automation_menu_mode = Gio::Menu::create();
-	automation_menu->append_section(automation_menu_mode);
-	automation_menu_mode->append("Numbers", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_NUMBERS).ascii().get_data());
-	automation_menu_mode->append("Small Envelope", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_SMALL).ascii().get_data());
-	automation_menu_mode->append("Large Envelope", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_RADIO_ENVELOPE_LARGE).ascii().get_data());
-
-	automation_menu_move = Gio::Menu::create();
-	automation_menu->append_section(automation_menu_move);
-	automation_menu_move->append("Move Left", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_MOVE_LEFT).ascii().get_data());
-	automation_menu_move->append("Move Right", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_MOVE_RIGHT).ascii().get_data());
-	automation_menu_remove = Gio::Menu::create();
-	automation_menu->append_section(automation_menu_remove);
-	automation_menu_remove->append("Remove", key_bindings->get_keybind_detailed_name(KeyBindings::AUTOMATION_REMOVE).ascii().get_data());
 
 	select_menu = Gio::Menu::create();
 	select_menu_select = Gio::Menu::create();
@@ -989,6 +1166,7 @@ void Interface::_on_application_startup() {
 	key_bindings->action_activated.connect(sigc::mem_fun(*this, &Interface::_on_action_activated));
 
 	settings_dialog.initialize_bindings();
+	pattern_editor.initialize_menus();
 }
 
 void Interface::add_editor_plugin_function(EffectEditorPluginFunc p_plugin) {
@@ -1000,6 +1178,7 @@ void Interface::_on_pattern_settings_open() {
 	pattern_settings_popover.popup();
 	pattern_settings_length.get_adjustment()->set_value(song.pattern_get_beats(pattern_editor.get_current_pattern()));
 	bar_length.get_adjustment()->set_value(song.pattern_get_beats_per_bar(pattern_editor.get_current_pattern()));
+	change_swing.set_active(song.pattern_get_swing_beat_divisor(pattern_editor.get_current_pattern()));
 	change_next.get_adjustment()->set_value(1.0);
 }
 void Interface::_on_pattern_settings_change() {
@@ -1008,12 +1187,28 @@ void Interface::_on_pattern_settings_change() {
 	int patterns = change_next.get_adjustment()->get_value();
 	int beats = pattern_settings_length.get_adjustment()->get_value();
 	int beats_per_bar = bar_length.get_adjustment()->get_value();
+	Song::SwingBeatDivisor swing_divisor = Song::SWING_BEAT_DIVISOR_1;
+
+	Gtk::TreeModel::iterator iter = change_swing.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[zoom_model_columns.index];
+
+			swing_divisor = Song::SwingBeatDivisor(id);
+		}
+	}
+
 	for (int i = 0; i < patterns; i++) {
 		int pattern = pattern_editor.get_current_pattern() + i;
 		undo_redo.do_method(&song, &Song::pattern_set_beats, pattern, beats);
 		undo_redo.undo_method(&song, &Song::pattern_set_beats, pattern, song.pattern_get_beats(pattern));
 		undo_redo.do_method(&song, &Song::pattern_set_beats_per_bar, pattern, beats_per_bar);
 		undo_redo.undo_method(&song, &Song::pattern_set_beats_per_bar, pattern, song.pattern_get_beats_per_bar(pattern));
+		undo_redo.do_method(&song, &Song::pattern_set_swing_beat_divisor, pattern, swing_divisor);
+		undo_redo.undo_method(&song, &Song::pattern_set_swing_beat_divisor, pattern, song.pattern_get_swing_beat_divisor(pattern));
 
 		undo_redo.do_method(&pattern_editor, &PatternEditor::redraw_and_validate_cursor);
 		undo_redo.undo_method(&pattern_editor, &PatternEditor::redraw_and_validate_cursor);
@@ -1045,12 +1240,67 @@ bool Interface::_close_request(GdkEventAny *event) {
 	return true;
 }
 
+void Interface::_process_audio(AudioFrame *p_frames, int p_amount) {
+
+	singleton->song.process_audio(p_frames, p_amount);
+}
+
+Interface *Interface::singleton = NULL;
+
+bool Interface::_playback_timer_callback() {
+	if (!song.is_playing()) {
+		pattern_editor.set_playback_pos(-1, -1);
+		orderlist_editor.set_playback_order(-1);
+
+	} else {
+		pattern_editor.set_playback_pos(song.get_playing_pattern(), song.get_playing_tick());
+
+		orderlist_editor.set_playback_order(song.get_playing_order());
+		if (playback_cursor_follow) {
+			pattern_editor.set_playback_cursor(song.get_playing_pattern(), song.get_playing_tick());
+		}
+	}
+
+	for (int i = 0; i < racks.size(); i++) {
+		racks[i].volume->update_peak();
+	}
+
+	main_vu.update_peak();
+
+	return true;
+}
+
+void Interface::_on_main_volume_db_changed(float p_db) {
+
+	undo_redo.begin_action("Change Master Volume", true);
+	undo_redo.do_method(&song, &Song::set_main_volume_db, p_db);
+	undo_redo.undo_method(&song, &Song::set_main_volume_db, song.get_main_volume_db());
+	undo_redo.do_method(this, &Interface::_redraw_track_edits);
+	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
+	undo_redo.commit_action();
+}
+
+void Interface::_on_song_step_buffer_changed() {
+	int step_size = SoundDriverManager::get_buffer_size_frames(SoundDriverManager::get_step_buffer_size());
+	song.set_process_buffer_size(step_size);
+}
+
+void Interface::_on_song_mix_rate_changed() {
+
+	int mix_rate = SoundDriverManager::get_mix_frequency_hz(SoundDriverManager::get_mix_frequency());
+	song.set_sampling_rate(mix_rate);
+}
+void Interface::_update_song_mixing_parameters() {
+	song.set_sampling_rate(SoundDriverManager::get_mix_frequency_hz(SoundDriverManager::get_mix_frequency()));
+	song.set_process_buffer_size(SoundDriverManager::get_buffer_size_frames(SoundDriverManager::get_step_buffer_size()));
+}
 Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings) :
 		add_effect_dialog(p_fx_factory),
 		song_file(&song, p_fx_factory),
 		pattern_editor(&song, &undo_redo, p_theme, p_key_bindings),
 		orderlist_editor(&song, &undo_redo, p_theme, p_key_bindings),
-		settings_dialog(p_theme, p_key_bindings, p_fx_factory) {
+		settings_dialog(p_theme, p_key_bindings, p_fx_factory),
+		main_vu(&song, &undo_redo, p_theme) {
 
 	theme = p_theme;
 	key_bindings = p_key_bindings;
@@ -1065,23 +1315,29 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	main_vbox.pack_start(grid, Gtk::PACK_SHRINK);
 
+	grid.set_column_spacing(4);
+	grid.set_row_spacing(4);
 	grid.attach(play_hbox, 0, 0, 1, 1);
 
 	prev_pattern_icon = create_image_from_icon("PrevPattern");
 	prev_pattern.set_image(prev_pattern_icon);
 	play_hbox.pack_start(prev_pattern, Gtk::PACK_SHRINK);
+	prev_pattern.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_PREV_PATTERN));
 
 	play_icon = create_image_from_icon("Play");
 	play.set_image(play_icon);
 	play_hbox.pack_start(play, Gtk::PACK_SHRINK);
+	play.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_PLAY));
 
 	stop_icon = create_image_from_icon("Stop");
 	stop.set_image(stop_icon);
 	play_hbox.pack_start(stop, Gtk::PACK_SHRINK);
+	stop.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_STOP));
 
 	next_pattern_icon = create_image_from_icon("NextPattern");
 	next_pattern.set_image(next_pattern_icon);
 	play_hbox.pack_start(next_pattern, Gtk::PACK_SHRINK);
+	next_pattern.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_NEXT_PATTERN));
 
 	sep1.set_text("    ");
 	play_hbox.pack_start(sep1, Gtk::PACK_SHRINK);
@@ -1089,10 +1345,12 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	play_pattern_icon = create_image_from_icon("PlayPattern");
 	play_pattern.set_image(play_pattern_icon);
 	play_hbox.pack_start(play_pattern, Gtk::PACK_SHRINK);
+	play_pattern.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_PLAY_PATTERN));
 
 	play_cursor_icon = create_image_from_icon("PlayFromCursor");
 	play_cursor.set_image(play_cursor_icon);
 	play_hbox.pack_start(play_cursor, Gtk::PACK_SHRINK);
+	play_cursor.signal_clicked().connect(sigc::bind<KeyBindings::KeyBind>(sigc::mem_fun(*this, &Interface::_on_action_activated), KeyBindings::PLAYBACK_PLAY_FROM_CURSOR));
 
 	sep2.set_text("    ");
 	play_hbox.pack_start(sep2, Gtk::PACK_SHRINK);
@@ -1105,6 +1363,9 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	add_track.signal_clicked().connect(sigc::mem_fun(*this, &Interface::_add_track));
 
 	//play_hbox.pack_start(spacer1, Gtk::PACK_EXPAND_WIDGET);
+
+	grid.attach(main_vu, 1, 0, 3, 1);
+	main_vu.main_volume_db_changed.connect(sigc::mem_fun(*this, &Interface::_on_main_volume_db_changed));
 
 	tempo_label.set_text(" Tempo: ");
 	grid.attach(tempo_label, 4, 0, 1, 1);
@@ -1227,6 +1488,29 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	orderlist_editor.set_vscroll(orderlist_vscroll.get_adjustment());
 
+	{
+
+		change_swing_store = Gtk::ListStore::create(zoom_model_columns);
+		change_swing.set_model(change_swing_store);
+
+		const char *swing_divisor[Song::SWING_BEAT_DIVISOR_MAX] = {
+			"1 Beat",
+			"1/2 Beat",
+			"1/3 Beat",
+			"1/4 Beat",
+			"1/6 Beat",
+			"1/8 Beat"
+		};
+
+		for (int i = 0; i < Song::SWING_BEAT_DIVISOR_MAX; i++) {
+			Gtk::TreeModel::Row row = *(change_swing_store->append());
+			row[zoom_model_columns.name] = swing_divisor[i];
+			row[zoom_model_columns.index] = i;
+			swing_rows.push_back(row);
+		}
+
+		change_swing.pack_start(zoom_model_columns.name);
+	}
 	pattern_settings_popover.add(pattern_settings_grid);
 
 	pattern_settings_length_label.set_text("  Pattern Length (beats):");
@@ -1237,14 +1521,19 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	pattern_settings_grid.attach(bar_length_label, 0, 1, 1, 1);
 	bar_length.set_adjustment(Gtk::Adjustment::create(4, 2, 16));
 	pattern_settings_grid.attach(bar_length, 1, 1, 1, 1);
+
+	change_swing_label.set_text("Swing:");
+	pattern_settings_grid.attach(change_swing_label, 0, 2, 1, 1);
+	pattern_settings_grid.attach(change_swing, 1, 2, 1, 1);
+
 	//pattern_settings_vsep.set_text("sas  ");
 	pattern_settings_vsep.set_size_request(20, 2);
-	pattern_settings_grid.attach(pattern_settings_vsep, 0, 2, 2, 1);
+	pattern_settings_grid.attach(pattern_settings_vsep, 0, 3, 2, 1);
 	change_next_label.set_text("Patterns to Apply:");
-	pattern_settings_grid.attach(change_next_label, 0, 3, 1, 1);
+	pattern_settings_grid.attach(change_next_label, 0, 4, 1, 1);
 	change_next.set_adjustment(Gtk::Adjustment::create(1, 1, 999));
-	pattern_settings_grid.attach(change_next, 1, 3, 1, 1);
-	pattern_settings_grid.attach(pattern_settings_change_button, 0, 4, 2, 1);
+	pattern_settings_grid.attach(change_next, 1, 4, 1, 1);
+	pattern_settings_grid.attach(pattern_settings_change_button, 0, 5, 2, 1);
 	pattern_settings_change_button.set_label("Change");
 	pattern_settings_change_button.signal_clicked().connect(sigc::mem_fun(*this, &Interface::_on_pattern_settings_change));
 	pattern_settings_popover.set_relative_to(pattern_settings);
@@ -1254,6 +1543,8 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	settings_dialog.update_colors.connect(sigc::mem_fun(*this, &Interface::_update_colors));
 	settings_dialog.set_transient_for(*this);
 	settings_dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+	settings_dialog.update_song_step_buffer.connect(sigc::mem_fun(*this, &Interface::_on_song_step_buffer_changed));
+	settings_dialog.update_mix_rate.connect(sigc::mem_fun(*this, &Interface::_on_song_mix_rate_changed));
 
 	show_all_children();
 	rack_filler = NULL;
@@ -1269,6 +1560,17 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	_update_title();
 
 	signal_delete_event().connect(sigc::mem_fun(*this, &Interface::_close_request));
+
+	singleton = this;
+
+	playback_cursor_follow = false;
+
+	//setup song
+	_update_song_mixing_parameters();
+	SoundDriverManager::set_mix_callback(_process_audio);
+
+	playback_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &Interface::_playback_timer_callback),
+			10, Glib::PRIORITY_DEFAULT);
 }
 
 Interface::~Interface() {

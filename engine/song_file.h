@@ -16,6 +16,11 @@ public:
 
 	Error save(const String &p_path);
 	Error load(const String &p_path, List<MissingPlugin> *r_missing_plugins = NULL);
+
+	typedef void (*ExportWavPatternCallback)(int, void *);
+
+	Error export_wav(const String &p_path, int p_export_hz = 96000, ExportWavPatternCallback p_callback = NULL, void *p_userdata = NULL);
+
 	SongFile(Song *p_song, AudioEffectFactory *p_fx_factory);
 };
 

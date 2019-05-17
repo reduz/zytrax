@@ -12,12 +12,225 @@ ControlPort *AudioEffectVST2::_get_internal_control_port(int p_index) {
 }
 
 bool AudioEffectVST2::has_secondary_input() const {
-	return false;
+	return has_side_input;
 }
 
-void AudioEffectVST2::process(const Event *p_events, int p_event_count, const Frame *p_in, Frame *p_out, bool p_prev_active) {
+void AudioEffectVST2::_process(const Event *p_events, int p_event_count) {
+
+	if (effect->flags & effFlagsIsSynth) {
+
+		//pass time to midi
+		float time = float(process_block_size) / sampling_rate;
+		//convert input events to actual MIDI events
+		int midi_event_count;
+		const MIDIEventStamped *midi_events = _process_midi_events(p_events, p_event_count, time, midi_event_count);
+
+		event_pointers->numEvents = 0;
+
+		if (stop_all_notes) {
+			for (int i = 0; i < 127; i++) {
+
+				//send noteoff for every channel
+				VstMidiEvent &vstem = event_array[event_pointers->numEvents];
+				vstem.midiData[0] = 0x80 | last_midi_channel;
+				vstem.midiData[1] = i;
+				vstem.midiData[2] = 127;
+				vstem.midiData[3] = 0;
+				event_pointers->numEvents++;
+			}
+			{
+				//send all notes off
+				VstMidiEvent &vstem = event_array[event_pointers->numEvents];
+				vstem.midiData[0] = 0xB0 | last_midi_channel;
+				vstem.midiData[1] = 0x7B; //all notes off
+				vstem.midiData[2] = 0;
+				vstem.midiData[3] = 0;
+				vstem.deltaFrames = 0;
+				event_pointers->numEvents++;
+			}
+			{
+				//send reset controllers
+				VstMidiEvent &vstem = event_array[event_pointers->numEvents];
+				vstem.midiData[0] = 0xB0 | last_midi_channel;
+				vstem.midiData[1] = 0x79; //reset all controllers
+				vstem.midiData[2] = 0;
+				vstem.midiData[3] = 0;
+				vstem.deltaFrames = 0;
+				event_pointers->numEvents++;
+			}
+
+			stop_all_notes = false;
+		}
+
+		for (int i = 0; i < midi_event_count; i++) {
+			if (event_pointers->numEvents == MAX_INPUT_EVENTS) {
+				break;
+			}
+			const MIDIEvent &ev = midi_events[i].event;
+			int frame_offset = midi_events[i].frame;
+
+			VstMidiEvent &vstem = event_array[event_pointers->numEvents];
+			vstem.deltaFrames = frame_offset;
+
+			switch (ev.type) {
+				case MIDIEvent::MIDI_NOTE_ON: {
+
+					vstem.midiData[0] = 0x90 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.note.note;
+					vstem.midiData[2] = ev.note.velocity;
+					vstem.midiData[3] = 0;
+					last_midi_channel = ev.channel; //remember for note off?
+				} break;
+				case MIDIEvent::MIDI_NOTE_OFF: {
+
+					vstem.midiData[0] = 0x80 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.note.note;
+					vstem.midiData[2] = ev.note.velocity;
+					vstem.midiData[3] = 0;
+				} break;
+				case MIDIEvent::MIDI_CONTROLLER: {
+
+					vstem.midiData[0] = 0xB0 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.control.index;
+					vstem.midiData[2] = ev.control.parameter;
+					vstem.midiData[3] = 0;
+
+				} break;
+				case MIDIEvent::MIDI_PITCH_BEND: {
+
+					vstem.midiData[0] = 0xE0 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.pitch_bend.bend & 0x7F;
+					vstem.midiData[2] = ev.pitch_bend.bend >> 7;
+					vstem.midiData[3] = 0;
+				} break;
+				case MIDIEvent::MIDI_AFTERTOUCH: {
+
+					vstem.midiData[0] = 0xD0 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.aftertouch.pressure;
+					vstem.midiData[2] = 0;
+					vstem.midiData[3] = 0;
+				} break;
+				case MIDIEvent::MIDI_NOTE_PRESSURE: {
+
+					vstem.midiData[0] = 0xA0 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.note.note;
+					vstem.midiData[2] = ev.note.velocity;
+					vstem.midiData[3] = 0;
+				} break;
+				case MIDIEvent::MIDI_PATCH_SELECT: {
+
+					vstem.midiData[0] = 0xC0 | ev.channel; //channel 0?
+					vstem.midiData[1] = ev.note.note;
+					vstem.midiData[2] = ev.note.velocity;
+					vstem.midiData[3] = 0;
+				} break;
+				default: {
+					//unhandled, dont add
+					continue;
+				}
+			}
+
+			event_pointers->numEvents++;
+		}
+
+		effect->dispatcher(effect, effProcessEvents, 0, 0, event_pointers, 0.0f);
+	}
+
+	float **in_buffer_ptrs = in_buffers.size() ? &in_buffers[0] : 0;
+	float **out_buffer_ptrs = out_buffers.size() ? &out_buffers[0] : 0;
+
+	effect->processReplacing(effect, in_buffer_ptrs, out_buffer_ptrs, process_block_size);
 }
-void AudioEffectVST2::process_with_secondary(const Event *p_events, int p_event_count, const Frame *p_in, const Frame *p_secondary, Frame *p_out, bool p_prev_active) {
+void AudioEffectVST2::process(const Event *p_events, int p_event_count, const AudioFrame *p_in, AudioFrame *p_out, bool p_prev_active) {
+
+	if (in_buffers.size() >= 2) {
+		float *in_l = in_buffers[0];
+		float *in_r = in_buffers[1];
+		for (int i = 0; i < process_block_size; i++) {
+			in_l[i] = p_in[i].l;
+			in_r[i] = p_in[i].r;
+		}
+	}
+
+	_process(p_events, p_event_count);
+
+	float *out_l = out_buffers[0];
+	float *out_r = out_buffers[1];
+	for (int i = 0; i < process_block_size; i++) {
+		p_out[i].l = out_l[i];
+		p_out[i].r = out_r[i];
+	}
+}
+void AudioEffectVST2::process_with_secondary(const Event *p_events, int p_event_count, const AudioFrame *p_in, const AudioFrame *p_secondary, AudioFrame *p_out, bool p_prev_active) {
+	if (in_buffers.size() >= 4) {
+		float *in_l = in_buffers[0];
+		float *in_r = in_buffers[1];
+		float *sec_l = in_buffers[2];
+		float *sec_r = in_buffers[3];
+		for (int i = 0; i < process_block_size; i++) {
+			in_l[i] = p_in[i].l;
+			in_r[i] = p_in[i].r;
+			sec_l[i] = p_secondary[i].l;
+			sec_r[i] = p_secondary[i].r;
+		}
+	}
+
+	_process(p_events, p_event_count);
+
+	float *out_l = out_buffers[0];
+	float *out_r = out_buffers[1];
+	for (int i = 0; i < process_block_size; i++) {
+		p_out[i].l = out_l[i];
+		p_out[i].r = out_r[i];
+	}
+}
+
+void AudioEffectVST2::_clear_buffers() {
+
+	for (int i = 0; i < in_buffers.size(); i++) {
+		delete[] in_buffers[i];
+	}
+	in_buffers.clear();
+	for (int i = 0; i < out_buffers.size(); i++) {
+		delete[] out_buffers[i];
+	}
+	out_buffers.clear();
+}
+void AudioEffectVST2::_update_buffers() {
+
+	_clear_buffers();
+
+	in_buffers.resize(effect->numInputs);
+	for (int i = 0; i < effect->numInputs; i++) {
+		in_buffers[i] = new float[process_block_size];
+	}
+
+	out_buffers.resize(effect->numOutputs);
+	for (int i = 0; i < effect->numOutputs; i++) {
+		out_buffers[i] = new float[process_block_size];
+	}
+
+	has_side_input = in_buffers.size() == 4 && out_buffers.size() >= 2;
+}
+void AudioEffectVST2::set_process_block_size(int p_size) {
+	if (process_block_size == p_size) {
+		return;
+	}
+	process_block_size = p_size;
+	effect->dispatcher(effect, effMainsChanged, 0, 0, NULL, 0.0f);
+	effect->dispatcher(effect, effSetBlockSize, 0, process_block_size, NULL, 0.0f);
+	effect->dispatcher(effect, effMainsChanged, 0, 1, NULL, 0.0f);
+	_update_buffers();
+}
+
+void AudioEffectVST2::set_sampling_rate(int p_hz) {
+	if (sampling_rate == p_hz) {
+		return;
+	}
+	sampling_rate = p_hz;
+	effect->dispatcher(effect, effMainsChanged, 0, 0, NULL, 0.0f);
+	effect->dispatcher(effect, effSetSampleRate, 0, 0, NULL, sampling_rate);
+	effect->dispatcher(effect, effMainsChanged, 0, 1, NULL, 0.0f);
 }
 
 String AudioEffectVST2::get_name() const {
@@ -32,6 +245,20 @@ String AudioEffectVST2::get_provider_id() const {
 }
 
 void AudioEffectVST2::reset() {
+
+	//attempt to reset the plugin in any way possible, since it's not clear in VST how to do it
+
+	effect->dispatcher(effect, effMainsChanged, 0, 0, NULL, 0.0f);
+	//reset preset.. this maybe helps..
+	int current_preset = effect->dispatcher(effect, effGetProgram, 0, 0, 0, 0.0f);
+	effect->dispatcher(effect, effSetProgram, 0, current_preset, NULL, 0.0f);
+	//switch the plugin back on (calls Resume)
+	effect->dispatcher(effect, effMainsChanged, 0, 1, NULL, 0.0f);
+
+	if (effect->flags & effFlagsIsSynth) {
+		stop_all_notes = true;
+		_reset_midi();
+	}
 }
 
 bool AudioEffectVST2::has_user_interface() const {
@@ -66,7 +293,11 @@ void AudioEffectVST2::close_user_interface() {
 	effect->dispatcher(effect, effEditClose, 0, 0, NULL, 0);
 }
 
+#if 1
+#define DEBUG_CALLBACK(m_text)
+#else
 #define DEBUG_CALLBACK(m_text) printf("VST Callback: %s\n", m_text)
+#endif
 
 VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, VstInt32 index, VstIntPtr value, void *ptr, float opt) {
 
@@ -79,6 +310,9 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 			DEBUG_CALLBACK("audioMasterAutomate");
 			// index, value, returns 0
 			if (vst_effect) {
+				if (index >= 0 && index < vst_effect->control_ports.size() && !vst_effect->control_ports[index].setting) {
+					vst_effect->control_ports[index].ui_changed_notify();
+				}
 				//update automation on host
 				//plug->parameter_changed_externally (index, opt);
 			}
@@ -107,8 +341,10 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 		case DECLARE_VST_DEPRECATED(audioMasterWantMidi):
 			DEBUG_CALLBACK("audioMasterWantMidi");
 			return 1;
-#if 0
+
 		case audioMasterGetTime:
+			return (intptr_t)NULL; //no time
+#if 0
 			DEBUG_CALLBACK ("audioMasterGetTime");
 			newflags = kVstNanosValid | kVstAutomationWriting | kVstAutomationReading;
 
@@ -288,7 +524,6 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 				if (vst_effect->resize_callback) {
 					vst_effect->resize_callback(vst_effect->resize_userdata, w, h);
 				}
-				printf("sizewindow %i,%i\n", w, h);
 
 				return 1;
 			}
@@ -296,14 +531,14 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 		case audioMasterGetSampleRate:
 			DEBUG_CALLBACK("audioMasterGetSampleRate");
 			if (vst_effect) {
-				return 44100;
+				return vst_effect->sampling_rate;
 			}
 			return 0;
 
 		case audioMasterGetBlockSize:
 			DEBUG_CALLBACK("audioMasterGetBlockSize");
 			if (vst_effect) {
-				return 128;
+				return vst_effect->process_block_size;
 			}
 			return 0;
 
@@ -447,12 +682,20 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 
 		case audioMasterBeginEdit:
 			DEBUG_CALLBACK("audioMasterBeginEdit");
+			if (index >= 0 && index < vst_effect->control_ports.size()) {
+				vst_effect->control_ports[index].editing = true;
+			}
 			// begin of automation session (when mouse down), parameter index in <index>
 			return 0;
 
 		case audioMasterEndEdit:
 			DEBUG_CALLBACK("audioMasterEndEdit");
 			// end of automation session (when mouse up),     parameter index in <index>
+			if (index >= 0 && index < vst_effect->control_ports.size()) {
+				vst_effect->control_ports[index].editing = false;
+				vst_effect->control_ports[index].ui_changed_notify();
+			}
+
 			return 0;
 
 		case audioMasterOpenFileSelector:
@@ -536,11 +779,13 @@ String AudioEffectVST2::get_path() const {
 float AudioEffectVST2::ControlPortVST2::get() const {
 	return effect->getParameter(effect, index);
 }
-void AudioEffectVST2::ControlPortVST2::set(float p_val, bool p_make_initial) {
-	effect->setParameter(effect, index, p_val);
-	if (p_make_initial) {
-		initial = p_val;
+void AudioEffectVST2::ControlPortVST2::set(float p_val) {
+	if (editing) { //being edited
+		return;
 	}
+	setting = true; //lock used to avoid rogue effects emitting automated when being set.
+	effect->setParameter(effect, index, p_val);
+	setting = false;
 }
 String AudioEffectVST2::ControlPortVST2::get_value_as_text() const {
 	char label[kVstMaxLabelLen + 1];
@@ -572,6 +817,8 @@ Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, con
 		cp->visible = true; //bleh just allow all - i < 100; //the first 50 are visible, the rest are not
 		cp->index = i;
 		cp->effect = effect;
+		cp->setting = false;
+		cp->editing = false;
 		char label[kVstMaxLabelLen + 1];
 		effect->dispatcher(effect, effGetParamLabel, i, 0, label, 0); //just crap
 		label[kVstMaxLabelLen] = 0;
@@ -580,13 +827,15 @@ Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, con
 		effect->dispatcher(effect, effGetParamName, i, 0, label, 0); //just crap
 		label[kVstMaxLabelLen] = 0;
 		cp->name.parse_utf8(label);
-		cp->identifier = "vst_param_" + String::num(i);
+		cp->identifier = cp->name.to_lower();
+		cp->identifier.replace(" ", "_");
+		cp->identifier = "vst_param_" + cp->identifier;
 		float value = effect->getParameter(effect, i);
 		cp->value = value;
-		cp->initial = value;
 	}
-	effect->dispatcher(effect, effSetSampleRate, 0, 0, NULL, 44100); //just crap
-	effect->dispatcher(effect, effSetBlockSize, 0, 128, NULL, 0.0f);
+	effect->dispatcher(effect, effSetSampleRate, 0, 0, NULL, sampling_rate);
+	effect->dispatcher(effect, effSetBlockSize, 0, process_block_size, NULL, 0.0f);
+	_update_buffers();
 	effect->dispatcher(effect, effSetProcessPrecision, 0, kVstProcessPrecision32, NULL, 0.0f);
 	effect->dispatcher(effect, effMainsChanged, 0, 1, NULL, 0.0f);
 	effect->dispatcher(effect, effStartProcess, 0, 0, NULL, 0.0f);
@@ -603,9 +852,39 @@ AudioEffectVST2::AudioEffectVST2() {
 	effect = NULL;
 	resize_callback = NULL;
 	resize_userdata = NULL;
+	process_block_size = 128;
+	sampling_rate = 44100;
+	has_side_input = false;
+	stop_all_notes = false;
+	event_pointer_data = new unsigned char[sizeof(VstInt32) + sizeof(VstIntPtr) + sizeof(VstEvent *) * MAX_INPUT_EVENTS];
+	event_pointers = (VstEvents *)event_pointer_data;
+	last_midi_channel = 0;
+
+	event_pointers->numEvents = 0;
+	event_pointers->reserved = 0;
+
+	for (int i = 0; i < MAX_INPUT_EVENTS; i++) {
+
+		event_array[i].type = kVstMidiType;
+		event_array[i].byteSize = 24;
+		event_array[i].deltaFrames = 0;
+		event_array[i].flags = 0; ///< @see VstMidiEventFlags
+		event_array[i].noteLength = 0; ///< (in sample frames) of entire note, if available,
+		event_array[i].noteOffset = 0; ///< offset (in sample frames) into note from note
+		event_array[i].midiData[0] = 0;
+		event_array[i].midiData[1] = 0;
+		event_array[i].midiData[2] = 0;
+		event_array[i].midiData[3] = 0;
+		event_array[i].detune = 0;
+		event_array[i].noteOffVelocity = 0;
+		event_array[i].reserved1 = 0;
+		event_pointers->events[i] = (VstEvent *)&event_array[i];
+	}
 }
 
 AudioEffectVST2::~AudioEffectVST2() {
+	_clear_buffers();
+	delete[] event_pointer_data;
 	if (effect) {
 		effect->dispatcher(effect, effClose, 0, 0, NULL, 0.0f);
 	}

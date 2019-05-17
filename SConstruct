@@ -24,6 +24,8 @@ opts.Add(BoolVariable("use_jack","Use Jack with RtAudio",False))
 opts.Add(BoolVariable("use_pulseaudio","Use Pulseaudio with RtAudio",True))
 opts.Add(BoolVariable("use_alsa","Use Alsa with RtAudio",True))
 opts.Add(BoolVariable("enable_vst2","Enable VST2",True))
+opts.Add(BoolVariable("use_wasapi","Enable Wasapi",True))
+opts.Add(BoolVariable("use_directsound","Enable Wasapi",True))
 
 opts.Update(env)  # update environment
 Help(opts.GenerateHelpText(env))  # generate help
@@ -36,8 +38,10 @@ if (env["enable_rtaudio"]):
 
 	env.Append(CXXFLAGS=["-DRTAUDIO_ENABLED"])
 	if (env["platform"]=="windows"):
-		env.Append(CXXFLAGS=["-D__WINDOWS_WASAPI__"])
-		env.Append(CXXFLAGS=["-D__WINDOWS_DS__"])
+		if (env["use_wasapi"]):
+			env.Append(CXXFLAGS=["-D__WINDOWS_WASAPI__"])
+		if (env["use_directsound"]):
+			env.Append(CXXFLAGS=["-D__WINDOWS_DS__"])
 		#env.Append(CXXFLAGS=["-D__WINDOWS_ASIO__"])
 		env.Append(LIBS=["dsound","mfplat","mfuuid","wmcodecdspuuid","ksuser"])
 

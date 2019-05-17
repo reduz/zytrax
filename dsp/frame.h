@@ -2,50 +2,66 @@
 #define AudioFrame_H
 
 #include "typedefs.h"
-typedef float AudioFrame;
 
-struct Frame {
+struct AudioFrame {
 
-	float l,r;
+	float l, r;
 
+	_FORCE_INLINE_ const float &operator[](int idx) const { return idx == 0 ? l : r; }
+	_FORCE_INLINE_ float &operator[](int idx) { return idx == 0 ? l : r; }
+	_FORCE_INLINE_ AudioFrame operator+(const AudioFrame &p_frame) const { return AudioFrame(l + p_frame.l, r + p_frame.r); }
+	_FORCE_INLINE_ AudioFrame operator-(const AudioFrame &p_frame) const { return AudioFrame(l - p_frame.l, r - p_frame.r); }
+	_FORCE_INLINE_ AudioFrame operator*(const AudioFrame &p_frame) const { return AudioFrame(l * p_frame.l, r * p_frame.r); }
+	_FORCE_INLINE_ AudioFrame operator/(const AudioFrame &p_frame) const { return AudioFrame(l / p_frame.l, r / p_frame.r); }
 
-	_FORCE_INLINE_ const AudioFrame& operator[](int idx) const { return idx==0?l:r; }
-	_FORCE_INLINE_ AudioFrame& operator[](int idx) { return idx==0?l:r; }
-	_FORCE_INLINE_ Frame operator+(const Frame& p_Frame) const { return Frame(l+p_Frame.l,r+p_Frame.r); }
-	_FORCE_INLINE_ Frame operator-(const Frame& p_Frame) const { return Frame(l-p_Frame.l,r-p_Frame.r); }
-	_FORCE_INLINE_ Frame operator*(const Frame& p_Frame) const { return Frame(l*p_Frame.l,r*p_Frame.r); }
-	_FORCE_INLINE_ Frame operator/(const Frame& p_Frame) const { return Frame(l/p_Frame.l,r/p_Frame.r); }
+	_FORCE_INLINE_ void operator+=(const AudioFrame &p_frame) {
+		l += p_frame.l;
+		r += p_frame.r;
+	}
+	_FORCE_INLINE_ void operator-=(const AudioFrame &p_frame) {
+		l -= p_frame.l;
+		r -= p_frame.r;
+	}
+	_FORCE_INLINE_ void operator*=(const AudioFrame &p_frame) {
+		l *= p_frame.l;
+		r *= p_frame.r;
+	}
+	_FORCE_INLINE_ void operator/=(const AudioFrame &p_frame) {
+		l /= p_frame.l;
+		r /= p_frame.r;
+	}
 
-	_FORCE_INLINE_ void operator+=(const Frame& p_Frame) { l+=p_Frame.l;r+=p_Frame.r; }
-	_FORCE_INLINE_ void operator-=(const Frame& p_Frame) { l-=p_Frame.l;r-=p_Frame.r; }
-	_FORCE_INLINE_ void operator*=(const Frame& p_Frame) { l*=p_Frame.l;r*=p_Frame.r; }
-	_FORCE_INLINE_ void operator/=(const Frame& p_Frame) { l/=p_Frame.l;r/=p_Frame.r; }
+	_FORCE_INLINE_ AudioFrame operator+(float p_frame) const { return AudioFrame(l + p_frame, r + p_frame); }
+	_FORCE_INLINE_ AudioFrame operator-(float p_frame) const { return AudioFrame(l - p_frame, r - p_frame); }
+	_FORCE_INLINE_ AudioFrame operator*(float p_frame) const { return AudioFrame(l * p_frame, r * p_frame); }
+	_FORCE_INLINE_ AudioFrame operator/(float p_frame) const { return AudioFrame(l / p_frame, r / p_frame); }
 
-	_FORCE_INLINE_ Frame operator+(const AudioFrame& p_AudioFrame) const { return Frame(l+p_AudioFrame,r+p_AudioFrame); }
-	_FORCE_INLINE_ Frame operator-(const AudioFrame& p_AudioFrame) const { return Frame(l-p_AudioFrame,r-p_AudioFrame); }
-	_FORCE_INLINE_ Frame operator*(const AudioFrame& p_AudioFrame) const { return Frame(l*p_AudioFrame,r*p_AudioFrame); }
-	_FORCE_INLINE_ Frame operator/(const AudioFrame& p_AudioFrame) const { return Frame(l/p_AudioFrame,r/p_AudioFrame); }
+	_FORCE_INLINE_ void operator+=(float p_frame) {
+		l += p_frame;
+		r += p_frame;
+	}
+	_FORCE_INLINE_ void operator-=(float p_frame) {
+		l -= p_frame;
+		r -= p_frame;
+	}
+	_FORCE_INLINE_ void operator*=(float p_frame) {
+		l *= p_frame;
+		r *= p_frame;
+	}
+	_FORCE_INLINE_ void operator/=(float p_frame) {
+		l /= p_frame;
+		r /= p_frame;
+	}
 
-	_FORCE_INLINE_ void operator+=(const AudioFrame& p_AudioFrame) { l+=p_AudioFrame; r+=p_AudioFrame; }
-	_FORCE_INLINE_ void operator-=(const AudioFrame& p_AudioFrame) { l-=p_AudioFrame; r-=p_AudioFrame; }
-	_FORCE_INLINE_ void operator*=(const AudioFrame& p_AudioFrame) { l*=p_AudioFrame; r*=p_AudioFrame; }
-	_FORCE_INLINE_ void operator/=(const AudioFrame& p_AudioFrame) { l/=p_AudioFrame; r/=p_AudioFrame; }
-
-	_FORCE_INLINE_ Frame(AudioFrame p_l, AudioFrame p_r) {l=p_l; r=p_r;}
-	_FORCE_INLINE_ Frame(AudioFrame p_AudioFrame) {l=p_AudioFrame; r=p_AudioFrame;}
-	_FORCE_INLINE_ Frame() {}
-
-} _FORCE_ALIGN_;
-
-typedef Frame StereoAudioFrame;
-
-enum AudioFrameType {
-
-	AUDIO_FRAME_MONO,
-	AUDIO_FRAME_STEREO
+	_FORCE_INLINE_ AudioFrame(float p_l, float p_r) {
+		l = p_l;
+		r = p_r;
+	}
+	_FORCE_INLINE_ AudioFrame(const AudioFrame &p_frame) {
+		l = p_frame.l;
+		r = p_frame.r;
+	}
+	_FORCE_INLINE_ AudioFrame() {}
 };
-
-
-
 
 #endif // AudioFrame_H

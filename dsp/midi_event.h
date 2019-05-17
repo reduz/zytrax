@@ -67,8 +67,6 @@ public:
 		MIDI_SYSEX = 0xF, //this will not be used here for now anway
 	};
 
-	unsigned int frame;
-
 	unsigned char type; //see Type enum
 	unsigned char channel; // 0 - 15
 

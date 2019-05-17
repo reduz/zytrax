@@ -57,6 +57,14 @@ struct PortRangeHint {
 
 class ControlPort {
 public:
+	typedef void (*UIChangedCallback)(void *);
+
+private:
+	UIChangedCallback changed_callback;
+	void *changed_userdata;
+	char command;
+
+public:
 	enum Hint {
 
 		HINT_RANGE, ///< just a range (Default)
@@ -70,16 +78,21 @@ public:
 	virtual float get_min() const = 0;
 	virtual float get_max() const = 0;
 	virtual float get_step() const = 0;
-	virtual float get_initial() const = 0;
 	virtual float get() const = 0;
 	virtual bool is_visible() const = 0;
 
-	virtual void set(float p_val, bool p_make_initial = false) = 0; //set, optionally make the value the default too
-	virtual void set_normalized(float p_val, bool p_make_initial = false); // set in range 0-1, internally converted to range
+	virtual void set(float p_val) = 0; //set, optionally make the value the default too
+	virtual void set_normalized(float p_val); // set in range 0-1, internally converted to range
 	virtual float get_normalized() const;
 
 	virtual String get_value_as_text() const;
 	virtual Hint get_hint() const;
+
+	void ui_changed_notify();
+
+	void set_ui_changed_callback(UIChangedCallback p_callback, void *p_userdata);
+	void set_command(char p_command);
+	char get_command() const;
 
 	ControlPort();
 	virtual ~ControlPort();
@@ -101,16 +114,19 @@ public:
 		enum {
 			NOTE_MAX = 0x7F //for note
 		};
-		uint32_t param8; //for note
-		float paramf; // for note volume or aftertouch (0-1) or bpm (float)
+		Type type;
+		uint32_t param8; //for note, BPM
+		float paramf; // for note volume (0-1)
 		uint32_t offset; //offset in samples (for anything that supports it)
 	};
 
 	//process
 	virtual bool has_secondary_input() const = 0;
-	virtual void process(const Event *p_events, int p_event_count, const Frame *p_in, Frame *p_out, bool p_prev_active) = 0;
-	virtual void process_with_secondary(const Event *p_events, int p_event_count, const Frame *p_in, const Frame *p_secondary, Frame *p_out, bool p_prev_active) = 0;
+	virtual void process(const Event *p_events, int p_event_count, const AudioFrame *p_in, AudioFrame *p_out, bool p_prev_active) = 0;
+	virtual void process_with_secondary(const Event *p_events, int p_event_count, const AudioFrame *p_in, const AudioFrame *p_secondary, AudioFrame *p_out, bool p_prev_active) = 0;
 
+	virtual void set_process_block_size(int p_size) = 0;
+	virtual void set_sampling_rate(int p_hz) = 0;
 	//info
 	virtual String get_name() const = 0;
 	virtual String get_unique_id() const = 0;
@@ -137,7 +153,7 @@ class ControlPortDefault : public ControlPort {
 public:
 	String name;
 	String identifier;
-	float min, max, step, initial;
+	float min, max, step;
 	float value;
 	Hint hint;
 	bool visible;
@@ -149,13 +165,10 @@ public:
 	virtual float get_min() const { return min; }
 	virtual float get_max() const { return max; }
 	virtual float get_step() const { return step; }
-	virtual float get_initial() const { return initial; }
 	virtual float get() const { return value; }
 
-	virtual void set(float p_val, bool p_make_initial = false) {
+	virtual void set(float p_val) {
 		value = p_val;
-		if (p_make_initial)
-			initial = value;
 		was_set = true;
 	}
 
@@ -163,11 +176,11 @@ public:
 	virtual bool is_visible() const { return visible; }
 
 	ControlPortDefault() {
+		value = 0;
 		hint = HINT_RANGE;
 		min = 0;
 		max = 1;
 		step = 1;
-		initial = 0;
 		visible = true;
 		was_set = false;
 	}

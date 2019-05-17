@@ -212,7 +212,6 @@ bool OrderlistEditor::on_key_press_event(GdkEventKey *key_event) {
 
 		int new_number = num[0] * 100 + num[1] * 10 + num[2];
 
-		printf("base %i number %i existing %i new %i n1 %i n2 %i n3 %i field %i\n", base, number, existing, new_number, num[0], num[1], num[2], cursor.field);
 		undo_redo->begin_action("Insert Number");
 		undo_redo->do_method(song, &Song::order_set, cursor.row, new_number);
 		undo_redo->undo_method(song, &Song::order_set, cursor.row, existing);
@@ -429,6 +428,7 @@ bool OrderlistEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
 	Gdk::RGBA note_color = theme->colors[Theme::COLOR_PATTERN_EDITOR_NOTE];
 	Gdk::RGBA order_color = theme->colors[Theme::COLOR_PATTERN_EDITOR_ROW_BEAT];
+	Gdk::RGBA playing_order_color = theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR];
 
 	_draw_fill_rect(cr, w / 2, 0, w / 2, h, theme->colors[Theme::COLOR_PATTERN_EDITOR_BG]);
 
@@ -443,7 +443,7 @@ bool OrderlistEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		text[1] = '0' + (row / 10) % 10;
 		text[2] = '0' + row % 10;
 
-		_draw_text(cr, fw, i * row_height + fa + top_ofs, text, order_color);
+		_draw_text(cr, fw, i * row_height + fa + top_ofs, text, row == playback_order ? playing_order_color : order_color);
 
 		int pattern = song->order_get(row);
 
@@ -492,6 +492,15 @@ void OrderlistEditor::on_parsing_error(
 		const Glib::RefPtr<const Gtk::CssSection> &section,
 		const Glib::Error &error) {}
 
+int OrderlistEditor::get_cursor_order() const {
+	return cursor.row;
+}
+void OrderlistEditor::set_playback_order(int p_order) {
+	if (p_order != playback_order) {
+		playback_order = p_order;
+		queue_draw();
+	}
+}
 OrderlistEditor::OrderlistEditor(Song *p_song, UndoRedo *p_undo_redo,
 		Theme *p_theme, KeyBindings *p_bindings) :
 		// The GType name will actually be gtkmm__CustomObject_mywidget
@@ -522,6 +531,7 @@ OrderlistEditor::OrderlistEditor(Song *p_song, UndoRedo *p_undo_redo,
 	top_ofs = 4;
 
 	drawing = false;
+	playback_order = -1;
 }
 
 OrderlistEditor::~OrderlistEditor() {

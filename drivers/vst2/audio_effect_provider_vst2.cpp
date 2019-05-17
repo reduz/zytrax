@@ -65,6 +65,11 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 
 			String lib_name = p + "/" + String(dirent->d_name);
 
+			if (lib_name.get_extension() != "dll") {
+				continue;
+			}
+			printf("opening plugin: %s\n", lib_name.utf8().get_data());
+
 			HINSTANCE libhandle = LoadLibraryW(lib_name.c_str());
 
 			AEffect *ptrPlug = open_vst_from_lib_handle(libhandle, &host);
@@ -78,53 +83,54 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 				FreeLibrary(libhandle);
 				continue;
 			}
+
 			ptrPlug->dispatcher(ptrPlug, effOpen, 0, 0, NULL, 0.0f);
 
-			AudioEffectInfo info;
+			if (ptrPlug->numOutputs >= 2) { //needs to have at least 2 outputs
+				AudioEffectInfo info;
 
-			String name = dirent->d_name;
-			name = name.substr(0, name.find("."));
-			info.caption = name;
-			printf("plugin name: %s\n", info.caption.utf8().get_data());
-			info.description = "VST Plugin";
-			info.long_description = "VST Info:\n Name: " + info.caption + "\n ID: " + String::num(ptrPlug->uniqueID) + "\n Version: " + String(ptrPlug->version);
-			info.unique_ID = "VST_" + String::num(ptrPlug->uniqueID);
-			info.synth = /*(ptrPlug->dispatcher(ptrPlug,effGetVstVersion,0,0,NULL,0.0f)==2  */ ptrPlug->flags & effFlagsIsSynth;
-			info.category = info.synth ? "VST Instruments" : "VST Effects";
-			info.has_ui = (ptrPlug->flags & effFlagsHasEditor);
+				String name = dirent->d_name;
+				name = name.substr(0, name.find("."));
+				info.caption = name;
+				printf("plugin name: %s\n", info.caption.utf8().get_data());
+				info.description = "VST Plugin";
+				info.long_description = "VST Info:\n Name: " + info.caption + "\n ID: " + String::num(ptrPlug->uniqueID) + "\n Version: " + String(ptrPlug->version);
+				info.unique_ID = "VST_" + String::num(ptrPlug->uniqueID);
+				info.synth = /*(ptrPlug->dispatcher(ptrPlug,effGetVstVersion,0,0,NULL,0.0f)==2  */ ptrPlug->flags & effFlagsIsSynth;
+				info.category = info.synth ? "VST Instruments" : "VST Effects";
+				info.has_ui = (ptrPlug->flags & effFlagsHasEditor);
 
-			info.provider_caption = "VST2";
-			info.version = String::num(ptrPlug->version);
+				info.provider_caption = "VST2";
+				info.version = String::num(ptrPlug->version);
 
-			info.provider_id = get_id();
-			info.path = lib_name;
+				info.provider_id = get_id();
+				info.path = lib_name;
 
-			if (ptrPlug->flags & effFlagsProgramChunks) {
+				if (ptrPlug->flags & effFlagsProgramChunks) {
 
-				info.description += " (CS)";
-			}
-
-			/* Perform the "write only" test */
-
-			//plugin_data->write_only=true;	//i cant really be certain of anything with VST plugins, so this is always true
-			/*
-			if (ptrPlug->numParams) {
-
-				ptrPlug->setParameter(ptrPlug,0,1.0); //set 1.0
-				float res=ptrPlug->getParameter(ptrPlug,0);
-				if (res<0.8) { //try if it's not near 1.0, with some threshold, then no reading (far most of the ones that dont support this will just return 0)
-
-
+					info.description += " (CS)";
 				}
-		} */
-			p_factory->add_audio_effect(info);
 
+				/* Perform the "write only" test */
+
+				//plugin_data->write_only=true;	//i cant really be certain of anything with VST plugins, so this is always true
+				/*
+				if (ptrPlug->numParams) {
+
+					ptrPlug->setParameter(ptrPlug,0,1.0); //set 1.0
+					float res=ptrPlug->getParameter(ptrPlug,0);
+					if (res<0.8) { //try if it's not near 1.0, with some threshold, then no reading (far most of the ones that dont support this will just return 0)
+
+
+					}
+			} */
+				p_factory->add_audio_effect(info);
+				if (p_callback) {
+					p_callback(info.caption, p_userdata);
+				}
+			}
 			ptrPlug->dispatcher(ptrPlug, effClose, 0, 0, NULL, 0.0f);
 			FreeLibrary(libhandle);
-
-			if (p_callback) {
-				p_callback(info.caption, p_userdata);
-			}
 		}
 	}
 }
@@ -208,7 +214,7 @@ VstIntPtr VSTCALLBACK AudioEffectProviderVST2::host(AEffect *effect, VstInt32 op
 			retval = kVstLangEnglish;
 			break;
 	}
-	return retval; //stupid plugin, i'm just reading stuff, dont annoy me with questions!
+	return retval;
 }
 
 String AudioEffectProviderVST2::get_name() const {
@@ -225,5 +231,4 @@ AudioEffectProviderVST2::AudioEffectProviderVST2() {
 }
 
 AudioEffectProviderVST2::~AudioEffectProviderVST2() {
-	printf("erased provider\n");
 }

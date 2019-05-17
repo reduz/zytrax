@@ -12,6 +12,7 @@
 #ifndef SOUND_DRIVER_H
 #define SOUND_DRIVER_H
 
+#include "dsp/frame.h"
 #include "globals/config.h"
 #include "rstring.h"
 /**
@@ -19,6 +20,9 @@
 */
 
 class SoundDriver {
+protected:
+	void mix(AudioFrame *p_buffer, int p_frames);
+
 public:
 	virtual void lock() = 0; ///< Lock called from UI,game,etc (non-audio) thread, to access audio variables
 	virtual void unlock() = 0; ///< UnLock called from UI,game,etc (non-audio) thread, to access audio variables

@@ -9,8 +9,16 @@
 class AudioEffectMIDI : public AudioEffect {
 public:
 	enum CustomMIDIPorts {
+		CUSTOM_MIDI_BEND_PORTAMENTO,
+		CUSTOM_MIDI_BEND_VIBRATO,
+		CUSTOM_MIDI_BEND_SLIDE_UP,
+		CUSTOM_MIDI_BEND_SLIDE_DOWN,
+		CUSTOM_MIDI_PITCH_BEND,
+		CUSTOM_MIDI_PITCH_BEND_UP,
+		CUSTOM_MIDI_PITCH_BEND_DOWN,
 		CUSTOM_MIDI_SMART_PORTAMENTO,
-		CUSTOM_MIDI_SMART_VIBRATO,
+		CUSTOM_MIDI_AFTERTOUCH,
+		CUSTOM_MIDI_CHANGE_PROGRAM,
 		CUSTOM_MIDI_MACRO,
 		CUSTOM_MIDI_MAX,
 	};
@@ -19,26 +27,47 @@ public:
 		TOTAL_INTERNAL_PORTS = MIDIEvent::CC_MAX + CUSTOM_MIDI_MAX
 	};
 
+	struct MIDIEventStamped {
+		uint32_t frame;
+		MIDIEvent event;
+	};
+
 private:
 	enum {
-		INTERNAL_MIDI_EVENT_BUFFER_SIZE = 4096
+		INTERNAL_MIDI_EVENT_BUFFER_SIZE = 4096,
+		PITCH_BEND_MAX = 8192,
+		PITCH_BEND_MIN = -8192
 	};
 
 	ControlPortDefault cc_ports[MIDIEvent::CC_MAX];
 	ControlPortDefault custom_ports[CUSTOM_MIDI_MAX];
 	Vector<uint8_t> midi_macro[CUSTOM_MIDI_MACRO_MAX];
 
-	struct MIDIEventStamped {
-		uint32_t frame;
-		MIDIEvent event;
-	};
-
 	MIDIEventStamped process_events[INTERNAL_MIDI_EVENT_BUFFER_SIZE];
 
 	int midi_channel;
+	int pitch_bend_range; //in semitones
+
+	bool reset_pending;
+	int current_pitch_bend;
+	int extra_pitch_bend;
+
+	/* bend vibrato stuff */
+	int prev_bend_vibrato;
+	float bend_vibrato_time;
+	/* bend portamento stuff */
+	bool prev_bend_portamento;
+	bool prev_bend_slide;
+	int bend_portamento_last_note;
+	int bend_portamento_target_note;
+	int bp_remap_note_off_from;
+	int bp_remap_note_off_to;
+
+	bool update_pitch_bend_range;
 
 protected:
-	MIDIEventStamped *_process_midi_events(const Event *p_events, int p_event_count, int &r_stamped_event_count);
+	void _reset_midi();
+	MIDIEventStamped *_process_midi_events(const Event *p_events, int p_event_count, float p_time, int &r_stamped_event_count);
 	virtual int _get_internal_control_port_count() const = 0;
 	virtual ControlPort *_get_internal_control_port(int p_index) = 0;
 
@@ -60,6 +89,8 @@ public:
 	virtual JSON::Node to_json() const;
 	virtual Error from_json(const JSON::Node &node);
 
+	void set_pitch_bend_range(int p_semitones);
+	int get_pitch_bend_range() const;
 	AudioEffectMIDI();
 };
 

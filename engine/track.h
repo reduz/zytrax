@@ -13,10 +13,10 @@ typedef uint64_t Tick;
 
 class Automation {
 public:
-	enum DisplayMode {
-		DISPLAY_ROWS,
-		DISPLAY_SMALL,
-		DISPLAY_LARGE
+	enum EditMode {
+		EDIT_ROWS_DISCRETE,
+		EDIT_ENVELOPE_SMALL,
+		EDIT_ENVELOPE_LARGE
 	};
 
 	enum {
@@ -27,10 +27,15 @@ public:
 private:
 	AudioEffect *owner;
 	ControlPort *port;
-	DisplayMode display_mode;
-	bool visible;
+	EditMode display_mode;
 
 	Map<int, ValueStream<Tick, uint8_t> > data;
+
+	bool has_pre_play_capture;
+	float pre_play_capture_value;
+
+	static void _ui_changed_callbacks(void *p_ud);
+	void _ui_changed_callback();
 
 public:
 	void set_point(int p_pattern, Tick p_offset, uint8_t p_value);
@@ -47,12 +52,17 @@ public:
 	ControlPort *get_control_port();
 	AudioEffect *get_owner();
 
-	void set_visible(bool p_visible);
-	bool is_visible() const;
-	void set_display_mode(DisplayMode p_mode);
-	DisplayMode get_display_mode() const;
+	void set_edit_mode(EditMode p_mode);
+	EditMode get_edit_mode() const;
+
+	void pre_play_capture();
+	void pre_play_restore();
 
 	bool is_empty() const;
+
+	void add_notify();
+	void remove_notify();
+
 	Automation(ControlPort *p_port, AudioEffect *p_owner = NULL);
 };
 
@@ -78,6 +88,24 @@ public:
 		}
 	};
 
+	struct Command {
+
+		enum {
+			EMPTY = 0xFF,
+			MAX_PARAM = 99,
+		};
+
+		uint8_t command;
+		uint8_t parameter;
+		inline bool is_empty() const { return (command == EMPTY && parameter == 0); }
+		bool operator==(Command p_command) const { return command == p_command.command && parameter == p_command.parameter; }
+
+		Command(uint8_t p_command = EMPTY, uint8_t p_parameter = 0) {
+			command = p_command;
+			parameter = p_parameter;
+		}
+	};
+
 	struct Pos {
 
 		Tick tick;
@@ -98,6 +126,7 @@ public:
 
 		enum Type {
 			TYPE_NOTE,
+			TYPE_COMMAND,
 			TYPE_AUTOMATION
 		};
 
@@ -126,10 +155,28 @@ public:
 			}
 		}
 
+		operator Command() const {
+
+			if (type != TYPE_COMMAND)
+				return Command();
+			else {
+
+				Command c;
+				c.command = a;
+				c.parameter = b;
+				return c;
+			}
+		}
+
 		Event(const Note &p_note) {
 			type = TYPE_NOTE;
 			a = p_note.note;
 			b = p_note.volume;
+		}
+		Event(const Command &p_command) {
+			type = TYPE_COMMAND;
+			a = p_command.command;
+			b = p_command.parameter;
 		}
 
 		Event(const uint8_t p_autoval) {
@@ -137,6 +184,14 @@ public:
 			type = TYPE_AUTOMATION;
 			a = p_autoval;
 			b = 0;
+		}
+
+		static Event make_empty(Type p_type) {
+			Event ev;
+			ev.type = p_type;
+			ev.a = Note::EMPTY;
+			ev.b = ev.type == TYPE_COMMAND ? 0 : Note::EMPTY;
+			return ev;
 		}
 
 		Event() {
@@ -151,20 +206,29 @@ public:
 		Note note;
 	};
 
+	struct PosCommand {
+		Pos pos;
+		Command command;
+	};
+
 	struct PosEvent {
 		Pos pos;
 		Event event;
 	};
 
 	enum {
-		SEND_SPEAKERS = -1
+		SEND_SPEAKERS = -1,
+		EVENT_BUFFER_MAX = 8192
 	};
 
 private:
 	Map<int, ValueStream<Pos, Note> > note_data;
 	int note_columns;
+	Vector<uint8_t> column_state;
 
-	int swing_step;
+	Map<int, ValueStream<Pos, Command> > command_data;
+	int command_columns;
+
 	bool muted;
 
 	Vector<AudioEffect *> effects;
@@ -178,13 +242,30 @@ private:
 	};
 
 	Vector<Send> sends;
-	ControlPortDefault swing;
-	ControlPortDefault volume;
-	ControlPortDefault pan;
 
 	float mix_volume;
 
 	String name;
+
+	int sampling_rate;
+
+	friend class Song;
+	Vector<AudioFrame> input_buffer;
+	Vector<AudioFrame> process_buffer;
+	Vector<AudioFrame> process_buffer2;
+
+	AudioEffect::Event event_buffer[EVENT_BUFFER_MAX];
+	int event_buffer_size;
+
+	void process_events(int p_pattern, Tick p_offset, Tick p_from_tick, Tick p_to_tick, int p_bpm, int p_swing_divisor, float p_swing, int p_from = -1, int p_to = -1);
+	const AudioFrame *process_audio_step();
+
+	bool first_mix;
+
+	mutable float peak_volume_l;
+	mutable float peak_volume_r;
+
+	_FORCE_INLINE_ Tick _get_swinged_tick(Tick p_tick, int p_swing_divisor, float p_swing);
 
 public:
 	void set_name(String p_name);
@@ -228,10 +309,18 @@ public:
 	void get_notes_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, int &r_first, int &r_count) const;
 	void get_notes_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, List<PosNote> *r_notes) const;
 
-	/* swingie */
+	void set_command_columns(int p_columns);
+	int get_command_column_count() const;
 
-	void set_swing_step(int p_swing_step);
-	int get_swing_step() const;
+	void set_command(int p_pattern, Pos p_pos, Command p_command);
+	Command get_command(int p_pattern, Pos p_pos) const;
+
+	int get_command_count(int p_pattern) const;
+	Command get_command_by_index(int p_pattern, int p_index) const;
+	Pos get_command_pos_by_index(int p_pattern, int p_index) const;
+
+	void get_commands_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, int &r_first, int &r_count) const;
+	void get_commands_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, List<PosCommand> *r_commands) const;
 
 	void set_muted(bool p_mute);
 	bool is_muted() const;
@@ -242,17 +331,15 @@ public:
 	Event get_event(int p_pattern, int p_column, Tick p_pos) const;
 	void get_events_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, List<PosEvent> *r_events) const;
 
-	ControlPort *get_volume_port();
-	ControlPort *get_pan_port();
-	ControlPort *get_swing_port();
-
 	void set_mix_volume_db(float p_db);
 	float get_mix_volume_db() const;
 
-	float get_peak_volume_db() const;
+	float get_peak_volume_db_l() const;
+	float get_peak_volume_db_r() const;
 
 	void add_send(int p_track, int p_pos = -1);
 	void set_send_amount(int p_send, float p_amount);
+	void set_send_track(int p_send, int p_track);
 	void set_send_mute(int p_send, bool p_mute);
 	int get_send_track(int p_send) const;
 	float get_send_amount(int p_send) const;
@@ -260,6 +347,15 @@ public:
 	int get_send_count();
 	void remove_send(int p_send);
 	void swap_sends(int p_send, int p_with_send);
+	bool has_send(int p_send) const;
+
+	void set_process_buffer_size(int p_frames);
+	void set_sampling_rate(int p_hz);
+
+	void stop();
+
+	void automations_pre_play_capture();
+	void automations_pre_play_restore();
 
 	Track();
 	~Track();

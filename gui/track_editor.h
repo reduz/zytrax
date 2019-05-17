@@ -12,6 +12,10 @@
 
 class TrackRackVolume : public Gtk::Widget {
 protected:
+	enum {
+		TRACK_MAX_DB = 12,
+		TRACK_MIN_DB = -60
+	};
 	int min_width;
 	int min_height;
 	int min_width_chars;
@@ -23,6 +27,13 @@ protected:
 
 	int vu_x, vu_y;
 	int vu_w, vu_h;
+
+	int grabber_x, grabber_y;
+	int grabber_w, grabber_h;
+
+	bool grabbing;
+	float grabbing_db;
+	int grabbing_y;
 
 	// Overrides:
 	Gtk::SizeRequestMode get_request_mode_vfunc() const override;
@@ -77,12 +88,19 @@ protected:
 			int y, int w, int h, const Gdk::RGBA &p_color);
 
 	bool selected;
+	uint64_t last_time;
+	float peak_db_l;
+	float peak_db_r;
 
 public:
+	sigc::signal2<void, int, float> volume_db_changed;
+
 	void set_selected(bool p_selected) {
 		selected = p_selected;
 		queue_draw();
 	}
+
+	void update_peak();
 
 	TrackRackVolume(int p_track, Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme,
 			KeyBindings *p_bindings);

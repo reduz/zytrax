@@ -17,6 +17,12 @@ void EffectEditorMIDI::_midi_channel_changed() {
 	midi_effect->set_midi_channel(channel);
 }
 
+void EffectEditorMIDI::_midi_pitch_bend_range_changed() {
+
+	int pitch_bend_range = midi_pitch_bend_range_spinbox.get_adjustment()->get_value();
+	midi_effect->set_pitch_bend_range(pitch_bend_range);
+}
+
 String EffectEditorMIDI::_get_text_from_hex(const Vector<uint8_t> &p_hex) {
 
 	String macro_text;
@@ -73,13 +79,24 @@ EffectEditorMIDI::EffectEditorMIDI(AudioEffectMIDI *p_effect, EffectEditor *p_ed
 	effect_editor = p_editor;
 
 	append_page(cc_vbox, "MIDI Controls");
-	cc_vbox.pack_start(midi_channel_hb, Gtk::PACK_SHRINK);
+	cc_vbox.pack_start(midi_grid, Gtk::PACK_SHRINK);
 	midi_channel_label.set_text("MIDI Channel:");
-	midi_channel_hb.pack_start(midi_channel_label);
-	midi_channel_hb.pack_start(midi_channel_spinbox);
+	midi_channel_label.set_hexpand(true);
+	midi_grid.attach(midi_channel_label, 0, 0, 1, 1);
+	midi_grid.attach(midi_channel_spinbox, 1, 0, 1, 1);
+	midi_channel_spinbox.set_hexpand(true);
 	midi_channel_spinbox.set_adjustment(Gtk::Adjustment::create(0, 0, 15));
 	midi_channel_spinbox.get_adjustment()->set_value(midi_effect->get_midi_channel());
 	midi_channel_spinbox.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_midi_channel_changed));
+
+	midi_pitch_bend_range_label.set_text("Pitch Bend Range:");
+	midi_grid.attach(midi_pitch_bend_range_label, 0, 1, 1, 1);
+	midi_pitch_bend_range_label.set_hexpand(true);
+	midi_grid.attach(midi_pitch_bend_range_spinbox, 1, 1, 1, 1);
+	midi_pitch_bend_range_spinbox.set_hexpand(true);
+	midi_pitch_bend_range_spinbox.set_adjustment(Gtk::Adjustment::create(2, 2, 24));
+	midi_pitch_bend_range_spinbox.get_adjustment()->set_value(midi_effect->get_pitch_bend_range());
+	midi_pitch_bend_range_spinbox.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_midi_pitch_bend_range_changed));
 
 	cc_vbox.pack_start(cc_separator, Gtk::PACK_SHRINK);
 	cc_vbox.pack_start(cc_scroll, Gtk::PACK_EXPAND_WIDGET);

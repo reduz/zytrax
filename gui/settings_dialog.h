@@ -103,6 +103,11 @@ class SettingsDialog : public Gtk::MessageDialog {
 	Gtk::Frame plugin_path_frame;
 	Gtk::VBox plugin_path_vbox;
 
+	void _driver_changed();
+	void _driver_freq_changed();
+	void _driver_buffer_changed();
+	void _driver_step_changed();
+
 	class PluginModelColumns : public Gtk::TreeModelColumnRecord {
 	public:
 		PluginModelColumns() {
@@ -217,7 +222,77 @@ class SettingsDialog : public Gtk::MessageDialog {
 	AudioEffectFactory *fx_factory;
 
 public:
+	enum {
+		MAX_DEFAULT_COMMANDS = 100
+	};
+
+private:
+	struct DefaultCommand {
+		String name;
+		char command;
+	};
+
+	static DefaultCommand default_commands[MAX_DEFAULT_COMMANDS];
+
+	class CommandEditorModelColumns : public Gtk::TreeModelColumnRecord {
+	public:
+		//GTK is beyond bizarre at this point
+
+		class CommandModelColumns : public Gtk::TreeModelColumnRecord {
+		public:
+			CommandModelColumns() {
+				add(name);
+				add(index);
+			}
+
+			Gtk::TreeModelColumn<Glib::ustring> name;
+			Gtk::TreeModelColumn<int> index;
+		};
+
+		CommandModelColumns command_model_columns;
+
+		CommandEditorModelColumns() {
+			add(name);
+			add(command);
+			add(index);
+		}
+
+		Gtk::TreeModelColumn<Glib::ustring> name;
+		Gtk::TreeModelColumn<Glib::ustring> command;
+		Gtk::TreeModelColumn<int> index;
+	};
+
+	CommandEditorModelColumns command_editor_columns;
+
+	Glib::RefPtr<Gtk::ListStore> command_list_store;
+	Glib::RefPtr<Gtk::TreeSelection> command_tree_selection;
+
+	Gtk::CellRendererText cell_render_text;
+	Gtk::CellRendererCombo cell_render_command;
+	Gtk::TreeViewColumn command_column1;
+	Gtk::TreeViewColumn command_column2;
+	Gtk::TreeView command_tree;
+	Gtk::ScrolledWindow command_tree_scroll;
+
+	Glib::RefPtr<Gtk::ListStore> command_commands_list_store;
+	//Glib::RefPtr<Gtk::TreeSelection> tree_selection;
+	Gtk::Frame command_frame;
+
+	void _update_command_list();
+	void _command_name_changed(const Glib::ustring &path, const Glib::ustring &text);
+	void _command_value_changed(const Glib::ustring &path, const Glib::ustring &value);
+
+	static SettingsDialog *singleton;
+
+public:
 	sigc::signal0<void> update_colors;
+	sigc::signal0<void> update_song_step_buffer;
+	sigc::signal0<void> update_mix_rate;
+
+	static void set_default_command(int p_index, const String &p_name, char p_command);
+	static String get_default_command_name(int p_index);
+	static char get_default_command_command(int p_index);
+	static void add_default_command(const String &p_name, char p_command);
 
 	void initialize_bindings();
 	SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, AudioEffectFactory *p_fx_factory);

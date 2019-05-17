@@ -222,6 +222,74 @@ ThemeColorList::ThemeColorList(Theme *p_theme) :
 ThemeColorList::~ThemeColorList() {
 }
 
+////////////////////////////////
+
+void SettingsDialog::_driver_changed() {
+
+	Gtk::TreeModel::iterator iter = driver_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[model_columns.index];
+
+			SoundDriverManager::init_driver(id);
+			_save_settings();
+		}
+	}
+}
+void SettingsDialog::_driver_freq_changed() {
+
+	Gtk::TreeModel::iterator iter = frequency_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[model_columns.index];
+
+			SoundDriverManager::set_mix_frequency(SoundDriverManager::MixFrequency(id));
+			SoundDriverManager::init_driver();
+			update_mix_rate.emit();
+			_save_settings();
+		}
+	}
+}
+void SettingsDialog::_driver_buffer_changed() {
+
+	Gtk::TreeModel::iterator iter = buffer_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[model_columns.index];
+
+			SoundDriverManager::set_buffer_size(SoundDriverManager::BufferSize(id));
+			SoundDriverManager::init_driver();
+			_save_settings();
+		}
+	}
+}
+void SettingsDialog::_driver_step_changed() {
+
+	Gtk::TreeModel::iterator iter = step_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[model_columns.index];
+
+			SoundDriverManager::set_step_buffer_size(SoundDriverManager::BufferSize(id));
+			//but actually not here..
+			update_song_step_buffer.emit();
+			_save_settings();
+		}
+	}
+}
+
 bool SettingsDialog::_scan_plugin_key(GdkEvent *p_key) {
 	//avoid closing scan with escape key
 	if (p_key->type == GDK_KEY_PRESS && ((GdkEventKey *)(p_key))->keyval == GDK_KEY_Escape) {
@@ -235,7 +303,9 @@ void SettingsDialog::_scan_callback(const String &p_name, void *p_ud) {
 	SettingsDialog *sd = (SettingsDialog *)p_ud;
 	Gtk::TreeModel::Row row = *(sd->scan_list_store->append());
 	row[sd->scan_model_columns.name] = p_name.utf8().get_data();
-	gtk_main_iteration_do(false);
+	while (gtk_events_pending()) {
+		gtk_main_iteration_do(false);
+	}
 }
 void SettingsDialog::_scan_plugins() {
 
@@ -263,6 +333,7 @@ void SettingsDialog::_scan_plugins() {
 	scan.signal_event().connect(sigc::mem_fun(*this, &SettingsDialog::_scan_plugin_key));
 
 	scan.show();
+
 	fx_factory->rescan_effects(_scan_callback, this);
 
 	response_button->set_sensitive(true);
@@ -284,8 +355,6 @@ void SettingsDialog::_save_plugins() {
 
 	{ //plugins
 		JSON::Node plugin_array = JSON::array();
-
-		printf("effect count: %i\n", fx_factory->get_audio_effect_count());
 
 		for (int i = 0; i < fx_factory->get_audio_effect_count(); i++) {
 
@@ -537,14 +606,126 @@ void SettingsDialog::_save_settings() {
 		node.add("key_bindings", bindings);
 	}
 
+	{ //default commands
+		JSON::Node def_commands = JSON::array();
+		for (int i = 0; i < MAX_DEFAULT_COMMANDS; i++) {
+			if (default_commands[i].name == "" && default_commands[i].command == 0) {
+				continue;
+			}
+			JSON::Node command = JSON::object();
+			command.add("index", i);
+			command.add("identifier", default_commands[i].name.utf8().get_data());
+			command.add("command", default_commands[i].command);
+			def_commands.add(command);
+		}
+
+		node.add("default_commands", def_commands);
+	}
+
 	save_json(save_to, node);
 }
 
+SettingsDialog::DefaultCommand SettingsDialog::default_commands[MAX_DEFAULT_COMMANDS];
+
+void SettingsDialog::_update_command_list() {
+	command_list_store->clear();
+
+	for (int i = 0; i < MAX_DEFAULT_COMMANDS; i++) {
+
+		Gtk::TreeModel::iterator iter = command_list_store->append();
+		Gtk::TreeModel::Row row = *iter;
+
+		row[model_columns.name] = default_commands[i].name.utf8().get_data();
+
+		if (default_commands[i].command == 0) {
+			row[command_editor_columns.command] = "<assign>";
+		} else {
+			char s[2] = { char('A' + (default_commands[i].command - 'a')), 0 };
+			row[command_editor_columns.command] = s;
+		}
+		row[command_editor_columns.index] = i;
+	}
+}
+
+void SettingsDialog::_command_name_changed(const Glib::ustring &path, const Glib::ustring &text) {
+
+	Gtk::TreeIter iter = command_list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+	int index = (*iter)[command_editor_columns.index];
+	String s;
+	s.parse_utf8(text.c_str());
+	(*iter)[command_editor_columns.name] = text;
+
+	default_commands[index].name = s;
+	_save_settings();
+}
+
+void SettingsDialog::_command_value_changed(const Glib::ustring &path, const Glib::ustring &value) {
+
+	Gtk::TreeIter iter = command_list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+	int index = (*iter)[command_editor_columns.index];
+	char valc = value[0];
+	if (valc == '<') {
+		valc = 0; //unselected
+		(*iter)[command_editor_columns.command] = "<assign>";
+	} else {
+		valc = 'a' + (valc - 'A'); //unselected
+		(*iter)[command_editor_columns.command] = value;
+	}
+
+	default_commands[index].command = valc;
+	_save_settings();
+}
+
+void SettingsDialog::set_default_command(int p_index, const String &p_name, char p_command) {
+	ERR_FAIL_INDEX(p_index, MAX_DEFAULT_COMMANDS);
+	default_commands[p_index].name = p_name;
+	default_commands[p_index].command = p_command;
+}
+
+String SettingsDialog::get_default_command_name(int p_index) {
+	ERR_FAIL_INDEX_V(p_index, MAX_DEFAULT_COMMANDS, String());
+	return default_commands[p_index].name;
+}
+char SettingsDialog::get_default_command_command(int p_index) {
+	ERR_FAIL_INDEX_V(p_index, MAX_DEFAULT_COMMANDS, 0);
+	return default_commands[p_index].command;
+}
+
+void SettingsDialog::add_default_command(const String &p_name, char p_command) {
+
+	bool exists = false;
+	for (int i = 0; i < MAX_DEFAULT_COMMANDS; i++) {
+		if (default_commands[i].name == p_name) {
+			default_commands[i].command = p_command;
+			exists = true;
+			break;
+		}
+	}
+
+	if (!exists) {
+		for (int i = 0; i < MAX_DEFAULT_COMMANDS; i++) {
+			if (default_commands[i].name == String()) {
+				default_commands[i].name = p_name;
+				default_commands[i].command = p_command;
+				break;
+			}
+		}
+	}
+
+	if (singleton) {
+		singleton->_update_command_list();
+		singleton->_save_settings();
+	}
+}
+SettingsDialog *SettingsDialog::singleton = NULL;
 SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, AudioEffectFactory *p_fx_factory) :
 		MessageDialog("", false /* use_markup */, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_CLOSE),
 		key_remap_dialog("", false, Gtk::MESSAGE_OTHER, Gtk::BUTTONS_OK_CANCEL),
 		theme_color_list(p_theme) {
 
+	singleton = this;
 	fx_factory = p_fx_factory;
 	key_bindings = p_key_bindings;
 	theme = p_theme;
@@ -569,6 +750,7 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 			driver_combo.set_active(driver_rows[active_index]);
 		}
 	}
+	driver_combo.signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::_driver_changed));
 
 	{
 
@@ -590,6 +772,7 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 			frequency_combo.set_active(frequency_rows[active_index]);
 		}
 	}
+	frequency_combo.signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::_driver_freq_changed));
 
 	{
 
@@ -611,6 +794,7 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 			buffer_combo.set_active(buffer_rows[active_index]);
 		}
 	}
+	buffer_combo.signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::_driver_buffer_changed));
 
 	{
 
@@ -632,6 +816,8 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 			step_combo.set_active(step_rows[active_index]);
 		}
 	}
+
+	step_combo.signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::_driver_step_changed));
 
 	////// zoom
 
@@ -843,6 +1029,96 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 
 	//////////////////
 
+	notebook.append_page(command_frame, "Default Commands");
+	command_frame.set_label("Commands:");
+	command_frame.add(command_tree_scroll);
+	command_frame.set_hexpand(true);
+	command_frame.set_vexpand(true);
+	command_tree_scroll.set_hexpand(true);
+	command_tree_scroll.set_vexpand(true);
+	command_tree_scroll.add(command_tree);
+
+	command_list_store = Gtk::ListStore::create(command_editor_columns);
+	command_tree_selection = command_tree.get_selection();
+	command_tree.set_model(command_list_store);
+
+	command_tree.set_model(command_list_store);
+	command_tree.set_hexpand(true);
+	command_tree.set_vexpand(true);
+
+	command_column1.set_title("Name");
+	command_column1.pack_start(cell_render_text, true);
+	cell_render_text.signal_edited().connect(sigc::mem_fun(*this, &SettingsDialog::_command_name_changed));
+	command_column1.add_attribute(cell_render_text.property_text(), command_editor_columns.name);
+	cell_render_text.property_editable() = true;
+
+	command_tree.append_column(command_column1);
+	command_tree.get_column(0)->set_expand(true);
+
+	command_commands_list_store = Gtk::ListStore::create(command_editor_columns.command_model_columns);
+	{
+		{
+			Gtk::TreeModel::iterator iter = command_commands_list_store->append();
+			Gtk::TreeModel::Row row = *iter;
+			row[command_editor_columns.command_model_columns.name] = "<unassigned>";
+			row[command_editor_columns.command_model_columns.index] = 0;
+		}
+		for (int i = 'a'; i <= 'z'; i++) {
+
+			Gtk::TreeModel::iterator iter = command_commands_list_store->append();
+			Gtk::TreeModel::Row row = *iter;
+
+			const char s[2] = { char('A' + (i - 'a')), 0 };
+			row[command_editor_columns.command_model_columns.name] = s;
+			row[command_editor_columns.command_model_columns.index] = i;
+		}
+	}
+
+	command_column2.set_title("Command");
+	command_column2.pack_start(cell_render_command, false);
+	command_column2.add_attribute(cell_render_command.property_text(), command_editor_columns.command);
+	cell_render_command.signal_edited().connect(sigc::mem_fun(*this, &SettingsDialog::_command_value_changed));
+
+	cell_render_command.property_model() = command_commands_list_store;
+	cell_render_command.property_text_column() = 0;
+	cell_render_command.property_editable() = true;
+	cell_render_command.property_has_entry() = false;
+	cell_render_command.set_visible(true);
+	command_tree.append_column(command_column2);
+	command_tree.get_column(1)->set_expand(false);
+	//tree.set_can_focus(false);
+	//tree_selection->set_mode(Gtk::SELECTION_NONE);
+
+	bool has_default_commands = false;
+	for (int i = 0; i < MAX_DEFAULT_COMMANDS; i++) {
+		if (default_commands[i].name != "" || default_commands[i].command) {
+			has_default_commands = true;
+		}
+	}
+
+	if (!has_default_commands) {
+		default_commands[0].name = "bend_portamento";
+		default_commands[0].command = 'g';
+		default_commands[1].name = "bend_vibrato";
+		default_commands[1].command = 'h';
+		default_commands[2].name = "bend_slide_up";
+		default_commands[2].command = 'f';
+		default_commands[3].name = "bend_slide_down";
+		default_commands[3].command = 'e';
+		default_commands[4].name = "cc_Pan";
+		default_commands[4].command = 'w';
+		default_commands[5].name = "cc_Expression";
+		default_commands[5].command = 'm';
+		default_commands[6].name = "cc_Breath";
+		default_commands[6].command = 'b';
+		default_commands[7].name = "cc_Modulation";
+		default_commands[7].command = 'u';
+		default_commands[8].name = "cc_FilterCutoff";
+		default_commands[8].command = 'z';
+	}
+
+	_update_command_list();
+	///////////////////////
 	Glib::RefPtr<Gdk::Screen> screen = Gdk::Screen::get_default();
 	int width = screen->get_width();
 	int height = screen->get_height();

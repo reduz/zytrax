@@ -84,6 +84,10 @@ bool EffectPlaceholderVST2::_update_window_position() {
 		prev_visible = visible;
 	}
 
+	if (visible) {
+		vst_effect->process_user_interface();
+	}
+
 	return true;
 }
 
@@ -125,7 +129,6 @@ void EffectPlaceholderVST2::on_realize() {
 	}
 
 	if (m_refGdkWindow) {
-		printf("CREATE\n");
 		//hwnd for gtk window
 		HWND hwnd = gdk_win32_window_get_impl_hwnd(m_refGdkWindow->gobj());
 		//set as parent. This works, while SetParent DOES NOT.
@@ -139,104 +142,11 @@ void EffectPlaceholderVST2::on_realize() {
 		ShowWindow(vst_window, SW_SHOW);
 		prev_visible = true;
 	}
-
-#if 0
-
-		//size allocate
-		/*vst_effect->open_user_interface(hwnd);
-		vst_effect->get_user_interface_size(vst_w, vst_h);
-		set_size_request(vst_w, vst_h);
-		printf("rect: %i,%i\n", vst_w, vst_h);*/
-
-		//SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) & (~WS_CLIPCHILDREN));
-		//const auto style = WS_CAPTION | WS_THICKFRAME | WS_OVERLAPPEDWINDOW;
-		const auto style = WS_POPUP;
-		vst_window = CreateWindowExW(0, L"VST_HOST", vst_effect->get_path().c_str(), style, 0, 0, 0, 0, NULL, 0, 0, 0);
-		SetWindowLongPtr(vst_window, GWLP_HWNDPARENT, (LONG_PTR)hwnd);
-		//SetParent((HWND)vst_window, (HWND)hwnd);
-		//Whoe the Wind
-		ShowWindow(vst_window, SW_SHOW);
-
-
-		/*
-		HWND window_parent = NULL;
-		HMODULE hInst = GetModuleHandleA(NULL);
-		vst_window = CreateWindowExA(0, "FST", "memario",
-				window_parent ? WS_CHILD : (WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX),
-				CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-				(HWND)window_parent, NULL,
-				hInst,
-				NULL);
-
-		ERR_FAIL_COND(!vst_window);
-
-		if (!SetPropA(vst_window, "fst_ptr", vst_effect)) {
-			ERR_PRINT("cant set window local ptr");
-		}
-		if (window_parent) {
-			SetParent((HWND)vst_window, (HWND)window_parent);
-		}
-*/
-
-		vst_effect->get_user_interface_size(vst_w, vst_h);
-		vst_effect->open_user_interface(vst_window);
-		vst_effect->get_user_interface_size(vst_w, vst_h);
-
-		printf("xy: %i,%i\n", int(attributes.x), int(attributes.y));
-		resize_editor(attributes.x + 0, attributes.y + 0, attributes.x + vst_w, attributes.y + vst_h);
-		ShowWindow(vst_window, SW_SHOW);
-		set_size_request(vst_w, vst_h);
-		/*
-		printf("rect: %i,%i\n", vst_w, vst_h);
-		SetWindowPos((HWND)vst_window,
-				HWND_TOP ,
-				0, 0,
-				vst_w, vst_h,
-				SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-		ShowWindow(vst_window, SW_SHOWNA);
-		UpdateWindow(vst_window);
-
-		SetTimer(NULL, idle_timer_id, 50, (TIMERPROC)idle_hands);
-*/
-		effects.push_back(vst_effect);
-#endif
-#if 0
-		* /
-/*
-		WNDCLASSEX wcex{ sizeof(wcex) };
-		wcex.lpfnWndProc = DefWindowProc;
-		wcex.hInstance = GetModuleHandle(0);
-		wcex.lpszClassName = "Minimal VST host - Guest VST Window Frame";
-		RegisterClassEx(&wcex);
-
-		const auto style = WS_CAPTION | WS_THICKFRAME | WS_OVERLAPPEDWINDOW;
-		HWND editorHwnd = CreateWindow(
-				wcex.lpszClassName, "soso", style, 0, 0, vst_w, vst_h, hwnd, 0, 0, 0);
-		printf("hwnd is %p, new %p\n", hwnd, editorHwnd);
-
-		UpdateWindow(editorHwnd);
-		RECT rc;
-		rc.left = 0;
-		rc.right = vst_w;
-		rc.top = 0;
-		rc.bottom = vst_h;
-
-		//const auto style = GetWindowLongPtr(editorHwnd, GWL_STYLE);
-		const auto exStyle = GetWindowLongPtr(editorHwnd, GWL_EXSTYLE);
-		const BOOL fMenu = GetMenu(editorHwnd) != nullptr;
-		AdjustWindowRectEx(&rc, style, fMenu, exStyle);
-		MoveWindow(editorHwnd, 0, 0, vst_w, vst_h, TRUE);
-
-		vst_effect->open_user_interface(&editorHwnd);
-		ShowWindow(editorHwnd, SW_SHOW);
-		*/
-#endif
 }
 
 void EffectPlaceholderVST2::on_unrealize() {
 	//clear the window
 	if (m_refGdkWindow) {
-		printf("DESTROY\n");
 		//clear parenthood
 		SetWindowLongPtr(vst_window, GWLP_HWNDPARENT, (LONG_PTR)NULL);
 		//disconnect timer
@@ -244,7 +154,6 @@ void EffectPlaceholderVST2::on_unrealize() {
 		//Hide the Window
 		ShowWindow(vst_window, SW_HIDE);
 		prev_visible = false;
-		printf("unrealized dude\n");
 	}
 	m_refGdkWindow.reset();
 

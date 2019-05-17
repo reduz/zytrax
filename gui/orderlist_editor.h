@@ -74,9 +74,13 @@ protected:
 
 	void _v_scroll_changed();
 
+	int playback_order;
+
 public:
 	void set_vscroll(Glib::RefPtr<Gtk::Adjustment> p_v_scroll);
+	int get_cursor_order() const;
 
+	void set_playback_order(int p_order);
 	OrderlistEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);
 	~OrderlistEditor();
 };

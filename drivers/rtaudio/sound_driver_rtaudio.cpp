@@ -12,7 +12,7 @@ Vector<RtAudio *> rt_audios;
 class SoundDriverRTAudio : public SoundDriver {
 public:
 	RtAudio *rt_audio;
-	std::mutex mutex;
+	std::recursive_mutex mutex;
 	int device;
 	int mix_rate;
 	RtAudio::DeviceInfo info;
@@ -43,6 +43,11 @@ public:
 			unsigned int nFrames,
 			double streamTime,
 			RtAudioStreamStatus status) {
+
+		if (mutex.try_lock()) {
+			mix((AudioFrame *)outputBuffer, nFrames);
+			mutex.unlock();
+		}
 		return 0;
 	}
 

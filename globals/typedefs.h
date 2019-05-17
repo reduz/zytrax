@@ -110,6 +110,10 @@ typedef unsigned long long int64_t;
 #define ABS(m_v) ((m_v < 0) ? (-(m_v)) : (m_v))
 #endif
 
+#ifndef SIGN
+#define SIGN(m_v) ((m_v < 0) ? (-1) : (1))
+#endif
+
 #ifndef MIN
 #define MIN(m_a, m_b) (((m_a) < (m_b)) ? (m_a) : (m_b))
 #endif

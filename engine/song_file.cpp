@@ -1,4 +1,5 @@
 #include "song_file.h"
+#include "engine/sound_driver_manager.h"
 #include "json_file.h"
 
 class AudioEffectDummy : public AudioEffect {
@@ -10,8 +11,8 @@ public:
 	JSON::Node json;
 
 	virtual bool has_secondary_input() const { return false; }
-	virtual void process(const Event *p_events, int p_event_count, const Frame *p_in, Frame *p_out, bool p_prev_active) {}
-	virtual void process_with_secondary(const Event *p_events, int p_event_count, const Frame *p_in, const Frame *p_secondary, Frame *p_out, bool p_prev_active) {}
+	virtual void process(const Event *p_events, int p_event_count, const AudioFrame *p_in, AudioFrame *p_out, bool p_prev_active) {}
+	virtual void process_with_secondary(const Event *p_events, int p_event_count, const AudioFrame *p_in, const AudioFrame *p_secondary, AudioFrame *p_out, bool p_prev_active) {}
 
 	//info
 	virtual String get_name() const { return "DummyPlugin"; }
@@ -20,6 +21,9 @@ public:
 
 	virtual int get_control_port_count() const { return ports.size(); }
 	virtual ControlPort *get_control_port(int p_port) { return &ports[p_port]; }
+
+	virtual void set_process_block_size(int p_size) {}
+	virtual void set_sampling_rate(int p_hz) {}
 
 	virtual void reset() {}
 
@@ -72,6 +76,7 @@ Error SongFile::save(const String &p_path) {
 		track.add("volume", t->get_mix_volume_db());
 		track.add("muted", t->is_muted());
 		track.add("columns", t->get_column_count());
+		track.add("command_columns", t->get_command_column_count());
 
 		JSON::Node automations = JSON::array();
 
@@ -101,14 +106,13 @@ Error SongFile::save(const String &p_path) {
 
 			automation.add("effect_index", effect_idx);
 			automation.add("parameter", param_name.utf8().get_data());
-			String display_mode;
-			switch (a->get_display_mode()) {
-				case Automation::DISPLAY_ROWS: display_mode = "numbers"; break;
-				case Automation::DISPLAY_SMALL: display_mode = "envelope_small"; break;
-				case Automation::DISPLAY_LARGE: display_mode = "envelope_large"; break;
+			String edit_mode;
+			switch (a->get_edit_mode()) {
+				case Automation::EDIT_ROWS_DISCRETE: edit_mode = "discrete_numbers"; break;
+				case Automation::EDIT_ENVELOPE_SMALL: edit_mode = "envelope_small"; break;
+				case Automation::EDIT_ENVELOPE_LARGE: edit_mode = "envelope_large"; break;
 			}
-			automation.add("display_mode", display_mode.utf8().get_data());
-			automation.add("visible", a->is_visible());
+			automation.add("edit_mode", edit_mode.utf8().get_data());
 			automations.add(automation);
 		}
 		track.add("automations", automations);
@@ -121,6 +125,21 @@ Error SongFile::save(const String &p_path) {
 			effect.add("provider_id", fx->get_provider_id().utf8().get_data());
 			effect.add("id", fx->get_unique_id().utf8().get_data());
 			effect.add("skip", fx->is_skipped());
+
+			JSON::Node commands = JSON::object();
+			bool added_commands = false;
+			for (int k = 0; k < fx->get_control_port_count(); k++) {
+				char command = fx->get_control_port(k)->get_command();
+				if (command != 0) {
+					const char s[2] = { command, 0 };
+					commands.add(fx->get_control_port(k)->get_identifier().utf8().get_data(), s);
+					added_commands = true;
+				}
+			}
+			if (added_commands) {
+				effect.add("commands", commands);
+			}
+
 			effect.add("state", fx->to_json());
 			effects.add(effect);
 		}
@@ -204,6 +223,31 @@ Error SongFile::save(const String &p_path) {
 					track_valid = true;
 				}
 
+				int command_count = t->get_command_count(i);
+				if (command_count) {
+					JSON::Node commands = JSON::array();
+					for (int k = 0; k < command_count; k++) {
+
+						JSON::Node command = JSON::object();
+						Track::Pos p = t->get_command_pos_by_index(i, k);
+
+						command.add("tick", (int)p.tick);
+						command.add("column", p.column);
+
+						Track::Command n = t->get_command_by_index(i, k);
+
+						if (n.command != Track::Command::EMPTY) {
+							command.add("command", int(n.command));
+						}
+						//there is always parameter
+						command.add("parameter", n.parameter);
+
+						commands.add(command);
+					}
+					track.add("commands", commands);
+					track_valid = true;
+				}
+
 				bool automation_valid = false;
 				JSON::Node automations = JSON::array();
 				for (int k = 0; k < t->get_automation_count(); k++) {
@@ -256,11 +300,16 @@ Error SongFile::save(const String &p_path) {
 				config_not_default = true;
 			}
 
+			if (song->pattern_get_swing_beat_divisor(i) != Song::SWING_BEAT_DIVISOR_1) {
+				config_not_default = true;
+			}
+
 			if (pattern_valid || config_not_default) {
 				pattern.add("index", i);
 				pattern.add("tracks", tracks);
 				pattern.add("beats", song->pattern_get_beats(i));
 				pattern.add("beats_per_bar", song->pattern_get_beats_per_bar(i));
+				pattern.add("swing_divisor_index", song->pattern_get_swing_beat_divisor(i));
 				patterns.add(pattern);
 			}
 		}
@@ -334,6 +383,8 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 		t->set_muted(track.get("muted").toBool());
 		int columns = track.get("columns").toInt();
 		t->set_columns(MAX(1, columns));
+		int command_columns = track.get("command_columns").toInt();
+		t->set_command_columns(MAX(0, command_columns));
 
 		JSON::Node effects = track.get("effects");
 
@@ -384,7 +435,47 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 						dummy->ports.push_back(cpdefault);
 					}
 				}
+
+				if (effect.has("commands")) {
+					JSON::Node commands = effect.get("commands");
+
+					for (JSON::Node::iterator I = commands.begin(); I != commands.end(); I++) {
+						printf("ITERATION \n");
+						String name;
+						name.parse_utf8(I->first.c_str());
+						int exists = false;
+						for (int k = 0; k < dummy->ports.size(); k++) {
+							if (dummy->ports[i].name == name) {
+								exists = true;
+								break;
+							}
+						}
+
+						if (!exists) {
+							ControlPortDefault cpdefault;
+							cpdefault.identifier = name;
+							cpdefault.name = name;
+							dummy->ports.push_back(cpdefault);
+						}
+					}
+				}
 				fx = dummy;
+			}
+
+			if (effect.has("commands")) {
+				JSON::Node commands = effect.get("commands");
+
+				for (int k = 0; k < fx->get_control_port_count(); k++) {
+
+					std::string cpname = fx->get_control_port(k)->get_identifier().utf8().get_data();
+					if (commands.has(cpname)) {
+						std::string cs = commands.get(cpname).toString();
+						if (cs.length() >= 1) {
+							char c = cs[0];
+							fx->get_control_port(k)->set_command(c);
+						}
+					}
+				}
 			}
 
 			fx->set_skip(effect.get("skip").toBool());
@@ -417,17 +508,15 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 
 			Automation *a = new Automation(control_port, fx);
 
-			String display_mode;
-			display_mode.parse_utf8(automation.get("display_mode").toString().c_str());
-			if (display_mode == "envelope_large") {
-				a->set_display_mode(Automation::DISPLAY_LARGE);
-			} else if (display_mode == "envelope_small") {
-				a->set_display_mode(Automation::DISPLAY_SMALL);
+			String edit_mode;
+			edit_mode.parse_utf8(automation.get("edit_mode").toString().c_str());
+			if (edit_mode == "envelope_large") {
+				a->set_edit_mode(Automation::EDIT_ENVELOPE_LARGE);
+			} else if (edit_mode == "envelope_small") {
+				a->set_edit_mode(Automation::EDIT_ENVELOPE_SMALL);
 			} else {
-				a->set_display_mode(Automation::DISPLAY_ROWS);
+				a->set_edit_mode(Automation::EDIT_ROWS_DISCRETE);
 			}
-
-			a->set_visible(automation.get("visible").toBool());
 
 			t->add_automation(a);
 		}
@@ -455,11 +544,9 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 		}
 	}
 
-	printf("has patterns?\n");
 	if (node.has("patterns")) {
 		//patterns
 		JSON::Node patterns = node.get("patterns");
-		printf("pattern count: %i\n", patterns.getCount());
 
 		for (int i = 0; i < patterns.getCount(); i++) {
 
@@ -467,8 +554,6 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 
 			ERR_CONTINUE(!pattern.has("index"));
 			int index = pattern.get("index").toInt();
-
-			printf("pattern index: %i\n", index);
 
 			if (pattern.has("beats")) {
 				song->pattern_set_beats(index, pattern.get("beats").toInt());
@@ -478,25 +563,24 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 				song->pattern_set_beats_per_bar(index, pattern.get("beats_per_bar").toInt());
 			}
 
+			if (pattern.has("swing_divisor_index")) {
+				song->pattern_set_swing_beat_divisor(index, Song::SwingBeatDivisor(pattern.get("swing_divisor_index").toInt()));
+			}
+
 			JSON::Node tracks = pattern.get("tracks");
 
-			printf("track count: %i\n", tracks.getCount());
 			for (int j = 0; j < tracks.getCount(); j++) {
 
 				JSON::Node track = tracks.get(j);
 				int track_index = track.get("index").toInt();
-				printf("track index: %i\n", track_index);
 
 				ERR_CONTINUE(track_index < 0 || track_index >= song->get_track_count());
 
 				Track *t = song->get_track(track_index);
 
-				printf("has notes? %i\n", int(track.has("notes")));
-
 				if (track.has("notes")) {
 
 					JSON::Node notes = track.get("notes");
-					printf("note count %i\n", int(notes.getCount()));
 					for (int k = 0; k < notes.getCount(); k++) {
 
 						JSON::Node note = notes.get(k);
@@ -520,6 +604,30 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 						}
 
 						t->set_note(index, p, n);
+					}
+				}
+
+				if (track.has("commands")) {
+
+					JSON::Node commands = track.get("commands");
+					for (int k = 0; k < commands.getCount(); k++) {
+
+						JSON::Node command = commands.get(k);
+
+						Track::Pos p;
+						p.tick = command.get("tick").toInt();
+						p.column = command.get("column").toInt();
+
+						Track::Command c;
+						if (command.has("command")) {
+							c.command = command.get("command").toInt();
+						} else {
+							c.command = Track::Command::EMPTY;
+						}
+
+						c.parameter = command.get("parameter").toInt();
+
+						t->set_command(index, p, c);
 					}
 				}
 
@@ -554,6 +662,106 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 			}
 		}
 	}
+
+	song->update_process_order();
+
+	return OK;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+Error SongFile::export_wav(const String &p_path, int p_export_hz, ExportWavPatternCallback p_callback, void *p_userdata) {
+
+#ifdef WINDOWS_ENABLED
+	FILE *f = _wfopen(p_path.c_str(), L"wb");
+#else
+	FILE *f = fopen(p_path.utf8().get_data(), "wb");
+#endif
+
+	if (!f) {
+		return ERR_CANT_OPEN;
+	}
+
+	fwrite("RIFF", 4, 1, f);
+	uint32_t total_size = 4 /* WAVE */ + 8 /* fmt+size */ + 16 /* format */ + 8 /* data+size */;
+	fwrite(&total_size, 4, 1, f);
+	fwrite("WAVE", 4, 1, f);
+	fwrite("fmt ", 4, 1, f);
+
+	uint32_t format = 16;
+	fwrite(&format, 4, 1, f);
+
+	uint16_t compression = 1; //standard pcm
+	fwrite(&compression, 2, 1, f);
+	uint16_t channels = 2; //stereo
+	fwrite(&channels, 2, 1, f);
+
+	uint32_t sampling_rate = p_export_hz;
+	fwrite(&sampling_rate, 4, 1, f);
+
+	uint16_t bits_per_sample = 32;
+	uint16_t blockalign = bits_per_sample / 8 * (2);
+	uint32_t bytes_per_sec = sampling_rate * blockalign;
+
+	fwrite(&bytes_per_sec, 4, 1, f);
+	fwrite(&blockalign, 2, 1, f);
+	fwrite(&bits_per_sample, 2, 1, f);
+
+	fwrite("data", 4, 1, f);
+	uint32_t data_size = 0;
+	fwrite(&data_size, 4, 1, f);
+
+	uint32_t data_from = ftell(f);
+
+	//begin save data
+	SoundDriverManager::lock_driver();
+
+	uint32_t block_size = 64;
+	AudioFrame *block = new AudioFrame[block_size];
+	song->set_sampling_rate(sampling_rate);
+	song->set_process_buffer_size(block_size);
+
+	song->play(0, 0, false);
+	int current_order = -1;
+	while (song->is_playing()) {
+		song->process_audio(block, block_size);
+		for (int i = 0; i < block_size; i++) {
+			int32_t l = int32_t(CLAMP(double(block[i].l), -1.0, 1.0) * double(2147483647.0));
+			int32_t r = int32_t(CLAMP(double(block[i].r), -1.0, 1.0) * double(2147483647.0));
+
+			fwrite(&l, 4, 1, f);
+			fwrite(&r, 4, 1, f);
+		}
+		int order = song->get_playing_order();
+		if (current_order != order) {
+			current_order = order;
+			printf("order: %i\n", current_order);
+			if (p_callback) {
+				p_callback(current_order, p_userdata);
+			}
+		}
+	}
+	song->stop();
+
+	delete[] block;
+	//restore
+	song->set_sampling_rate(SoundDriverManager::get_mix_frequency_hz(SoundDriverManager::get_mix_frequency()));
+	song->set_process_buffer_size(SoundDriverManager::get_buffer_size_frames(SoundDriverManager::get_step_buffer_size()));
+
+	SoundDriverManager::unlock_driver();
+
+	//end save data
+
+	data_size = ftell(f) - data_from;
+
+	fseek(f, 4, SEEK_SET);
+	total_size += data_size;
+	fwrite(&total_size, 4, 1, f);
+
+	fseek(f, 0x28, SEEK_SET);
+	fwrite(&data_size, 4, 1, f);
+
+	fclose(f);
 
 	return OK;
 }

@@ -40,9 +40,6 @@ int AddEffectDialog::get_selected_effect_index() {
 void AddEffectDialog::update_effect_list() {
 
 	list_store->clear();
-	printf("factory: %p\n", fx_factory);
-
-	printf("effect count: %i\n", fx_factory->get_audio_effect_count());
 
 	for (int i = 0; i < fx_factory->get_audio_effect_count(); i++) {
 

@@ -713,6 +713,10 @@ static int parse_utf8_char(const char *p_utf8, unsigned int *p_ucs4, int p_left)
 
 bool String::parse_utf8(const char *p_utf8) {
 
+	if (!p_utf8) {
+		free_shared();
+		return false;
+	}
 	String aux;
 
 	int cstr_size = 0;

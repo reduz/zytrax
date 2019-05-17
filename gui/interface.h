@@ -5,6 +5,7 @@
 #include "engine/song_file.h"
 #include "gui/add_effect_dialog.h"
 #include "gui/effect_editor.h"
+#include "gui/master_vu.h"
 #include "gui/orderlist_editor.h"
 #include "gui/pattern_editor.h"
 #include "gui/settings_dialog.h"
@@ -69,6 +70,7 @@ private:
 	Glib::RefPtr<Gio::Menu> menu;
 	Glib::RefPtr<Gio::Menu> file_menu;
 	Glib::RefPtr<Gio::Menu> file_menu_file;
+	Glib::RefPtr<Gio::Menu> file_menu_export;
 	Glib::RefPtr<Gio::Menu> file_menu_exit;
 
 	Glib::RefPtr<Gio::Menu> play_menu;
@@ -81,21 +83,6 @@ private:
 	Glib::RefPtr<Gio::Menu> edit_menu_info;
 	Glib::RefPtr<Gio::Menu> edit_menu_undo;
 	Glib::RefPtr<Gio::Menu> edit_menu_focus;
-
-	Glib::RefPtr<Gio::Menu> track_menu;
-	Glib::RefPtr<Gio::Menu> track_menu_add;
-	Glib::RefPtr<Gio::Menu> track_menu_column;
-	Glib::RefPtr<Gio::Menu> track_menu_solo;
-	Glib::RefPtr<Gio::Menu> track_menu_edit;
-	Glib::RefPtr<Gio::Menu> track_menu_remove;
-
-	Glib::RefPtr<Gio::SimpleAction> automation_action;
-	Glib::RefPtr<Gio::Menu> automation_menu;
-	Glib::RefPtr<Gio::MenuItem> automation_menu_item;
-	Glib::RefPtr<Gio::Menu> automation_menu_visible;
-	Glib::RefPtr<Gio::Menu> automation_menu_mode;
-	Glib::RefPtr<Gio::Menu> automation_menu_move;
-	Glib::RefPtr<Gio::Menu> automation_menu_remove;
 
 	Glib::RefPtr<Gio::Menu> select_menu;
 	Glib::RefPtr<Gio::Menu> select_menu_select;
@@ -223,6 +210,9 @@ private:
 	void _on_effect_request_editor(int p_track, int p_effect);
 	void _update_editor_automations_for_effect(AudioEffect *p_effect);
 	void _on_toggle_automation_visibility(Track *p_track, AudioEffect *p_effect, int p_automation, bool p_visible);
+	void _on_select_automation_command(Track *p_track, AudioEffect *p_effect, int p_automation, int p_command);
+
+	void _on_track_volume_changed(int p_track, float p_volume_db);
 
 	enum {
 		MAX_EFFECT_EDITOR_PLUGINS = 1024
@@ -239,8 +229,13 @@ private:
 	Gtk::SpinButton pattern_settings_length;
 	Gtk::SpinButton bar_length;
 	Gtk::SpinButton change_next;
+	Gtk::ComboBox change_swing;
 	Gtk::Label pattern_settings_length_label;
 	Gtk::Label bar_length_label;
+	Gtk::Label change_swing_label;
+	Vector<Gtk::TreeModel::Row> swing_rows;
+	Glib::RefPtr<Gtk::ListStore> change_swing_store;
+	Vector<Gtk::TreeModel::Row> change_swing_rows;
 	Gtk::Label change_next_label;
 	Gtk::Button pattern_settings_change_button;
 
@@ -251,6 +246,29 @@ private:
 	static void _undo_redo_action(const String &p_name, void *p_userdata);
 
 	bool _close_request(GdkEventAny *event);
+
+	static void _process_audio(AudioFrame *p_frames, int p_amount);
+
+	void _update_song_process_order();
+
+	static Interface *singleton;
+
+	void _update_song_mixing_parameters();
+
+	bool playback_cursor_follow;
+	sigc::connection playback_timer;
+	bool _playback_timer_callback();
+
+	MasterVU main_vu;
+	void _on_main_volume_db_changed(float p_db);
+	void _on_song_step_buffer_changed();
+	void _on_song_mix_rate_changed();
+
+	bool _export_dialog_key(GdkEvent *p_key);
+	static void _export_dialog_callback(int p_order, void *p_userdata);
+
+	Gtk::Label export_wav_label;
+	String last_wav_export_path;
 
 public:
 	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);

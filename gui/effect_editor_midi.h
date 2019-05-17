@@ -25,9 +25,11 @@ class EffectEditorMIDI : public Gtk::Notebook {
 
 	CCModelColumns cc_model_columns;
 	Gtk::VBox cc_vbox;
-	Gtk::HBox midi_channel_hb;
+	Gtk::Grid midi_grid;
 	Gtk::Label midi_channel_label;
 	Gtk::SpinButton midi_channel_spinbox;
+	Gtk::Label midi_pitch_bend_range_label;
+	Gtk::SpinButton midi_pitch_bend_range_spinbox;
 	Gtk::VSeparator cc_separator;
 	Glib::RefPtr<Gtk::ListStore> cc_list_store;
 	Glib::RefPtr<Gtk::TreeSelection> cc_tree_selection;
@@ -60,6 +62,7 @@ class EffectEditorMIDI : public Gtk::Notebook {
 
 	void _cc_toggled(const Glib::ustring &path);
 	void _midi_channel_changed();
+	void _midi_pitch_bend_range_changed();
 	void _macro_edited(const Glib::ustring &path, const Glib::ustring &text);
 
 	String _get_text_from_hex(const Vector<uint8_t> &p_hex);

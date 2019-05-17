@@ -11,11 +11,11 @@ String AudioEffectProvider::get_scan_path(int p_index) {
 	return scan_paths[p_index];
 }
 
-void ControlPort::set_normalized(float p_val, bool p_make_initial) {
+void ControlPort::set_normalized(float p_val) {
 
 	p_val *= get_max() - get_min();
 	p_val += get_min();
-	set(p_val, p_make_initial);
+	set(p_val);
 }
 
 float ControlPort::get_normalized() const {
@@ -36,9 +36,28 @@ ControlPort::Hint ControlPort::get_hint() const {
 	return HINT_RANGE;
 }
 
+void ControlPort::ui_changed_notify() {
+	if (changed_callback) {
+		changed_callback(changed_userdata);
+	}
+}
+void ControlPort::set_ui_changed_callback(UIChangedCallback p_callback, void *p_userdata) {
+	changed_callback = p_callback;
+	changed_userdata = p_userdata;
+}
 ControlPort::ControlPort() {
+	changed_callback = NULL;
+	changed_userdata = NULL;
+	command = 0;
 }
 ControlPort::~ControlPort() {
+}
+
+void ControlPort::set_command(char p_command) {
+	command = p_command;
+}
+char ControlPort::get_command() const {
+	return command;
 }
 
 void AudioEffect::set_skip(bool p_skip) {
@@ -88,6 +107,7 @@ void AudioEffectFactory::add_provider(AudioEffectProvider *p_provider) {
 }
 
 void AudioEffectFactory::rescan_effects(AudioEffectProvider::ScanCallback p_callback, void *p_userdata) {
+
 	audio_effects.clear();
 	for (int i = 0; i < providers.size(); i++) {
 		providers[i]->scan_effects(this, p_callback, p_userdata);
