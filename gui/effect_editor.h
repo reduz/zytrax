@@ -79,6 +79,16 @@ class EffectEditor : public Gtk::Window {
 	//because GTK is horrible
 	sigc::connection menu_timer;
 
+	//hide on escape
+	virtual bool on_key_press_event(GdkEventKey *key_event) {
+
+		if (key_event->keyval == GDK_KEY_Escape) {
+			hide();
+		}
+
+		return false;
+	}
+
 public:
 	sigc::signal4<void, Track *, AudioEffect *, int, bool> toggle_automation_visibility;
 	sigc::signal4<void, Track *, AudioEffect *, int, int> select_automation_command;

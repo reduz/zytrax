@@ -35,10 +35,8 @@ public:
 struct AudioEffectInfo {
 
 	String caption; ///< Caption of the Node (for node browser menu)
-	String short_caption; ///< Short Caption of the Node (for audio graph)
 	String description; ///< Short description of the node (for node browser / node info )
 	String author; ///< plugin author
-	String long_description; ///< Long description of the node (for node browser / node info )
 	String unique_ID; ///< Unique String ID of node (so it is reconizable when saving)
 	String provider_caption;
 	String category; ///< String to categorize this node (for node browser)
@@ -46,8 +44,15 @@ struct AudioEffectInfo {
 	String version;
 	bool synth;
 	bool has_ui;
+	bool internal;
 	String provider_id;
 	String path;
+
+	AudioEffectInfo() {
+		has_ui = false;
+		synth = false;
+		internal = false;
+	}
 };
 
 struct PortRangeHint {
@@ -67,7 +72,8 @@ private:
 public:
 	enum Hint {
 
-		HINT_RANGE, ///< just a range (Default)
+		HINT_RANGE, ///< just a range, trust min and max
+		HINT_RANGE_NORMALIZED, // just a range, but min and max are normalized, so ask text somewhere else
 		HINT_TOGGLE, ///< valid values 0.0f , 1.0f
 		HINT_ENUM, ///< asking integer values to get_Value_as_text will return them
 	};
@@ -158,6 +164,7 @@ public:
 	Hint hint;
 	bool visible;
 	bool was_set;
+	Vector<String> enum_values;
 
 	virtual String get_name() const { return name; }
 	virtual String get_identifier() const { return identifier; }
@@ -174,6 +181,25 @@ public:
 
 	virtual Hint get_hint() const { return hint; }
 	virtual bool is_visible() const { return visible; }
+
+	virtual String get_value_as_text() const {
+		if (hint == HINT_RANGE || hint == HINT_RANGE_NORMALIZED) {
+			return String::num(value);
+		} else if (hint == HINT_ENUM) {
+			int v = int(value);
+			if (v >= 0 && v < enum_values.size()) {
+				return enum_values[v];
+			} else {
+				String::num(v);
+			}
+		} else {
+			if (value > 0.5) {
+				return "Enabled";
+			} else {
+				return "Disabled";
+			}
+		}
+	}
 
 	ControlPortDefault() {
 		value = 0;

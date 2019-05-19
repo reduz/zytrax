@@ -49,6 +49,8 @@ private:
 		bool setting;
 		bool editing;
 
+		virtual Hint get_hint() const { return HINT_RANGE_NORMALIZED; }
+
 		virtual String get_name() const { return name; }
 		virtual String get_identifier() const { return identifier; }
 		virtual float get_min() const { return 0; }

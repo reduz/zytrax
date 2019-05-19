@@ -128,7 +128,9 @@ void UndoRedo::clean() {
 	for (int i = 0; i < group_list.size(); i++) {
 		_delete_group(group_list[i], false, true);
 	}
+	group_list.clear();
 	current_group = 0;
+	group_rc = 0;
 }
 
 void UndoRedo::set_action_callback(ActionCallback p_action_callback, void *p_action_callback_userdata) {

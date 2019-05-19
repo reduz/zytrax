@@ -362,7 +362,6 @@ void SettingsDialog::_save_plugins() {
 			const AudioEffectInfo *info = fx_factory->get_audio_effect(i);
 
 			plugin_node.add("caption", info->caption.utf8().get_data());
-			plugin_node.add("short_caption", info->short_caption.utf8().get_data());
 			plugin_node.add("description", info->description.utf8().get_data());
 			plugin_node.add("author", info->author.utf8().get_data());
 			plugin_node.add("category", info->category.utf8().get_data());

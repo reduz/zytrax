@@ -1,4 +1,5 @@
 #include "interface.h"
+#include "effect_editor_default.h"
 #include "icons.h"
 
 void Interface::_add_track() {
@@ -974,6 +975,14 @@ void Interface::_on_effect_request_editor(int p_track, int p_effect) {
 		effect_editor->select_automation_command.connect(sigc::mem_fun(*this, &Interface::_on_select_automation_command));
 
 		active_effect_editors[effect] = effect_editor;
+
+		effect_editor->set_title(effect->get_name().utf8().get_data());
+
+		//nope, dont do it
+		//effect_editor->set_transient_for(*this);
+		effect_editor->set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+	} else {
+		active_effect_editors[effect]->hide();
 	}
 
 	active_effect_editors[effect]->show();
@@ -1571,6 +1580,8 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	playback_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &Interface::_playback_timer_callback),
 			10, Glib::PRIORITY_DEFAULT);
+
+	add_editor_plugin_function(&create_default_editor_func);
 }
 
 Interface::~Interface() {

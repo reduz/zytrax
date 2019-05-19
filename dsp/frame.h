@@ -3,6 +3,19 @@
 
 #include "typedefs.h"
 
+static inline float undenormalise(volatile float f) {
+	union {
+		uint32_t i;
+		float f;
+	} v;
+
+	v.f = f;
+
+	// original: return (v.i & 0x7f800000) == 0 ? 0.0f : f;
+	// version from Tim Blechmann:
+	return (v.i & 0x7f800000) < 0x08000000 ? 0.0f : f;
+}
+
 struct AudioFrame {
 
 	float l, r;
@@ -60,6 +73,11 @@ struct AudioFrame {
 	_FORCE_INLINE_ AudioFrame(const AudioFrame &p_frame) {
 		l = p_frame.l;
 		r = p_frame.r;
+	}
+
+	_FORCE_INLINE_ void undenormalise() {
+		l = ::undenormalise(l);
+		r = ::undenormalise(r);
 	}
 	_FORCE_INLINE_ AudioFrame() {}
 };

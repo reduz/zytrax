@@ -4,6 +4,7 @@
 #include "drivers/vst2/factory_wrapper_vst2.h"
 #endif
 
+#include "effects/effects.h"
 #include "engine/song.h"
 #include "globals/json_file.h"
 #include "gui/interface.h"
@@ -155,9 +156,10 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
-
 		SoundDriverManager::init_driver(use_driver_index);
 	}
+
+	register_effects(&effect_factory);
 
 	/* make it dark */
 	if (theme.color_scheme == Theme::COLOR_SCHEME_DARK) {
@@ -183,7 +185,6 @@ int main(int argc, char *argv[]) {
 				AudioEffectInfo info;
 
 				info.caption.parse_utf8(plugin_node.get("caption").toString().c_str());
-				info.short_caption.parse_utf8(plugin_node.get("short_caption").toString().c_str());
 				info.description.parse_utf8(plugin_node.get("description").toString().c_str());
 				info.author.parse_utf8(plugin_node.get("author").toString().c_str());
 				info.category.parse_utf8(plugin_node.get("category").toString().c_str());

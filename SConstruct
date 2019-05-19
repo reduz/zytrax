@@ -96,6 +96,7 @@ SConscript('globals/SCsub');
 SConscript('dsp/SCsub');
 SConscript('engine/SCsub');
 SConscript('gui/SCsub');
+SConscript('effects/SCsub');
 SConscript('drivers/SCsub');
 SConscript('bin/SCsub');
 

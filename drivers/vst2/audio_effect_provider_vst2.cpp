@@ -93,8 +93,7 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 				name = name.substr(0, name.find("."));
 				info.caption = name;
 				printf("plugin name: %s\n", info.caption.utf8().get_data());
-				info.description = "VST Plugin";
-				info.long_description = "VST Info:\n Name: " + info.caption + "\n ID: " + String::num(ptrPlug->uniqueID) + "\n Version: " + String(ptrPlug->version);
+				info.description = "VST Info:\n Name: " + info.caption + "\n ID: " + String::num(ptrPlug->uniqueID) + "\n Version: " + String(ptrPlug->version);
 				info.unique_ID = "VST_" + String::num(ptrPlug->uniqueID);
 				info.synth = /*(ptrPlug->dispatcher(ptrPlug,effGetVstVersion,0,0,NULL,0.0f)==2  */ ptrPlug->flags & effFlagsIsSynth;
 				info.category = info.synth ? "VST Instruments" : "VST Effects";

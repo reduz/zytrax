@@ -10,3 +10,5 @@ drivers/rtaudio/rtaudio
 drivers/lv2
 drivers/vst2/vst
 drivers/vst2
+effects/internal
+effects

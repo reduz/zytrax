@@ -274,7 +274,6 @@ public:
 	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);
 
 	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings);
-
 	~Interface();
 };
 

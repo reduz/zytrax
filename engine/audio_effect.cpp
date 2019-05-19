@@ -108,7 +108,14 @@ void AudioEffectFactory::add_provider(AudioEffectProvider *p_provider) {
 
 void AudioEffectFactory::rescan_effects(AudioEffectProvider::ScanCallback p_callback, void *p_userdata) {
 
-	audio_effects.clear();
+	//remove non internal effects
+	for (int i = 0; i < audio_effects.size(); i++) {
+		if (!audio_effects[i].internal) {
+			audio_effects.remove(i);
+			i--;
+		}
+	}
+	//audio_effects.clear();
 	for (int i = 0; i < providers.size(); i++) {
 		providers[i]->scan_effects(this, p_callback, p_userdata);
 	}
