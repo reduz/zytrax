@@ -9,4 +9,8 @@ if (env["enable_rtaudio"]):
 	env.add_sources(targets,"rtaudio/*.cpp")
 	env.add_sources(targets,"rtaudio/rtaudio/*.cpp")
 
+if (env["enable_rtmidi"]):
+	env.add_sources(targets,"rtmidi/*.cpp")
+	env.add_sources(targets,"rtmidi/rtmidi/*.cpp")
+
 env.libs+=env.Library('drivers', targets);

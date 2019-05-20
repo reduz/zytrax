@@ -981,6 +981,8 @@ void Interface::_on_effect_request_editor(int p_track, int p_effect) {
 		//nope, dont do it
 		//effect_editor->set_transient_for(*this);
 		effect_editor->set_position(Gtk::WIN_POS_CENTER_ALWAYS);
+
+		effect_editor->signal_focus_in_event().connect(sigc::bind<Track *>(sigc::mem_fun(*this, &Interface::_on_editor_window_gained_focus), track));
 	} else {
 		active_effect_editors[effect]->hide();
 	}
@@ -1254,6 +1256,36 @@ void Interface::_process_audio(AudioFrame *p_frames, int p_amount) {
 	singleton->song.process_audio(p_frames, p_amount);
 }
 
+void Interface::_process_midi(double p_delta, const MIDIEvent &p_event) {
+	AudioEffect::Event ev;
+	switch (p_event.type) {
+		case MIDIEvent::MIDI_NOTE_ON: {
+			ev.type = AudioEffect::Event::TYPE_NOTE;
+			ev.param8 = p_event.note.note;
+			ev.paramf = p_event.note.velocity / 127.0;
+
+		} break;
+		case MIDIEvent::MIDI_NOTE_OFF: {
+			ev.type = AudioEffect::Event::TYPE_NOTE_OFF;
+			ev.param8 = p_event.note.note;
+			ev.paramf = p_event.note.velocity / 127.0;
+
+		} break;
+		case MIDIEvent::MIDI_NOTE_PRESSURE: {
+			ev.type = AudioEffect::Event::TYPE_AFTERTOUCH;
+			ev.param8 = p_event.note.note;
+			ev.paramf = p_event.note.velocity / 127.0;
+
+		} break;
+		default: {
+			return;
+		}
+	}
+
+	ev.offset = 0;
+	singleton->song.play_single_event(singleton->pattern_editor.get_current_track(), ev);
+}
+
 Interface *Interface::singleton = NULL;
 
 bool Interface::_playback_timer_callback() {
@@ -1302,6 +1334,17 @@ void Interface::_on_song_mix_rate_changed() {
 void Interface::_update_song_mixing_parameters() {
 	song.set_sampling_rate(SoundDriverManager::get_mix_frequency_hz(SoundDriverManager::get_mix_frequency()));
 	song.set_process_buffer_size(SoundDriverManager::get_buffer_size_frames(SoundDriverManager::get_step_buffer_size()));
+}
+
+bool Interface::_on_editor_window_gained_focus(GdkEventFocus *, Track *p_track) {
+	for (int i = 0; i < song.get_track_count(); i++) {
+		if (song.get_track(i) == p_track) {
+			pattern_editor.set_focus_on_track(i);
+			return false;
+		}
+	}
+
+	return false;
 }
 Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings) :
 		add_effect_dialog(p_fx_factory),
@@ -1577,6 +1620,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	//setup song
 	_update_song_mixing_parameters();
 	SoundDriverManager::set_mix_callback(_process_audio);
+	MIDIDriverManager::set_event_callback(_process_midi);
 
 	playback_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &Interface::_playback_timer_callback),
 			10, Glib::PRIORITY_DEFAULT);

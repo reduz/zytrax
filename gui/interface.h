@@ -248,6 +248,7 @@ private:
 	bool _close_request(GdkEventAny *event);
 
 	static void _process_audio(AudioFrame *p_frames, int p_amount);
+	static void _process_midi(double p_delta, const MIDIEvent &p_event);
 
 	void _update_song_process_order();
 
@@ -269,6 +270,8 @@ private:
 
 	Gtk::Label export_wav_label;
 	String last_wav_export_path;
+
+	bool _on_editor_window_gained_focus(GdkEventFocus *, Track *p_track);
 
 public:
 	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);

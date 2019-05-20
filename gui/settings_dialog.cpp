@@ -239,6 +239,22 @@ void SettingsDialog::_driver_changed() {
 		}
 	}
 }
+
+void SettingsDialog::_midi_input_driver_changed() {
+
+	Gtk::TreeModel::iterator iter = midi_input_driver_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[model_columns.index];
+
+			MIDIDriverManager::init_input_driver(id);
+			_save_settings();
+		}
+	}
+}
 void SettingsDialog::_driver_freq_changed() {
 
 	Gtk::TreeModel::iterator iter = frequency_combo.get_active();
@@ -554,10 +570,19 @@ void SettingsDialog::_save_settings() {
 			}
 		}
 
+		std::string midi_driver_id;
+		if (MIDIDriverManager::get_current_input_driver_index() >= 0) {
+			MIDIInputDriver *driver = MIDIDriverManager::get_input_driver(MIDIDriverManager::get_current_input_driver_index());
+			if (driver) {
+				midi_driver_id = driver->get_id().utf8().get_data();
+			}
+		}
+
 		audio_node.add("id", driver_id);
 		audio_node.add("mixing_hz", SoundDriverManager::get_mix_frequency());
 		audio_node.add("buffer_size", SoundDriverManager::get_buffer_size());
 		audio_node.add("block_size", SoundDriverManager::get_step_buffer_size());
+		audio_node.add("midi_in_id", midi_driver_id);
 
 		node.add("audio", audio_node);
 	}
@@ -730,6 +755,29 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	theme = p_theme;
 	{
 
+		midi_input_driver_list_store = Gtk::ListStore::create(model_columns);
+		midi_input_driver_combo.set_model(midi_input_driver_list_store);
+
+		for (int i = 0; i < MIDIDriverManager::get_input_driver_count(); i++) {
+			MIDIInputDriver *midi_input_driver = MIDIDriverManager::get_input_driver(i);
+
+			Gtk::TreeModel::Row row = *(midi_input_driver_list_store->append());
+			row[model_columns.name] = midi_input_driver->get_name().utf8().get_data();
+			row[model_columns.index] = i;
+			midi_input_driver_rows.push_back(row);
+		}
+
+		midi_input_driver_combo.pack_start(model_columns.name);
+
+		int active_index = MIDIDriverManager::get_current_input_driver_index();
+		if (active_index >= 0) {
+			midi_input_driver_combo.set_active(midi_input_driver_rows[active_index]);
+		}
+	}
+	midi_input_driver_combo.signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::_midi_input_driver_changed));
+
+	{
+
 		driver_list_store = Gtk::ListStore::create(model_columns);
 		driver_combo.set_model(driver_list_store);
 
@@ -858,6 +906,12 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	sound_settings_grid.attach(step_label, 0, 3, 1, 1);
 	step_combo.set_hexpand(true);
 	sound_settings_grid.attach(step_combo, 1, 3, 1, 1);
+
+	midi_input_driver_label.set_text("MIDI-In Driver: ");
+	midi_input_driver_label.set_hexpand(true);
+	sound_settings_grid.attach(midi_input_driver_label, 0, 4, 1, 1);
+	midi_input_driver_combo.set_hexpand(true);
+	sound_settings_grid.attach(midi_input_driver_combo, 1, 4, 1, 1);
 
 	sound_settings_grid.set_margin_left(8);
 	sound_settings_grid.set_margin_right(8);

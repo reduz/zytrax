@@ -15,7 +15,7 @@ void AudioEffectNotePuncher::process_with_secondary(const Event *p_events, int p
 
 	int attack_samples = (control_ports[CONTROL_PORT_ATTACK_MS].value / 1000.0) * sampling_rate;
 	int decay_samples = (control_ports[CONTROL_PORT_DECAY_MS].value / 1000.0) * sampling_rate;
-	float amplify = db2linear(control_ports[CONTROL_PORT_PUNCH_DB].value);
+	float amplify_db = control_ports[CONTROL_PORT_PUNCH_DB].value;
 
 	//check notes
 	for (int i = 0; i < p_event_count; i++) {
@@ -57,7 +57,9 @@ void AudioEffectNotePuncher::process_with_secondary(const Event *p_events, int p
 				}
 			}
 
-			amp *= amplify;
+			amp = db2linear(amplify_db * amp);
+
+			//printf("%i att %i dec %i - %f\n", punches[j].time, attack_samples, decay_samples, amp);
 
 			envelope[i] = MAX(envelope[i], amp);
 			punches[j].time++;

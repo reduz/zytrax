@@ -1,6 +1,8 @@
 #ifndef MIDI_EVENT_H
 #define MIDI_EVENT_H
 
+#include "globals/error_list.h"
+
 struct MIDIEvent {
 public:
 	enum CC { //enum of those supported, use cc_indices to get actual number
@@ -139,6 +141,7 @@ public:
 		} scale;
 	};
 
+	Error parse(unsigned char *p_raw);
 	MIDIEvent();
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned char data1, unsigned char data2);
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned short data);

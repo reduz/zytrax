@@ -256,6 +256,7 @@ public:
 
 	void redraw_and_validate_cursor();
 
+	void set_focus_on_track(int p_track);
 	void initialize_menus();
 
 	PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);

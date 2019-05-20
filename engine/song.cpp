@@ -111,6 +111,12 @@ void Song::_process_audio_step() {
 		playback.range.active = false;
 	}
 
+	for (int i = 0; i < playback.single_event_count; i++) {
+		ERR_CONTINUE(playback.single_event[i].track < 0 || playback.single_event[i].track >= tracks.size());
+		tracks[playback.single_event[i].track]->add_single_event(playback.single_event[i].event);
+	}
+	playback.single_event_count = 0;
+
 	//process audio in track-order
 	ERR_FAIL_COND(track_process_order.size() != tracks.size());
 
@@ -706,6 +712,18 @@ void Song::play_event_range(int p_pattern, int p_from_column, int p_to_column, T
 	playback.range.to_column = p_to_column;
 	playback.range.to_tick = p_to_tick;
 }
+void Song::play_single_event(int p_track, const AudioEffect::Event &p_event) {
+	_AUDIO_LOCK_
+	if (playback.single_event_count == SINGLE_EVENT_MAX) {
+		return;
+	}
+	if (p_track < 0 || p_track >= tracks.size()) {
+		return;
+	}
+	playback.single_event[playback.single_event_count].event = p_event;
+	playback.single_event[playback.single_event_count].track = p_track;
+	playback.single_event_count++;
+}
 void Song::stop() {
 	_AUDIO_LOCK_
 
@@ -852,7 +870,9 @@ Song::Song() {
 	playback.prev_volume = 1.0;
 	playback.range.active = false;
 	playback.can_loop = true;
+	playback.single_event_count = 0;
 	main_volume_db = -12;
 	peak_volume_l = 0;
 	peak_volume_r = 0;
+	playback.single_event_count = 0;
 }

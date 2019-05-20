@@ -968,6 +968,14 @@ Tick Track::_get_swinged_tick(Tick p_tick, int p_swing_divisor, float p_swing) {
 
 	return tick_frac + tick_debased;
 }
+void Track::add_single_event(const AudioEffect::Event &p_event) {
+
+	if (event_buffer_size == EVENT_BUFFER_MAX) {
+		return;
+	}
+	event_buffer[event_buffer_size] = p_event;
+	event_buffer_size++;
+}
 void Track::process_events(int p_pattern, Tick p_offset, Tick p_from_tick, Tick p_to_tick, int p_bpm, int p_swing_divisor, float p_swing, int p_from, int p_to) {
 
 	if (event_buffer_size == EVENT_BUFFER_MAX) {

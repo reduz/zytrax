@@ -12,3 +12,5 @@ drivers/vst2/vst
 drivers/vst2
 effects/internal
 effects
+drivers/rtmidi/rtmidi
+drivers/rtmidi

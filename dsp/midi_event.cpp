@@ -83,6 +83,48 @@ const unsigned char MIDIEvent::cc_indices[CC_MAX]{
 	128
 };
 
+Error MIDIEvent::parse(unsigned char *p_raw) {
+
+	switch (p_raw[0] >> 4) {
+		case 0x8: {
+			type = MIDI_NOTE_OFF;
+			note.note = p_raw[1];
+			note.velocity = p_raw[2];
+		} break;
+		case 0x9: {
+			type = MIDI_NOTE_ON;
+			note.note = p_raw[1];
+			note.velocity = p_raw[2];
+		} break;
+		case 0xA: {
+			type = MIDI_NOTE_PRESSURE;
+			note.note = p_raw[1];
+			note.velocity = p_raw[2];
+		} break;
+		case 0xB: {
+			type = MIDI_CONTROLLER;
+			control.index = p_raw[1];
+			control.parameter = p_raw[2];
+		} break;
+		case 0xC: {
+			type = MIDI_PATCH_SELECT;
+			patch.index = p_raw[1];
+		} break;
+		case 0xD: {
+			type = MIDI_AFTERTOUCH;
+			aftertouch.pressure = p_raw[1];
+		} break;
+		case 0xE: {
+			type = MIDI_PITCH_BEND;
+			pitch_bend.bend = (short(p_raw[1]) << 7) | short(p_raw[2]);
+		} break;
+		default: {
+			return ERR_INVALID_PARAMETER;
+		}
+	}
+	channel = p_raw[0] & 0xF;
+	return OK;
+}
 MIDIEvent::MIDIEvent() {
 	type = NONE;
 	raw.param1 = 0;

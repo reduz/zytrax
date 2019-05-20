@@ -2,6 +2,7 @@
 #define SETTINGS_DIALOG_H
 
 #include "engine/audio_effect.h"
+#include "engine/midi_driver_manager.h"
 #include "engine/sound_driver_manager.h"
 #include "gui/color_theme.h"
 #include "gui/key_bindings.h"
@@ -74,6 +75,9 @@ class SettingsDialog : public Gtk::MessageDialog {
 
 	ModelColumns model_columns;
 
+	Glib::RefPtr<Gtk::ListStore> midi_input_driver_list_store;
+	Vector<Gtk::TreeModel::Row> midi_input_driver_rows;
+
 	Glib::RefPtr<Gtk::ListStore> driver_list_store;
 	Vector<Gtk::TreeModel::Row> driver_rows;
 
@@ -91,6 +95,8 @@ class SettingsDialog : public Gtk::MessageDialog {
 	Gtk::Frame sound_settings_frame;
 	Gtk::Grid sound_settings_grid;
 
+	Gtk::ComboBox midi_input_driver_combo;
+	Gtk::Label midi_input_driver_label;
 	Gtk::ComboBox driver_combo;
 	Gtk::Label driver_label;
 	Gtk::ComboBox frequency_combo;
@@ -103,6 +109,7 @@ class SettingsDialog : public Gtk::MessageDialog {
 	Gtk::Frame plugin_path_frame;
 	Gtk::VBox plugin_path_vbox;
 
+	void _midi_input_driver_changed();
 	void _driver_changed();
 	void _driver_freq_changed();
 	void _driver_buffer_changed();

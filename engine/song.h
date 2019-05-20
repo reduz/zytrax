@@ -13,7 +13,8 @@ public:
 		ORDER_MAX = 999,
 		ORDER_EMPTY = 0xFFFFF,
 		ORDER_SKIP = 0xFFFFE,
-		MAX_PATTERN = 999
+		MAX_PATTERN = 999,
+		SINGLE_EVENT_MAX = 1024
 	};
 
 	enum SwingBeatDivisor {
@@ -89,6 +90,14 @@ private:
 			Tick to_tick;
 		} range;
 
+		struct SingleEvent {
+			int track;
+			AudioEffect::Event event;
+		};
+
+		SingleEvent single_event[SINGLE_EVENT_MAX];
+		int single_event_count;
+
 	} playback;
 
 	void _pre_capture_automations();
@@ -156,6 +165,7 @@ public:
 	void play_event_range(int p_pattern, int p_from_column, int p_to_column, Tick p_from_tick, Tick p_to_tick);
 	void play_next_pattern();
 	void play_prev_pattern();
+	void play_single_event(int p_track, const AudioEffect::Event &p_event);
 
 	void stop();
 	bool is_playing() const;

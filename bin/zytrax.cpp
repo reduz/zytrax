@@ -13,6 +13,9 @@
 #include "drivers/rtaudio/sound_driver_rtaudio.h"
 #endif
 
+#ifdef RTMIDI_ENABLED
+#include "drivers/rtmidi/midi_driver_rtmidi.h"
+#endif
 int main(int argc, char *argv[]) {
 
 	AudioEffectFactory effect_factory;
@@ -26,6 +29,9 @@ int main(int argc, char *argv[]) {
 	register_rtaudio_driver();
 #endif
 
+#ifdef RTMIDI_ENABLED
+	register_rtmidi_driver();
+#endif
 	auto app = Gtk::Application::create(argc, argv, "org.gtkmm.examples.base");
 
 	Theme theme;
@@ -35,19 +41,21 @@ int main(int argc, char *argv[]) {
 	{
 		String path = SettingsDialog::get_settings_path() + "/settings.json";
 		JSON::Node node;
-		int use_driver_index = 0;
+		int use_driver_index = SoundDriverManager::get_driver_count() ? 0 : -1;
+		int use_midi_in_driver_index = MIDIDriverManager::get_input_driver_count() ? 0 : -1;
 
 		if (load_json(path, node) == OK) {
 
 			if (node.has("audio")) { //audio
 				JSON::Node audio_node = node.get("audio");
 				std::string driver_id = audio_node.get("id").toString();
-				int use_driver_index = -1;
+
 				for (int i = 0; i < SoundDriverManager::get_driver_count(); i++) {
 					SoundDriver *driver = SoundDriverManager::get_driver(i);
 					if (driver->get_id() == driver_id.c_str()) {
+						use_driver_index = i;
 					}
-					use_driver_index = i;
+
 					break;
 				}
 
@@ -64,6 +72,17 @@ int main(int argc, char *argv[]) {
 
 				if (block_size >= 0 && block_size < SoundDriverManager::BUFFER_SIZE_MAX) {
 					SoundDriverManager::set_step_buffer_size(SoundDriverManager::BufferSize(block_size));
+				}
+
+				std::string midi_driver_id = audio_node.get("midi_in_id").toString();
+
+				for (int i = 0; i < MIDIDriverManager::get_input_driver_count(); i++) {
+					MIDIInputDriver *driver = MIDIDriverManager::get_input_driver(i);
+					if (driver->get_id() == midi_driver_id.c_str()) {
+						use_midi_in_driver_index = i;
+					}
+
+					break;
 				}
 			}
 
@@ -157,6 +176,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		SoundDriverManager::init_driver(use_driver_index);
+		MIDIDriverManager::init_input_driver(use_midi_in_driver_index);
 	}
 
 	register_effects(&effect_factory);

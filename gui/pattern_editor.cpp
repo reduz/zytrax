@@ -3813,6 +3813,23 @@ void PatternEditor::set_playback_pos(int p_pattern, Tick p_tick) {
 	}
 }
 
+void PatternEditor::set_focus_on_track(int p_track) {
+
+	if (song->get_event_column_track(cursor.column) == p_track) {
+		return; //it's already there
+	}
+	//not there, look for it
+
+	for (int i = 0; i < song->get_event_column_count(); i++) {
+		if (song->get_event_column_track(i) == p_track) {
+			cursor.column = i;
+			cursor.field = 0;
+			queue_draw();
+			return;
+		}
+	}
+}
+
 void PatternEditor::on_parsing_error(
 		const Glib::RefPtr<const Gtk::CssSection> &section,
 		const Glib::Error &error) {}
