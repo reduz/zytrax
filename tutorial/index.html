@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ZyTrax - An easy to use tracker-style sequencer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
+</head>
+
+<body id="_index">
+
+<nav>
+<section>
+
+    <span class="logo">
+	<img src="../zytrax_logo.png">
+    </span>
+
+    <span class="links">
+        <a href="/tutorial/">Tutorial</a>
+    </span>
+    <span class="home">
+        <a href="/">Home</a>
+    </span>
+</section>
+</nav>
+
+<main>
+<h2>Table of Contents</h2>
+<ul>
+<li><a href="#setting_up">Setting Up</a></li>
+<li><a href="#track">Adding a Track</a></li>
+<li><a href="#inserting">Inserting Values</a></li>
+<li><a href="#editing">Editing</a></li>
+<li><a href="#selection">Selection</a></li>
+<li><a href="#pasting">Pasting</a></li>
+<li><a href="#operations">Selection Oerations</a></li>
+<li><a href="#automations">Automations</a></li>
+<li><a href="#commands">Commands</a></li>
+<li><a href="#midi">MIDI</a></li>
+<li><a href="#more_docs">More Docs</a></li>
+</ul>
+
+<a name="setting_up"><h2>Setting Up</h2></a>
+<p>
+Before doing anything, you will need to find plugins. Open the
+<i>Settings</i> windows by going <b>Settings -> Preferences</b>.
+</p>
+<img src="plugins.png">
+<p>
+Enter paths where plugins will be scanned (just click <i>Browse</i> to open
+a dialog for selecting a path). When enough paths are there, push the
+<i>Scan</i> button. 
+</p>
+<p>
+This will scan all plugins available in the folders entered. If you add or
+remove plugins, you will need to hit <i>Scan</i> again. This happens
+because scanning is a time consuming operation, so ZyTrax will cache the
+plugins found for you.
+</p>
+<a name="track"><h2>Adding a Track</h2></a>
+<p>
+Use the <i>+New Track</i> button to create a new track. Both the track and
+the corresponding rack and volume controls will appear:
+</p>
+<img src="new_track.png">
+<p>
+By default, the track will be silent. Noise can be made by adding
+<i>Effects</i> to it. To do this, press the <b>Insert FX</b> label at the
+bottom, on the rack section. This will open a menu where you can select 
+the scanned plugins.
+</p>
+<p> The effect added should now appear on the rack. Make sure to select a
+synth, or else no sound generation will happen.
+</p>
+<img src="add_fx.png">
+<a name="inserting"><h2>Inserting Values</h2></a>
+<p>
+Make sure to focus on the <i>Pattern Editor</i>. Either click on it (the
+column full of dots on the left), or press <b>F2</b>, which will
+automatically focus on it (remember this key binding for future use, it's
+very handy!)
+</p>
+<p>
+The first thing that you will notice is that the cursor can move around
+as if it was in a text document. Horizontally, for a pattern track, 
+the cursor can move within different fields. Each field is as follows:
+</p>
+<h3>Note Field</h3>
+<img src="note_field.png">
+<p>
+The note field is used for entering notes. When the cursor is in this field,
+your PC keyboard becomes a two-octave musical keyboard with lots of useful
+functions:
+</p>
+<img src="keyboard.png">
+<p>
+Most keys become a virtual piano you can use to enter notes (And note-off:
+"==="). After a while entering your input with the keyboard, you will be
+surprised of how productive you have become.
+</p>
+<img src="insert.gif">
+<h3>Octave Field</h3>
+<img src="octave_field.png">
+<p>
+This fields only allows entering the octave as a number.
+</p>
+<h3>Volume Field</h3>
+<img src="volume_field.png">
+<p>
+Finally, the volume field. When unentered, volume is assumed to be the
+maximum volume (99). Volumes from 00 to 99 can be input for each note.
+</p>
+<p>
+Volumes can also be input without a note (which will send MIDI note
+pressure to plugins that support it), and into <i>Note Off</i> events, 
+for synthesizers that support note off velocity.
+</p>
+<a name="editing"><h2>Editing</h2></a>
+<p>
+Together with field input are three keys designed to make input easier:
+<p>
+<h3>Insert/Delete</h3>
+<p>Pressing the <i>Insert</i> or <i>Delete</i> keys will literally insert or delete rows
+below the cursor. These are very handy when you want to move notes around
+after they were inserted:
+</p>
+<img src="insert_delete.gif">
+<h3>Field Clear</h3>
+The <i>Field Clear</i> key will move the cursor down while clearing anything
+on the way. It's useful to just erase notes:
+</p>
+<img src="field_clear.gif">
+<p>
+When positioned in the volume field, it will just clear the volume.
+</p>
+<h2>Navigating</h2>
+<p>
+So far everything has been shown with a single track (that has only one
+column), but reality is that songs can quickly grow to have multiple
+columns and tracks. For this, some useful keybindings exist:
+</p>
+<h3>Tabbing</h3>
+<p>
+Using <i>Tab</i> and <i>Shift-Tab</i> will allow to quickly cycle between columns,
+skipping the fields entirely. This is the most common way of moving
+around horizontally:
+</p>
+<img src="tabbing.gif">
+<h3>Page Up/Down</h3>
+<p>
+To move up and down by a <i>bar</i>, use the <i>Page Up</i> and <i>Page
+Down</i> keys. This helps a lot when navigating long patterns.
+</p>
+<img src="page_up_down.gif">
+<h3>Home/End</h3>
+<p>
+The <i>Home</i> and <i>End</i> keys are vital for navigation. They move to
+the next and previous <i>boundaries</i>. 
+</p>
+<p>
+When pressing <i>Home</i>, if the cursor is currently in a field, it will move to the beginning of the
+column. If already there, it will move to the beginning of the track.
+</p>
+<p>
+If the cursor is already at the beginning of the track, it will move to the
+beginning of the first track and, from there, to the first row:
+</p>
+<img src="home.gif">
+<p>The <i>End</i> key does similarly in the opposite direction, going to the
+next column, the last column and the the last row.
+</p>
+<img src="end.gif">
+<a name="selection"><h2>Selection</h2></a>
+<p>
+Part of what makes keyboard-based input so efficient is being able to
+precisely manage selected regions and interact with them.
+</p>
+<p>ZyTrax has many ways to create a selection. Dragging with the mouse
+across the fields works, as well as using shift-cursors.
+</p>
+<h3>Block Begin/End</h3>
+<p>
+Most of the time, however, the most efficient way is to use the block selection
+keybindings. The basic ones are <i>Alt-B</i> for <i>Block Begin</i> and
+<i>Alt-E</i> for <i>Block End</i>.
+</p>
+<img src="block_selection.gif">
+<h3>Select Column/Track/All</h3>
+<p>
+It is possible to alternate the selection between the current column,
+track and entire song by pressing <i>Alt-L</i> repeatedly.
+</p>
+<img src="column_select.gif">
+<p>Combining
+this keybinding with the previously mentioned block selection keys allows
+to quickly produce complex selections with a few keypresses.
+</p>
+<img src="block_column_select.gif">
+<p>To get rid of the selection, simply press <i>Alt-U</i>.
+<h2>Clipboard</h2>
+<p>
+Once the selection is laid out properly, many useful clipboard operations are provided.
+Press <i>Alt-C</i> to copy the selection to the clipboard, or <i>Alt-Z</i> to cut it (zap 
+and copy).
+</p>
+<a name="pasting"><h3>Pasting</h3></a>
+<p>
+There are three different paste modes, depending on what you want to do:
+</p>
+<ul>
+<li>Paste-Overwrite: <i>Alt-O</i>.</li>
+<li>Paste-Insert: <i>Alt-P</i>.</li>
+<li>Paste-Mix: <i>Alt-M</i>.</li>
+</ul>
+<h3>Paste Overwrite</h3>
+<p>
+It simply pastes starting from the cursor, replacing the contents of the events with the contents
+of the selection.
+</p>
+<h3>Paste Insert</h3>
+<p>
+It pastes, but pushes the events in the columns being pasted downwards. This is very useful when you
+want to do repeating "patterns" like beats, or anything that repeats.
+</p>
+<img src="paste_insert.gif">
+<h3>Paste Mix</h3>
+<p>
+Works similar to <i>overwrite</i> but does not erase the previous contents. In fact, if there is any content it will
+be respected.
+</p>
+<a name="operations"><h2>Selection Operations</h2></a>
+<p>
+Once a selection block is laid out, it is possible to do a number of useful operations on it. Check the <i>Selection</i>
+menu on top, and make sure to learn the many shortcuts, as they are very useful:
+</p>
+<img src="selection_menu.png">
+<a name="automations"><h2>Automations</h2></a>
+<p>Plugin effects will usually provide a list of automatable parameters. They appear as checkboxes on the left side of the window:
+</p>
+<img src="automation.png">
+<p>
+Enabling one of those checkboxes will automatically make an automation column appear:
+</p>
+<img src="automation2.png">
+<p>
+Numbers can be written from 0 to 99 to control the exposed parameters, these numbers are <i>discrete</i>, which means that the
+value changes only when a new value is found, and effect takes place immediately. You can interpolate them with the <i>Alt-K</i>
+effect if you wish (still discrete, but you can make a nice ramp).
+</p>
+<p>
+Sometimes it may be desired to have more fine-grained control of the exposed parameter over time. This is possible by modifying
+the visualization mode. Simply right-click over the automation column and this menu will appear:
+</p>
+<img src="automation3.png">
+<p>
+Selecting the envelope views, the automation can be edited visually over time (and this time, it does interpolate the values):
+</p>
+<img src="automation4.png">
+<a name="commands"><h2>Commands</h2></a>
+<p>
+Commands are an alternative way to modify plugin effect parameters. Instead of ticking the <i>automation</i> box, just select
+a letter in the parameter list:
+</p>
+<img src="command.png">
+<p>
+Immediately, nothing will happen in the pattern view. Right click over the note columns in a pattern to open the settings:
+of that track:
+</p>
+<img src="command2.png">
+<p>
+This will make a command column appear. These columns are different from note columns, as they take a letter and a value (00-99 as always).
+</p>
+<p>
+In there, just use the same leter you assigned in the effect to control the parameter. This allows controlling a large amount of parameters
+from a single column:
+</p>
+<img src="command3.png">
+<p>
+As this doing this all the time for all effects can be tedious, it is possible to make this letter the default for this specific effect,
+so next time you instantiate it it will remember it. To do this, just right click over the parameter name:
+</p>
+<img src="command4.png">
+<p>If you want to edit this (or remove it), you can find all these assignments in the <i>settings</i> window:</p>
+<img src="command5.png">
+<a name="midi"><h2>MIDI</h2></a>
+<p>
+ZyTrax supports MIDI-In. The usage is very limited though, as it will only play notes from the track selected (the track is selected automatically
+when you open an effect Window). This can allow you to try out ideas, patches and notes on the plugin window or pattern editor.
+</p>
+<a name="more_docs"><h2>More docs</h2></a>
+<p>If you feel documentation is missing, or you would like to request a better description on some topic, feel free to <a href="https://github.com/reduz/zytrax/issues">open an issue</a> at the GitHub issue tracker</p>
+</main>
+
+
+<footer>
+<section>
+<p>&copy; 2019 Juan Linietsky</p>
+<p>
+    <a href="https://twitter.com/reduzio">Twitter</a>
+    <a href="https://github.com/reduz/zytrax">GitHub</a>
+</p>
+</section>
+</footer>
+
+</body>
+</html>
