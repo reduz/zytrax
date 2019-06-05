@@ -16,3 +16,32 @@ automation envelopes, smart automations, zoomable patterns and a
 simple pattern/orderlist layout).
 
 ![](zytrax.png)
+
+# Usage
+
+Currently, ZyTrax runs only on Windows and supports VS2 plugins via Vestige. 
+It compiles and runs on Linux/X11, but no plugin
+code exists (If anyone wants to contribute LV2 support, that would be
+awesome!).
+
+# Building
+
+You need to download MSys2, and then GTKmm for Windows, instructions
+[here](https://wiki.gnome.org/Projects/gtkmm/MSWindows). Make sure to
+download Python and Scons too from the package manager.
+
+To build, type:
+```
+scons
+```
+
+To run:
+```
+cd bin
+start zytrax.exe
+```
+
+Check the release to see how to package the executable for redistribution
+(just replace the .exe file).
+
+
