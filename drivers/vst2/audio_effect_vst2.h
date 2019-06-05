@@ -3,7 +3,7 @@
 
 #include "engine/audio_effect_midi.h"
 #include "globals/map.h"
-#include "vst/aeffectx.h"
+#include "vestige.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -32,7 +32,7 @@ private:
 	String provider_id;
 	AEffect *effect;
 	HINSTANCE libhandle;
-	static VstIntPtr VSTCALLBACK host(AEffect *effect, VstInt32 opcode, VstInt32 index, VstIntPtr value, void *ptr, float opt);
+	static intptr_t VESTIGECALLBACK host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt);
 
 	ResizeCallback resize_callback;
 	void *resize_userdata;

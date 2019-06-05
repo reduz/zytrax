@@ -299,7 +299,7 @@ void AudioEffectVST2::close_user_interface() {
 #define DEBUG_CALLBACK(m_text) printf("VST Callback: %s\n", m_text)
 #endif
 
-VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, VstInt32 index, VstIntPtr value, void *ptr, float opt) {
+intptr_t VESTIGECALLBACK AudioEffectVST2::host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt) {
 
 	//simple host for exploring plugin
 	AudioEffectVST2 *vst_effect = effect ? (AudioEffectVST2 *)effect->resvd1 : 0;
@@ -338,7 +338,7 @@ VstIntPtr VSTCALLBACK AudioEffectVST2::host(AEffect *effect, VstInt32 opcode, Vs
 			}
 			return 0;
 
-		case DECLARE_VST_DEPRECATED(audioMasterWantMidi):
+		case audioMasterWantMidi:
 			DEBUG_CALLBACK("audioMasterWantMidi");
 			return 1;
 
@@ -806,7 +806,7 @@ Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, con
 	if (!effect) {
 		return ERR_CANT_OPEN;
 	}
-	effect->resvd1 = (VstIntPtr)this;
+	effect->resvd1 = this;
 	effect->dispatcher(effect, effOpen, 0, 0, NULL, 0.0f);
 	vst_version = effect->dispatcher(effect, effGetVstVersion, 0, 0, NULL, 0.0f);
 	effect->dispatcher(effect, effMainsChanged, 0, 0, NULL, 0.0f);
@@ -836,7 +836,7 @@ Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, con
 	effect->dispatcher(effect, effSetSampleRate, 0, 0, NULL, sampling_rate);
 	effect->dispatcher(effect, effSetBlockSize, 0, process_block_size, NULL, 0.0f);
 	_update_buffers();
-	effect->dispatcher(effect, effSetProcessPrecision, 0, kVstProcessPrecision32, NULL, 0.0f);
+	effect->dispatcher(effect, effSetProcessPrecision, 0, 0, NULL, 0.0f);
 	effect->dispatcher(effect, effMainsChanged, 0, 1, NULL, 0.0f);
 	effect->dispatcher(effect, effStartProcess, 0, 0, NULL, 0.0f);
 	return OK;
@@ -856,7 +856,7 @@ AudioEffectVST2::AudioEffectVST2() {
 	sampling_rate = 44100;
 	has_side_input = false;
 	stop_all_notes = false;
-	event_pointer_data = new unsigned char[sizeof(VstInt32) + sizeof(VstIntPtr) + sizeof(VstEvent *) * MAX_INPUT_EVENTS];
+	event_pointer_data = new unsigned char[sizeof(int32_t) + sizeof(intptr_t) + sizeof(VstEvent *) * MAX_INPUT_EVENTS];
 	event_pointers = (VstEvents *)event_pointer_data;
 	last_midi_channel = 0;
 

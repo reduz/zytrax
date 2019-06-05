@@ -1,5 +1,5 @@
 #include "audio_effect_provider_vst2.h"
-#include "drivers/vst2/vst/aeffectx.h"
+#include "vestige.h"
 #include <dirent.h>
 /////////////////////////////////////////////
 
@@ -134,7 +134,7 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 	}
 }
 
-VstIntPtr VSTCALLBACK AudioEffectProviderVST2::host(AEffect *effect, VstInt32 opcode, VstInt32 index, VstIntPtr value, void *ptr, float opt) {
+intptr_t VESTIGECALLBACK AudioEffectProviderVST2::host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt) {
 	long retval = 0;
 	//simple host for exploring plugin
 	switch (opcode) {

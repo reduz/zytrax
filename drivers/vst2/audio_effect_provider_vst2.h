@@ -5,7 +5,7 @@
 
 class AudioEffectProviderVST2 : public AudioEffectProvider {
 
-	static VstIntPtr VSTCALLBACK host(AEffect *effect, VstInt32 opcode, VstInt32 index, VstIntPtr value, void *ptr, float opt);
+	static intptr_t VESTIGECALLBACK host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt);
 	friend class AudioEffectVST2;
 
 	static AEffect *open_vst_from_lib_handle(HINSTANCE libhandle, audioMasterCallback p_master_callback);
