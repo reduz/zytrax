@@ -24,6 +24,8 @@ It compiles and runs on Linux/X11, but no plugin
 code exists (If anyone wants to contribute LV2 support, that would be
 awesome! I just don't have the time).
 
+You can find a tutorial [here](http://zytrax.org/tutorial/).
+
 ## Download
 
 Head over to the [releases](https://github.com/reduz/zytrax/releases)
