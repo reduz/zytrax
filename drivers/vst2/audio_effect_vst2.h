@@ -98,7 +98,12 @@ public:
 	bool has_user_interface() const;
 	void get_user_interface_size(int &r_width, int &r_height);
 	void resize_user_interface(int p_width, int p_height);
+#ifdef WINDOWS_ENABLED
 	void open_user_interface(void *p_window_ptr);
+#else
+	void open_user_interface(long p_logint, void *p_window_ptr);
+#endif
+
 	void process_user_interface();
 	void close_user_interface();
 

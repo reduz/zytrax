@@ -76,6 +76,8 @@ if (env["platform"]=="freedesktop"):
 		env.Append(CXXFLAGS=["-D__LINUX_JACK__"])
 		env.ParseConfig("pkg-config jack --libs --cflags")
 
+
+	env.ParseConfig("pkg-config x11 --libs --cflags")
 	env.Append(LIBS=["dl"])
 
 

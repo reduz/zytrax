@@ -222,6 +222,7 @@ private:
 	int plugin_editor_function_count;
 
 	Map<AudioEffect *, EffectEditor *> active_effect_editors;
+	void _erase_effect_editors_for_effect(AudioEffect *p_effect);
 
 	Gtk::Popover pattern_settings_popover;
 	Gtk::Grid pattern_settings_grid;

@@ -149,6 +149,10 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			error_box.set_transient_for(*this);
 			error_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
 			if (error_box.run() == Gtk::RESPONSE_OK) {
+				for (Map<AudioEffect *, EffectEditor *>::Element *E = active_effect_editors.front(); E; E = E->next()) {
+					delete E->get();
+				}
+				active_effect_editors.clear();
 				song.clear();
 				undo_redo.clean();
 				save_version = 0;
@@ -612,7 +616,8 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			about_box.hide();
 
 		} break;
-		default: {}
+		default: {
+		}
 	}
 }
 
@@ -820,6 +825,14 @@ void Interface::_on_toggle_send_mute(int p_track, int p_send) {
 	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
 }
+
+void Interface::_erase_effect_editors_for_effect(AudioEffect *p_effect) {
+	if (active_effect_editors.has(p_effect)) {
+		delete active_effect_editors[p_effect];
+		active_effect_editors.erase(p_effect);
+	}
+}
+
 void Interface::_on_remove_effect(int p_track, int p_effect) {
 	ERR_FAIL_INDEX(p_track, song.get_track_count());
 	ERR_FAIL_INDEX(p_effect, song.get_track(p_track)->get_audio_effect_count());
@@ -832,6 +845,8 @@ void Interface::_on_remove_effect(int p_track, int p_effect) {
 	undo_redo.do_method(this, &Interface::_redraw_track_edits);
 	undo_redo.undo_method(this, &Interface::_redraw_track_edits);
 	undo_redo.commit_action();
+
+	_erase_effect_editors_for_effect(effect);
 }
 void Interface::_on_remove_send(int p_track, int p_send) {
 
@@ -1534,6 +1549,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 	pattern_editor.pattern_changed.connect(sigc::mem_fun(this, &Interface::_update_pattern));
 	pattern_editor.step_changed.connect(sigc::mem_fun(this, &Interface::_update_step));
 	pattern_editor.zoom_changed.connect(sigc::mem_fun(this, &Interface::_update_zoom));
+	pattern_editor.erase_effect_editor_request.connect(sigc::mem_fun(this, &Interface::_erase_effect_editors_for_effect));
 
 	pattern_editor.set_hscroll(pattern_hscroll.get_adjustment());
 	pattern_editor.set_vscroll(pattern_vscroll.get_adjustment());

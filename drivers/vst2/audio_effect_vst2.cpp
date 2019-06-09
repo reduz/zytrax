@@ -277,12 +277,18 @@ void AudioEffectVST2::process_user_interface() {
 
 	effect->dispatcher(effect, effEditIdle, 0, 0, NULL, 0);
 }
-
+#ifdef WINDOWS_ENABLED
 void AudioEffectVST2::open_user_interface(void *p_window_ptr) {
 
 	effect->dispatcher(effect, effEditOpen, 0, 0, p_window_ptr, 0);
 }
+#else
+void AudioEffectVST2::open_user_interface(long p_longint, void *p_window_ptr) {
 
+	effect->dispatcher(effect, effEditOpen, 0, p_longint, p_window_ptr, 0);
+}
+
+#endif
 void AudioEffectVST2::resize_user_interface(int p_width, int p_height) {
 
 	//fst->amc (fst->plugin, 15 /*audioMasterSizeWindow */, width, height, NULL, 0);

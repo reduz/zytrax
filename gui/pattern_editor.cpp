@@ -1057,6 +1057,10 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
 				undo_redo->commit_action();
 
+				for (int i = 0; i < song->get_track(current_track)->get_audio_effect_count(); i++) {
+					erase_effect_editor_request.emit(song->get_track(current_track)->get_audio_effect(i));
+				}
+
 			} break;
 
 			case KeyBindings::PATTERN_SELECT_BEGIN: {

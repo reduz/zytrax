@@ -1,14 +1,16 @@
 #include "effect_editor_vst2.h"
 //keep this for order
 #include "audio_effect_provider_vst2.h"
+#include "effect_editor_x11.h"
 
-void EffectPlaceholderVST2::_vst_resize(void *self, int w, int h) {
-	EffectPlaceholderVST2 *ph = (EffectPlaceholderVST2 *)self;
+#ifdef WINDOWS_ENABLED
+void EffectPlaceholderVST2Win32::_vst_resize(void *self, int w, int h) {
+	EffectPlaceholderVST2Win32 *ph = (EffectPlaceholderVST2Win32 *)self;
 	return;
 }
 
-void EffectPlaceholderVST2::resize_editor(int left, int top, int right, int bottom) {
-#ifdef WINDOWS_ENABLED
+void EffectPlaceholderVST2Win32::resize_editor(int left, int top, int right, int bottom) {
+
 	if (vst_window) {
 		RECT rc;
 		rc.left = left;
@@ -22,9 +24,8 @@ void EffectPlaceholderVST2::resize_editor(int left, int top, int right, int bott
 		AdjustWindowRectEx(&rc, style, fMenu, exStyle);
 		MoveWindow(vst_window, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, TRUE);
 	}
-#endif
 }
-void EffectPlaceholderVST2::on_size_allocate(Gtk::Allocation &allocation) {
+void EffectPlaceholderVST2Win32::on_size_allocate(Gtk::Allocation &allocation) {
 	// Do something with the space that we have actually been given:
 	//(We will not be given heights or widths less than we have requested, though
 	// we might get more)
@@ -40,7 +41,7 @@ void EffectPlaceholderVST2::on_size_allocate(Gtk::Allocation &allocation) {
 	}
 }
 
-bool EffectPlaceholderVST2::_update_window_position() {
+bool EffectPlaceholderVST2Win32::_update_window_position() {
 
 	bool visible = is_visible();
 
@@ -63,7 +64,6 @@ bool EffectPlaceholderVST2::_update_window_position() {
 		}
 	}
 
-#ifdef WINDOWS_ENABLED
 	GtkWidget *toplevel = gtk_widget_get_toplevel(gobj());
 	ERR_FAIL_COND_V(!GTK_IS_WINDOW(toplevel), false);
 	int root_x, root_y;
@@ -86,7 +86,7 @@ bool EffectPlaceholderVST2::_update_window_position() {
 		ShowWindow(vst_window, visible ? SW_SHOW : SW_HIDE);
 		prev_visible = visible;
 	}
-#endif
+
 	if (visible) {
 		vst_effect->process_user_interface();
 	}
@@ -94,7 +94,7 @@ bool EffectPlaceholderVST2::_update_window_position() {
 	return true;
 }
 
-void EffectPlaceholderVST2::on_realize() {
+void EffectPlaceholderVST2Win32::on_realize() {
 	// Do not call base class Gtk::Widget::on_realize().
 	// It's intended only for widgets that set_has_window(false).
 
@@ -132,7 +132,7 @@ void EffectPlaceholderVST2::on_realize() {
 	}
 
 	if (m_refGdkWindow) {
-#ifdef WINDOWS_ENABLED
+
 		//hwnd for gtk window
 		HWND hwnd = gdk_win32_window_get_impl_hwnd(m_refGdkWindow->gobj());
 		//set as parent. This works, while SetParent DOES NOT.
@@ -140,26 +140,25 @@ void EffectPlaceholderVST2::on_realize() {
 		/*SetParent((HWND)vst_window, (HWND)hwnd);*/
 		//turn on update timer to reposition the Window
 		//sorry, this is the only way I found..
-		update_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectPlaceholderVST2::_update_window_position),
+		update_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectPlaceholderVST2Win32::_update_window_position),
 				50, Glib::PRIORITY_DEFAULT);
 		//Show the Window
 		ShowWindow(vst_window, SW_SHOW);
-#endif
 		prev_visible = true;
 	}
 }
 
-void EffectPlaceholderVST2::on_unrealize() {
+void EffectPlaceholderVST2Win32::on_unrealize() {
 	//clear the window
 	if (m_refGdkWindow) {
-#ifdef WINDOWS_ENABLED
+
 		//clear parenthood
 		SetWindowLongPtr(vst_window, GWLP_HWNDPARENT, (LONG_PTR)NULL);
 		//disconnect timer
 		update_timer.disconnect();
 		//Hide the Window
 		ShowWindow(vst_window, SW_HIDE);
-#endif
+
 		prev_visible = false;
 	}
 	m_refGdkWindow.reset();
@@ -168,7 +167,7 @@ void EffectPlaceholderVST2::on_unrealize() {
 	Gtk::Widget::on_unrealize();
 }
 
-bool EffectPlaceholderVST2::on_visibility_notify_event(GdkEventVisibility *visibility_event) {
+bool EffectPlaceholderVST2Win32::on_visibility_notify_event(GdkEventVisibility *visibility_event) {
 	/*
 	if (m_refGdkWindow) {
 		if (visibility_event->state == GDK_VISIBILITY_FULLY_OBSCURED) {
@@ -181,7 +180,7 @@ bool EffectPlaceholderVST2::on_visibility_notify_event(GdkEventVisibility *visib
 	return false;
 }
 
-bool EffectPlaceholderVST2::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
+bool EffectPlaceholderVST2Win32::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	const Gtk::Allocation allocation = get_allocation();
 	return false;
 
@@ -196,7 +195,7 @@ bool EffectPlaceholderVST2::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	cr->fill();
 }
 
-EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
+EffectPlaceholderVST2Win32::EffectPlaceholderVST2Win32(AudioEffectVST2 *p_vst_effect) :
 		// The GType name will actually be gtkmm__CustomObject_mywidget
 		Glib::ObjectBase("filler"),
 		Gtk::Widget() {
@@ -204,7 +203,7 @@ EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
 	vst_effect = p_vst_effect;
 	vst_w = 1;
 	vst_h = 1;
-#ifdef WINDOWS_ENABLED
+
 	vst_window = NULL;
 
 	//create the window, but don't use it.
@@ -213,7 +212,6 @@ EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
 	//open the user interface (it won't be visible though.
 
 	vst_effect->open_user_interface(vst_window);
-#endif
 
 	//allocate size for this VST here
 	vst_effect->get_user_interface_size(vst_w, vst_h);
@@ -222,13 +220,13 @@ EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
 	prev_visible = false;
 }
 
-EffectPlaceholderVST2::~EffectPlaceholderVST2() {
+EffectPlaceholderVST2Win32::~EffectPlaceholderVST2Win32() {
 	vst_effect->close_user_interface();
-#ifdef WINDOWS_ENABLED
+
 	DestroyWindow(vst_window);
-#endif
 }
 
+#endif
 void initialize_vst2_editor() {
 
 #ifdef WINDOWS_ENABLED
@@ -250,14 +248,60 @@ void initialize_vst2_editor() {
 		return;
 	}
 #endif
+
+#ifdef FREEDESKTOP_ENABLED
+
+	vstfx_init();
+#endif
+}
+
+void finalize_vst2_editor() {
+
+#ifdef FREEDESKTOP_ENABLED
+
+	vstfx_exit();
+#endif
+}
+
+bool EffectEditorVST2::initialize() {
+#ifdef FREEDESKTOP_ENABLED
+	socket.add_id(xid);
+	int w, h;
+	vstfx_get_window_size(vst_effect, &w, &h);
+	socket.set_size_request(w, h);
+#endif
+	return false;
 }
 
 EffectEditorVST2::EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_editor) :
-		effect_editor_midi(p_vst, p_editor),
-		vst_placeholder(p_vst) {
+		effect_editor_midi(p_vst, p_editor)
+#ifdef WINDOWS_ENABLED
+		,
+		vst_placeholder(p_vst)
+#endif
+{
 
 	vst_effect = p_vst;
+#ifdef WINDOWS_ENABLED
 	effect_editor_midi.prepend_page(vst_placeholder, "VST2 Plugin");
+#endif
+
 	pack_start(effect_editor_midi, Gtk::PACK_EXPAND_WIDGET);
+
+#ifdef FREEDESKTOP_ENABLED
+	effect_editor_midi.prepend_page(socket, "VST2 Plugin");
+	xid = vstfx_run_editor(p_vst, this);
+
+#endif
+	//need window to be mapped, so wait
+	init_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectEditorVST2::initialize),
+			50, Glib::PRIORITY_DEFAULT);
+
 	show_all_children();
+}
+
+EffectEditorVST2::~EffectEditorVST2() {
+#ifdef FREEDESKTOP_ENABLED
+	vstfx_destroy_editor(vst_effect);
+#endif
 }

@@ -229,6 +229,8 @@ public:
 	sigc::signal0<void> zoom_changed;
 	sigc::signal0<void> pattern_changed;
 
+	sigc::signal1<void, AudioEffect *> erase_effect_editor_request;
+
 	void set_current_pattern(int p_pattern);
 	int get_current_pattern() const;
 

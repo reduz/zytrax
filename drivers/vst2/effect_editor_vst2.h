@@ -6,17 +6,23 @@
 #include <gdk/gdkwin32.h>
 #else
 #endif
+
+#ifdef FREEDESKTOP_ENABLED
+#include <gtkmm/socket.h>
+#endif
+
 class AudioEffectVST2;
 
-class EffectPlaceholderVST2 : public Gtk::Widget {
+#ifdef WINDOWS_ENABLED
+class EffectPlaceholderVST2Win32 : public Gtk::Widget {
 
 	AudioEffectVST2 *vst_effect;
 	Glib::RefPtr<Gdk::Window> m_refGdkWindow;
 	int vst_w;
 	int vst_h;
-#ifdef WINDOWS_ENABLED
+
 	HWND vst_window;
-#endif
+
 	sigc::connection update_timer;
 	static void _vst_resize(void *self, int w, int h);
 
@@ -33,20 +39,35 @@ public:
 	bool on_draw(const Cairo::RefPtr<Cairo::Context> &cr) override;
 	bool on_visibility_notify_event(GdkEventVisibility *visibility_event) override;
 
-	EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect);
-	~EffectPlaceholderVST2();
+	EffectPlaceholderVST2Win32(AudioEffectVST2 *p_vst_effect);
+	~EffectPlaceholderVST2Win32();
 };
+
+#endif
 
 class EffectEditorVST2 : public Gtk::VBox {
 
 	AudioEffectVST2 *vst_effect;
 	EffectEditorMIDI effect_editor_midi;
-	EffectPlaceholderVST2 vst_placeholder;
+#ifdef WINDOWS_ENABLED
+
+	EffectPlaceholderVST2Win32 vst_placeholder;
+#endif
+
+#ifdef FREEDESKTOP_ENABLED
+	int xid;
+	Gtk::Socket socket;
+#endif
+
+	sigc::connection init_timer;
+	bool initialize();
 
 public:
 	EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_editor);
+	~EffectEditorVST2();
 };
 
 void initialize_vst2_editor();
+void finalize_vst2_editor();
 
 #endif // EFFECT_EDITOR_VST2_H
