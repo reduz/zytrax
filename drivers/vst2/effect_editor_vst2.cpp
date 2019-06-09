@@ -68,7 +68,31 @@ bool EffectPlaceholderVST2Win32::_update_window_position() {
 	ERR_FAIL_COND_V(!GTK_IS_WINDOW(toplevel), false);
 	int root_x, root_y;
 	//gtk_window_get_position(GTK_WINDOW(toplevel), &root_x, &root_y);
-	gdk_window_get_origin(gtk_widget_get_window(gobj()), &root_x, &root_y);
+
+	HWND hwnd = gdk_win32_window_get_impl_hwnd(gtk_widget_get_window(gobj()));
+	/*	RECT r;
+	GetWindowRect(hwnd, &r);
+	root_x = r.left;
+	root_y = r.top;
+*/
+	POINT p;
+	p.x = 0;
+	p.y = 0;
+	ClientToScreen(hwnd, &p);
+	root_x = p.x;
+	root_y = p.y;
+
+	//method below is not compatible with multiple monitors
+	{
+		int widget_x, widget_y;
+		gdk_window_get_origin(gtk_widget_get_window(gobj()), &widget_x, &widget_y);
+		int toplevel_x, toplevel_y;
+		gdk_window_get_origin(gtk_widget_get_window(toplevel), &toplevel_x, &toplevel_y);
+		root_x += widget_x - toplevel_x;
+		root_y += widget_y - toplevel_y;
+	}
+
+	//gdk_window_get_origin(gtk_widget_get_window(gobj()), &root_x, &root_y);
 	int tlx = 0, tly = 0;
 	/*gtk_widget_translate_coordinates(gobj(), gtk_widget_get_toplevel(gobj()), 0, 0, &tlx, &tly);
 	root_x += tlx;
