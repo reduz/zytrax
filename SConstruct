@@ -61,8 +61,10 @@ if (env["platform"]=="windows"):
 
 
 if (env["platform"]=="freedesktop"):
-	env["enable_vst2"]=False # not supported
+
 	env.Append(CXXFLAGS=["-DFREEDESKTOP_ENABLED"])
+	if (env["enable_vst2"]):
+		env.Append(CXXFLAGS=["-DVST2_ENABLED"])
 	if (env["use_pulseaudio"]):
 		env.Append(CXXFLAGS=["-D__LINUX_PULSE__"])
 		env.ParseConfig("pkg-config libpulse --libs --cflags")
@@ -73,6 +75,9 @@ if (env["platform"]=="freedesktop"):
 	if (env["use_jack"]):
 		env.Append(CXXFLAGS=["-D__LINUX_JACK__"])
 		env.ParseConfig("pkg-config jack --libs --cflags")
+
+	env.Append(LIBS=["dl"])
+
 
 def add_sources(self, sources, filetype, lib_env = None, shared = False):
 	import glob;

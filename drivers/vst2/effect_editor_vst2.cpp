@@ -8,6 +8,7 @@ void EffectPlaceholderVST2::_vst_resize(void *self, int w, int h) {
 }
 
 void EffectPlaceholderVST2::resize_editor(int left, int top, int right, int bottom) {
+#ifdef WINDOWS_ENABLED
 	if (vst_window) {
 		RECT rc;
 		rc.left = left;
@@ -21,6 +22,7 @@ void EffectPlaceholderVST2::resize_editor(int left, int top, int right, int bott
 		AdjustWindowRectEx(&rc, style, fMenu, exStyle);
 		MoveWindow(vst_window, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, TRUE);
 	}
+#endif
 }
 void EffectPlaceholderVST2::on_size_allocate(Gtk::Allocation &allocation) {
 	// Do something with the space that we have actually been given:
@@ -61,6 +63,7 @@ bool EffectPlaceholderVST2::_update_window_position() {
 		}
 	}
 
+#ifdef WINDOWS_ENABLED
 	GtkWidget *toplevel = gtk_widget_get_toplevel(gobj());
 	ERR_FAIL_COND_V(!GTK_IS_WINDOW(toplevel), false);
 	int root_x, root_y;
@@ -83,7 +86,7 @@ bool EffectPlaceholderVST2::_update_window_position() {
 		ShowWindow(vst_window, visible ? SW_SHOW : SW_HIDE);
 		prev_visible = visible;
 	}
-
+#endif
 	if (visible) {
 		vst_effect->process_user_interface();
 	}
@@ -129,6 +132,7 @@ void EffectPlaceholderVST2::on_realize() {
 	}
 
 	if (m_refGdkWindow) {
+#ifdef WINDOWS_ENABLED
 		//hwnd for gtk window
 		HWND hwnd = gdk_win32_window_get_impl_hwnd(m_refGdkWindow->gobj());
 		//set as parent. This works, while SetParent DOES NOT.
@@ -140,6 +144,7 @@ void EffectPlaceholderVST2::on_realize() {
 				50, Glib::PRIORITY_DEFAULT);
 		//Show the Window
 		ShowWindow(vst_window, SW_SHOW);
+#endif
 		prev_visible = true;
 	}
 }
@@ -147,12 +152,14 @@ void EffectPlaceholderVST2::on_realize() {
 void EffectPlaceholderVST2::on_unrealize() {
 	//clear the window
 	if (m_refGdkWindow) {
+#ifdef WINDOWS_ENABLED
 		//clear parenthood
 		SetWindowLongPtr(vst_window, GWLP_HWNDPARENT, (LONG_PTR)NULL);
 		//disconnect timer
 		update_timer.disconnect();
 		//Hide the Window
 		ShowWindow(vst_window, SW_HIDE);
+#endif
 		prev_visible = false;
 	}
 	m_refGdkWindow.reset();
@@ -197,13 +204,17 @@ EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
 	vst_effect = p_vst_effect;
 	vst_w = 1;
 	vst_h = 1;
+#ifdef WINDOWS_ENABLED
 	vst_window = NULL;
 
 	//create the window, but don't use it.
 	const auto style = WS_POPUP;
 	vst_window = CreateWindowExW(0, L"VST_HOST", vst_effect->get_path().c_str(), style, 0, 0, 0, 0, NULL, 0, 0, 0);
 	//open the user interface (it won't be visible though.
+
 	vst_effect->open_user_interface(vst_window);
+#endif
+
 	//allocate size for this VST here
 	vst_effect->get_user_interface_size(vst_w, vst_h);
 	set_size_request(vst_w, vst_h);
@@ -213,11 +224,14 @@ EffectPlaceholderVST2::EffectPlaceholderVST2(AudioEffectVST2 *p_vst_effect) :
 
 EffectPlaceholderVST2::~EffectPlaceholderVST2() {
 	vst_effect->close_user_interface();
+#ifdef WINDOWS_ENABLED
 	DestroyWindow(vst_window);
+#endif
 }
 
 void initialize_vst2_editor() {
 
+#ifdef WINDOWS_ENABLED
 	HMODULE hInst = GetModuleHandleA(NULL);
 	ERR_FAIL_COND(!hInst);
 
@@ -235,6 +249,7 @@ void initialize_vst2_editor() {
 		ERR_PRINT("Error in initialize_vst2_editor(): (class registration failed");
 		return;
 	}
+#endif
 }
 
 EffectEditorVST2::EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_editor) :

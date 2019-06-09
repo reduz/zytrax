@@ -2,8 +2,10 @@
 #define EFFECT_EDITOR_VST2_H
 
 #include "gui/effect_editor_midi.h"
+#ifdef WINDOWS_ENABLED
 #include <gdk/gdkwin32.h>
-
+#else
+#endif
 class AudioEffectVST2;
 
 class EffectPlaceholderVST2 : public Gtk::Widget {
@@ -12,8 +14,9 @@ class EffectPlaceholderVST2 : public Gtk::Widget {
 	Glib::RefPtr<Gdk::Window> m_refGdkWindow;
 	int vst_w;
 	int vst_h;
+#ifdef WINDOWS_ENABLED
 	HWND vst_window;
-
+#endif
 	sigc::connection update_timer;
 	static void _vst_resize(void *self, int w, int h);
 

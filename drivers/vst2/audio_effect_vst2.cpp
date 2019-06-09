@@ -801,7 +801,12 @@ Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, con
 	unique_id = p_unique_id;
 	path = p_path;
 	provider_id = p_provider_id;
+#ifdef WINDOWS_ENABLED
 	libhandle = LoadLibraryW(p_path.c_str());
+#else
+	libhandle = dlopen(p_path.utf8().get_data(), RTLD_LOCAL | RTLD_LAZY);
+#endif
+
 	effect = AudioEffectProviderVST2::open_vst_from_lib_handle(libhandle, host);
 	if (!effect) {
 		return ERR_CANT_OPEN;
@@ -889,6 +894,10 @@ AudioEffectVST2::~AudioEffectVST2() {
 		effect->dispatcher(effect, effClose, 0, 0, NULL, 0.0f);
 	}
 	if (libhandle) {
+#ifdef WINDOWS_ENABLED
 		FreeLibrary(libhandle);
+#else
+		dlclose(libhandle);
+#endif
 	}
 }

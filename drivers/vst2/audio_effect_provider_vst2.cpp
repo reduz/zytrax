@@ -3,6 +3,7 @@
 #include <dirent.h>
 /////////////////////////////////////////////
 
+#ifdef WINDOWS_ENABLED
 AEffect *AudioEffectProviderVST2::open_vst_from_lib_handle(HINSTANCE libhandle, audioMasterCallback p_master_callback) {
 
 	if (libhandle == NULL) {
@@ -24,6 +25,29 @@ AEffect *AudioEffectProviderVST2::open_vst_from_lib_handle(HINSTANCE libhandle, 
 	}
 	return getNewPlugInstance(p_master_callback);
 }
+#else
+AEffect *AudioEffectProviderVST2::open_vst_from_lib_handle(void *libhandle, audioMasterCallback p_master_callback) {
+
+	if (libhandle == NULL) {
+		//printf("invalid file: %s\n",lib_name);
+		return NULL;
+	}
+
+	AEffect *(*getNewPlugInstance)(audioMasterCallback);
+
+	getNewPlugInstance = (AEffect * (*)(audioMasterCallback)) dlsym(libhandle, "VSTPluginMain");
+	if (!getNewPlugInstance) {
+		getNewPlugInstance = (AEffect * (*)(audioMasterCallback)) dlsym(libhandle, "main");
+	}
+
+	if (getNewPlugInstance == NULL) {
+		dlclose(libhandle);
+		//WARN_PRINT("Can't find symbol 'main'");
+		return NULL;
+	}
+	return getNewPlugInstance(p_master_callback);
+}
+#endif
 
 String AudioEffectProviderVST2::get_id() const {
 	return "VST2";
@@ -48,39 +72,72 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 			continue;
 		}
 		printf("scanning path: %s\n", p.utf8().get_data());
-
+#ifdef WINDOWS_ENABLED
 		_WDIR *dir;
 		struct _wdirent *dirent;
-
-		printf("about to open dir\n");
 		dir = _wopendir(p.c_str());
+#else
+		DIR *dir;
+		struct dirent *dirent;
+		dir = opendir(p.utf8().get_data());
+
+#endif
+
 		if (dir == NULL) {
 			printf("failed?\n");
 			return;
 		}
 
 		printf("opened dir\n");
+#ifdef WINDOWS_ENABLED
 
 		while ((dirent = _wreaddir(dir))) {
-
+#else
+		while ((dirent = readdir(dir))) {
+#endif
 			String lib_name = p + "/" + String(dirent->d_name);
 
+#ifdef WINDOWS_ENABLED
 			if (lib_name.get_extension() != "dll") {
+#elif defined(OSX_ENABLED)
+			if (lib_name.get_extension() != "dylib") {
+#else
+		if (lib_name.get_extension() != "so") {
+
+#endif
 				continue;
 			}
 			printf("opening plugin: %s\n", lib_name.utf8().get_data());
+#ifdef WINDOWS_ENABLED
 
 			HINSTANCE libhandle = LoadLibraryW(lib_name.c_str());
 
 			AEffect *ptrPlug = open_vst_from_lib_handle(libhandle, &host);
+#else
+
+			void *libhandle = dlopen(lib_name.utf8().get_data(), RTLD_LOCAL | RTLD_LAZY);
+			if (!libhandle) {
+				continue;
+			}
+			AEffect *ptrPlug = open_vst_from_lib_handle(libhandle, &host);
+
+#endif
 
 			if (ptrPlug == NULL) {
+#ifdef WINDOWS_ENABLED
 				FreeLibrary(libhandle);
+#else
+				dlclose(libhandle);
+#endif
 				continue;
 			}
 
 			if (ptrPlug->magic != kEffectMagic) {
+#ifdef WINDOWS_ENABLED
 				FreeLibrary(libhandle);
+#else
+				dlclose(libhandle);
+#endif
 				continue;
 			}
 
@@ -129,7 +186,11 @@ void AudioEffectProviderVST2::scan_effects(AudioEffectFactory *p_factory, ScanCa
 				}
 			}
 			ptrPlug->dispatcher(ptrPlug, effClose, 0, 0, NULL, 0.0f);
+#ifdef WINDOWS_ENABLED
 			FreeLibrary(libhandle);
+#else
+			dlclose(libhandle);
+#endif
 		}
 	}
 }

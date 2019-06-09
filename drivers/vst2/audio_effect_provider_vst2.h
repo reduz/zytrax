@@ -6,9 +6,13 @@
 class AudioEffectProviderVST2 : public AudioEffectProvider {
 
 	static intptr_t VESTIGECALLBACK host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt);
-	friend class AudioEffectVST2;
 
+	friend class AudioEffectVST2;
+#ifdef WINDOWS_ENABLED
 	static AEffect *open_vst_from_lib_handle(HINSTANCE libhandle, audioMasterCallback p_master_callback);
+#else
+	static AEffect *open_vst_from_lib_handle(void *libhandle, audioMasterCallback p_master_callback);
+#endif
 
 public:
 	static AudioEffectProviderVST2 *singleton;

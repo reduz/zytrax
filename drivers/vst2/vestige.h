@@ -29,7 +29,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef WINDOWS_ENABLED
 #define VESTIGECALLBACK __cdecl
+#else
+#define VESTIGECALLBACK
+#endif
 
 #define CCONST(a, b, c, d) ((((int)a) << 24) | \
 							(((int)b) << 16) | \

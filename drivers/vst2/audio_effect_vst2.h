@@ -5,8 +5,12 @@
 #include "globals/map.h"
 #include "vestige.h"
 
+#ifdef WINDOWS_ENABLED
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 class AudioEffectVST2 : public AudioEffectMIDI {
 public:
@@ -31,7 +35,11 @@ private:
 	String name;
 	String provider_id;
 	AEffect *effect;
+#ifdef WINDOWS_ENABLED
 	HINSTANCE libhandle;
+#else
+	void *libhandle;
+#endif
 	static intptr_t VESTIGECALLBACK host(AEffect *effect, int32_t opcode, int32_t index, intptr_t value, void *ptr, float opt);
 
 	ResizeCallback resize_callback;
