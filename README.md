@@ -19,8 +19,8 @@ simple pattern/orderlist layout).
 
 ## Usage
 
-Currently, ZyTrax runs only on Windows and supports VST2 plugins via Vestige. 
-It compiles and runs on Linux/X11, but no plugin
+Currently, ZyTrax runs only on Windows and Linux/X11. It supports VST2 plugins via Vestige. 
+It should compile on MacOS but no plugin
 code exists (If anyone wants to contribute LV2 support, that would be
 awesome! I just don't have the time).
 

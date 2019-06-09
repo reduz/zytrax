@@ -848,7 +848,7 @@ bool TrackRackEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		Cairo::FontExtents fe;
 		cr->get_font_extents(fe);
 
-		int new_width = fe.max_x_advance * min_width_chars;
+		int new_width = fe.height * min_width_chars;
 		int new_height = (fe.height + 2) * min_height_lines;
 
 		if (new_width != min_width || new_height != min_height) {
