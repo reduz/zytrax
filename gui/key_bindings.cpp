@@ -270,7 +270,7 @@ void KeyBindings::set_action_enabled(KeyBind p_bind, bool p_enabled) {
 
 void KeyBindings::set_action_checked(KeyBind p_bind, bool p_checked) {
 
-	actions[p_bind]->set_state(Glib::Variant<bool>::create(p_checked));
+	actions[p_bind]->change_state(Glib::Variant<bool>::create(p_checked));
 }
 void KeyBindings::set_action_state(KeyBind p_bind, const String &p_state) {
 
@@ -281,7 +281,7 @@ void KeyBindings::set_action_state(KeyBind p_bind, const String &p_state) {
 		idx = p_bind;
 	}
 
-	actions[idx]->set_state(Glib::Variant<Glib::ustring>::create(p_state.ascii().get_data()));
+	actions[idx]->change_state(Glib::Variant<Glib::ustring>::create(p_state.ascii().get_data()));
 }
 
 Glib::RefPtr<Gio::SimpleAction> KeyBindings::get_keybind_action(KeyBind p_bind) {
