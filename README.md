@@ -5,4 +5,4 @@ Simple and easy to use music tracker
 Needs: scons, liblilv-dev, libsuil-dev, libgtkmm-3.0-dev, libpulse-dev, libasound2-dev
 
 # Debian/Ubuntu packages
-Available at: http://phd-sid.ethz.ch/debian/zytrax/
+`apt install zytrax`
