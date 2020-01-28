@@ -1,4 +1,4 @@
-# sytrax
+# zytrax
 Simple and easy to use music tracker
 
 # Building from source
