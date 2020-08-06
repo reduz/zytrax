@@ -1,6 +1,9 @@
 #include "song_file.h"
+#include "base64.h"
 #include "engine/sound_driver_manager.h"
 #include "json_file.h"
+
+#include <map>
 
 class AudioEffectDummy : public AudioEffect {
 	//used to instantiate in place of plugins that were not found
@@ -43,6 +46,8 @@ Error SongFile::save(const String &p_path) {
 	JSON::Node node = JSON::object();
 
 	node.add("software", VERSION_SOFTWARE_NAME);
+
+	std::map<std::string, std::shared_ptr<Vector<uint8_t> > > shared_data_map;
 
 	{
 		JSON::Node version = JSON::object();
@@ -125,6 +130,14 @@ Error SongFile::save(const String &p_path) {
 			effect.add("provider_id", fx->get_provider_id().utf8().get_data());
 			effect.add("id", fx->get_unique_id().utf8().get_data());
 			effect.add("skip", fx->is_skipped());
+			String shared_data_key = fx->get_shared_data_key();
+			if (shared_data_key != String()) {
+				std::string sd = shared_data_key.utf8().get_data();
+				if (shared_data_map.find(sd) == shared_data_map.end()) {
+					shared_data_map[sd] = fx->get_shared_data();
+					effect.add("shared_data", sd);
+				}
+			}
 
 			JSON::Node commands = JSON::object();
 			bool added_commands = false;
@@ -317,6 +330,14 @@ Error SongFile::save(const String &p_path) {
 		node.add("patterns", patterns);
 	}
 
+	if (shared_data_map.begin() != shared_data_map.end()) {
+		JSON::Node shared = JSON::object();
+		for (auto I = shared_data_map.begin(); I != shared_data_map.end(); I++) {
+			shared.add(I->first, base64_encode(*I->second));
+		}
+		node.add("shared_data", shared);
+	}
+
 	return save_json(p_path, node);
 }
 
@@ -348,6 +369,20 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 
 	if (!node.has("information")) {
 		return ERR_FILE_CORRUPT;
+	}
+
+	std::map<std::string, std::shared_ptr<Vector<uint8_t> > > shared_data_map;
+
+	if (node.has("shared_data")) {
+		JSON::Node n = node.get("shared_data");
+		for (auto I = n.begin(); I != n.end(); I++) {
+			std::string key = I->first;
+			std::string data64 = I->second.toString();
+			Vector<uint8_t> data = base64_decode(data64);
+			shared_data_map[key] = std::make_shared<Vector<uint8_t> >(data);
+
+			printf("sd: %s\n", key.c_str());
+		}
 	}
 
 	song->clear();
@@ -479,6 +514,12 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 			}
 
 			fx->set_skip(effect.get("skip").toBool());
+			if (effect.has("shared_data")) {
+				std::string sd = effect.get("shared_data").toString();
+				if (shared_data_map.find(sd) != shared_data_map.end()) {
+					fx->set_shared_data(shared_data_map[sd]);
+				}
+			}
 			fx->from_json(effect.get("state"));
 			t->add_audio_effect(fx);
 		}

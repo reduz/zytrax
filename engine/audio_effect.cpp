@@ -1,5 +1,16 @@
 #include "audio_effect.h"
 
+String AudioEffect::get_shared_data_key() const {
+	return String();
+}
+
+std::shared_ptr<Vector<uint8_t> > AudioEffect::get_shared_data() const {
+	return std::shared_ptr<Vector<uint8_t> >();
+}
+
+void AudioEffect::set_shared_data(const std::shared_ptr<Vector<uint8_t> > &p_shared_data) {
+}
+
 String AudioEffectProvider::scan_paths[AudioEffectProvider::MAX_SCAN_PATHS];
 
 void AudioEffectProvider::set_scan_path(int p_index, const String &p_scan) {

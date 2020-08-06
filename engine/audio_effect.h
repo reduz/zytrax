@@ -6,6 +6,7 @@
 #include "globals/json.h"
 #include "rstring.h"
 #include "vector.h"
+#include <memory>
 
 class AudioEffect;
 class AudioEffectFactory;
@@ -145,6 +146,10 @@ public:
 
 	/* Load/Save */
 
+	virtual String get_shared_data_key() const;
+	virtual std::shared_ptr<Vector<uint8_t> > get_shared_data() const;
+	virtual void set_shared_data(const std::shared_ptr<Vector<uint8_t> > &p_shared_data);
+
 	virtual JSON::Node to_json() const = 0;
 	virtual Error from_json(const JSON::Node &node) = 0;
 
@@ -199,6 +204,7 @@ public:
 				return "Disabled";
 			}
 		}
+		return String();
 	}
 
 	ControlPortDefault() {

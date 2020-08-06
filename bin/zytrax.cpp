@@ -4,6 +4,10 @@
 #include "drivers/vst2/factory_wrapper_vst2.h"
 #endif
 
+#ifdef LV2_ENABLED
+#include "drivers/lv2/audio_effect_provider_lv2.h"
+#endif
+
 #include "effects/effects.h"
 #include "engine/song.h"
 #include "globals/json_file.h"
@@ -20,11 +24,18 @@ int main(int argc, char *argv[]) {
 
 	AudioEffectFactory effect_factory;
 
+	printf("one\n");
 #ifdef VST2_ENABLED
 	AudioEffectProvider *provider_vst2 = create_vst2_provider();
 	effect_factory.add_provider(provider_vst2);
 #endif
 
+	printf("two\n");
+#ifdef LV2_ENABLED
+	AudioEffectProviderLV2 provider_lv2(&argc, &argv);
+	effect_factory.add_provider(&provider_lv2);
+#endif
+	printf("three\n");
 #ifdef RTAUDIO_ENABLED
 	register_rtaudio_driver();
 #endif
@@ -179,6 +190,7 @@ int main(int argc, char *argv[]) {
 		MIDIDriverManager::init_input_driver(use_midi_in_driver_index);
 	}
 
+	printf("regfx\n");
 	register_effects(&effect_factory);
 
 	/* make it dark */
@@ -225,12 +237,16 @@ int main(int argc, char *argv[]) {
 
 	/* Initialize the UI */
 
+	printf("go\n");
+
 	Interface window(app.operator->(), &effect_factory, &theme, &key_bindings);
 	window.set_default_size(1280, 720);
 #ifdef VST2_ENABLED
 	window.add_editor_plugin_function(get_vst2_editor_function());
 #endif
 	int ret = app->run(window);
+
+	printf("bye\n");
 
 	SoundDriverManager::finish_driver();
 

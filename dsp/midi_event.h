@@ -142,6 +142,7 @@ public:
 	};
 
 	Error parse(unsigned char *p_raw);
+	bool write(unsigned char *p_to) const;
 	MIDIEvent();
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned char data1, unsigned char data2);
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned short data);

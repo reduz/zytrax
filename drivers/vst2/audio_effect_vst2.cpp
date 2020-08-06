@@ -512,6 +512,9 @@ intptr_t VESTIGECALLBACK AudioEffectVST2::host(AEffect *effect, int32_t opcode, 
 		case audioMasterIOChanged:
 			DEBUG_CALLBACK("audioMasterIOChanged");
 			// numInputs and/or numOutputs has changed
+			if (vst_effect) {
+				vst_effect->_update_buffers();
+			}
 			return 0;
 #if 0
 		case audioMasterNeedIdle:
@@ -857,6 +860,7 @@ void AudioEffectVST2::set_resize_callback(ResizeCallback p_callback, void *p_use
 	resize_callback = p_callback;
 	resize_userdata = p_userdata;
 }
+
 AudioEffectVST2::AudioEffectVST2() {
 
 	libhandle = NULL;
@@ -867,7 +871,7 @@ AudioEffectVST2::AudioEffectVST2() {
 	sampling_rate = 44100;
 	has_side_input = false;
 	stop_all_notes = false;
-	event_pointer_data = new unsigned char[sizeof(int32_t) + sizeof(intptr_t) + sizeof(VstEvent *) * MAX_INPUT_EVENTS];
+	event_pointer_data = new unsigned char[sizeof(VstEvents) + sizeof(VstEvent *) * MAX_INPUT_EVENTS];
 	event_pointers = (VstEvents *)event_pointer_data;
 	last_midi_channel = 0;
 

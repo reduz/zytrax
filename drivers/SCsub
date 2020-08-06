@@ -3,6 +3,10 @@ Export('env');
 
 targets=[]
 
+if (env["enable_lv2"]):
+	env.add_sources(targets,"lv2/*.cpp")
+	env.add_sources(targets,"lv2/*.c")
+
 if (env["enable_vst2"]):
 	env.add_sources(targets,"vst2/*.cpp")
 if (env["enable_rtaudio"]):

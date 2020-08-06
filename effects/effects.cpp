@@ -11,6 +11,7 @@
 #include "effects/internal/effect_phaser.h"
 #include "effects/internal/effect_reverb.h"
 #include "effects/internal/effect_stereo_enhancer.h"
+#include "effects/sf2/synth_sf2.h"
 #include "gui/interface.h"
 
 class AudioEffectProviderInternal : public AudioEffectProvider {
@@ -83,8 +84,8 @@ public:
 		if (p_info->unique_ID == "filter_high_shelf") {
 			return new AudioEffectFilter(Filter::HIGHSHELF);
 		}
-		if (p_info->unique_ID == "note_puncher") {
-			return new AudioEffectNotePuncher;
+		if (p_info->unique_ID == "sf2") {
+			return new AudioSynthSF2;
 		}
 
 		return NULL;
@@ -462,4 +463,21 @@ void register_effects(AudioEffectFactory *p_factory) {
 		info.provider_id = "internal";
 		p_factory->add_audio_effect(info);
 	}
+	{
+		//sf2
+		AudioEffectInfo info;
+		info.caption = "SoundFont Player";
+		info.description = "SF2 SoundFont Player";
+		info.author = "Bernhard Schelling";
+		info.unique_ID = "sf2";
+		info.provider_caption = "Internal";
+		info.category = "Internal Effects";
+		info.version = "1.0";
+		info.synth = true;
+		info.has_ui = true;
+		info.internal = true;
+		info.provider_id = "internal";
+		p_factory->add_audio_effect(info);
+	}
+	
 }

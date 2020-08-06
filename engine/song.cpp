@@ -595,6 +595,9 @@ String Song::get_description() const {
 void Song::set_process_buffer_size(int p_frames) {
 	_AUDIO_LOCK_;
 	buffer.resize(p_frames);
+	for (int i = 0; i < p_frames; i++) {
+		buffer[i] = AudioFrame(0, 0);
+	}
 	buffer_pos = p_frames;
 	for (int i = 0; i < tracks.size(); i++) {
 		tracks[i]->set_process_buffer_size(p_frames);

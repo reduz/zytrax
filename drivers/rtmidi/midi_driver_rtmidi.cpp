@@ -47,6 +47,7 @@ public:
 		// Don't ignore sysex, timing, or active sensing messages.
 		midiin->ignoreTypes(false, false, false);
 		active = true;
+		return true;
 	}
 	virtual void finish() {
 		midiin->closePort();

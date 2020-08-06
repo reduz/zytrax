@@ -2,8 +2,8 @@ Import('env')
 
 
 ctfiles=['zytrax.cpp'];
-
-env.Append(LINKFLAGS=["-Wl,--start-group"])
+env["LINKCOM"] = '$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS -Wl,--start-group $_LIBFLAGS -Wl,--end-group'
+#env.Append(LINKFLAGS=["-Wl,--start-group"])
 env.Append(LIBS=env.libs)
 env.Program('zytrax', ctfiles);
 

@@ -1,5 +1,6 @@
 #include "interface.h"
 #include "effect_editor_default.h"
+#include "effect_editor_sf2.h"
 #include "icons.h"
 
 void Interface::_add_track() {
@@ -1642,6 +1643,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 			10, Glib::PRIORITY_DEFAULT);
 
 	add_editor_plugin_function(&create_default_editor_func);
+	add_editor_plugin_function(&create_sf2_editor);
 }
 
 Interface::~Interface() {

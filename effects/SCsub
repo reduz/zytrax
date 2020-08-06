@@ -4,6 +4,8 @@ Export('env');
 targets=[]
 
 env.add_sources(targets,"internal/*.cpp")
+env.add_sources(targets,"sf2/*.cpp")
+env.add_sources(targets,"sf2/*.c")
 #env.add_sources(targets,"sampler/*.cpp")
 env.add_sources(targets,"*.cpp")
 

@@ -28,6 +28,7 @@ opts.Add(BoolVariable("use_wasapi","Enable Wasapi",True))
 opts.Add(BoolVariable("use_directsound","Enable Wasapi",True))
 opts.Add(BoolVariable("enable_rtmidi","Use RtMidi as MIDI Driver",True))
 opts.Add(BoolVariable("use_winmm","Enable WinMM for RtMidi",True))
+opts.Add(BoolVariable("enable_lv2","Enable LV2",False)) # Experimental, no UI
 
 opts.Update(env)  # update environment
 Help(opts.GenerateHelpText(env))  # generate help
@@ -46,6 +47,7 @@ if (env["enable_rtmidi"]):
 
 
 if (env["platform"]=="windows"):
+	env["enable_lv2"]=False
 	env.Append(CXXFLAGS=["-DWINDOWS_ENABLED"])
 	if (env["enable_vst2"]):	
 		env.Append(CXXFLAGS=["-DVST2_ENABLED"])
@@ -75,6 +77,10 @@ if (env["platform"]=="freedesktop"):
 	if (env["use_jack"]):
 		env.Append(CXXFLAGS=["-D__LINUX_JACK__"])
 		env.ParseConfig("pkg-config jack --libs --cflags")
+	if (env["enable_lv2"]):
+		env.ParseConfig("pkg-config lilv-0 --libs --cflags")
+		env.ParseConfig("pkg-config suil-0 --libs --cflags")
+		env.Append(CXXFLAGS=["-DLV2_ENABLED"])
 
 
 	env.ParseConfig("pkg-config x11 --libs --cflags")
