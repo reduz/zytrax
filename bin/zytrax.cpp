@@ -6,6 +6,7 @@
 
 #ifdef LV2_ENABLED
 #include "drivers/lv2/audio_effect_provider_lv2.h"
+#include "drivers/lv2/effect_editor_lv2.h"
 #endif
 
 #include "effects/effects.h"
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
 #ifdef LV2_ENABLED
 	AudioEffectProviderLV2 provider_lv2(&argc, &argv);
 	effect_factory.add_provider(&provider_lv2);
+	EffectEditorLV2::initialize_lv2_editor();
 #endif
 	printf("three\n");
 #ifdef RTAUDIO_ENABLED
@@ -244,6 +246,9 @@ int main(int argc, char *argv[]) {
 #ifdef VST2_ENABLED
 	window.add_editor_plugin_function(get_vst2_editor_function());
 #endif
+#ifdef LV2_ENABLED
+	window.add_editor_plugin_function(get_lv2_editor_function());
+#endif
 	int ret = app->run(window);
 
 	printf("bye\n");
@@ -257,6 +262,8 @@ int main(int argc, char *argv[]) {
 #ifdef RTAUDIO_ENABLED
 	cleanup_rtaudio_driver();
 #endif
-
+#ifdef LV2_ENABLED
+	EffectEditorLV2::finalize_lv2_editor();
+#endif
 	return ret;
 }

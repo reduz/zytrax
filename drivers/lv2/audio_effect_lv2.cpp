@@ -337,13 +337,13 @@ void AudioEffectLV2::_plugin_init() {
 			{ LV2_BUF_SIZE__boundedBlockLength, NULL }
 		};
 
-		const LV2_Feature *features[12] = {
+		const LV2_Feature *features[] = {
 			&uri_map_feature, &map_feature, &unmap_feature,
-			&sched_feature,
-			&log_feature,
-			&options_feature,
-			&def_state_feature,
-			&safe_restore_feature,
+			//&sched_feature,
+			//&log_feature,
+			//&options_feature,
+			//&def_state_feature,
+			//&safe_restore_feature,
 			&buf_size_features[0],
 			&buf_size_features[1],
 			&buf_size_features[2],

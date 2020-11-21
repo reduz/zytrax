@@ -180,6 +180,9 @@ public:
 	virtual JSON::Node _internal_to_json() const;
 	virtual Error _internal_from_json(const JSON::Node &node);
 
+	LilvInstance *get_instance() { return instance; }
+	const LilvPlugin *get_plugin() { return plugin; }
+
 	Error setup(const LilvPlugin *p_plugin, bool p_has_ui);
 
 	AudioEffectLV2();

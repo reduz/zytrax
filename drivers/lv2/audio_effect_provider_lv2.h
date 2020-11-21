@@ -165,12 +165,14 @@ private:
 	static AudioEffect *create_effects(const AudioEffectInfo *p_info);
 	//static uint32_t uri_to_id(LV2_URI_Map_Callback_Data callback_data, const char *map, const char *uri);
 	friend class AudioEffectLV2;
-	static AudioEffectProviderLV2 *singleton;
 
 	const LilvPlugins *plugins;
 
 public:
+	static AudioEffectProviderLV2 *singleton;
+
 	static const URIS &get_uris() { return uris; }
+	static LilvWorld *get_world() { return singleton->world; }
 	virtual AudioEffect *instantiate_effect(const AudioEffectInfo *p_info);
 	virtual void scan_effects(AudioEffectFactory *p_factory, ScanCallback p_callback, void *p_userdata);
 	virtual String get_id() const;
