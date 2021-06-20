@@ -33,22 +33,26 @@ section.
 
 ## Building
 
-You need to download MSys2, and then GTKmm for Windows, instructions
-[here](https://wiki.gnome.org/Projects/gtkmm/MSWindows). Make sure to
-download Python and Scons too from the package manager.
+If you're building on Windows, you need to download MSys2, and then GTKmm for
+Windows, instructions [here](https://wiki.gnome.org/Projects/gtkmm/MSWindows).
+Make sure to download Python and Scons too from the package manager. There's a
+build script (build.sh) you can refer to if that helps.
 
-To build, type:
+If you're building on a Linux distribution or BSD or something, you'll need to
+install packages for scons and the GTKmm headers. On Debian and Debian-related
+systems, these packages are called `scons` and `libgtkmm-3.0-dev`, but your
+repos might call them something else.
+
+Once you've got the dependencies, to build, type:
 ```
 scons
 ```
 
-To run:
+And then, to run, type:
 ```
 cd bin
-start zytrax.exe
+start zytrax.exe || ./zytrax
 ```
 
 Check the release to see how to package the executable for redistribution
 (just replace the .exe file).
-
-

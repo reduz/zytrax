@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 EnsureSConsVersion(0,14);
 
@@ -11,7 +12,7 @@ env.Append(CXXFLAGS=["-g3"])
 
 opts = Variables(ARGUMENTS)
 
-if (os.getenv("XDG_CURRENT_DESKTOP")!=None):
+if (os.getenv("XDG_SESSION_DESKTOP")!=None):
 	detected_platform="freedesktop"
 elif (os.getenv("APPDATA")!=None):
 	detected_platform = "windows"
