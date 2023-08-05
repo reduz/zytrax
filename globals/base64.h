@@ -2,6 +2,7 @@
 #define _BASE64_H_
 
 #include "vector.h"
+#include <cstdint>
 #include <string>
 
 std::string base64_encode(const Vector<uint8_t> &p_buffer);
