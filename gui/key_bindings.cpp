@@ -19,6 +19,7 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 
 	"FileNew",
 	"FileOpen",
+	"ImportIT",
 	"FileSave",
 	"FileSaveAs",
 	"FileExportWav",
@@ -45,6 +46,7 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"TrackRemoveColumn",
 	"TrackAddCommandColumn",
 	"TrackRemoveCommandColumn",
+	"TrackMergeNext",
 	"TrackMoveLeft",
 	"TrackMoveRight",
 	"TrackMute",
@@ -114,6 +116,11 @@ const char *KeyBindings::bind_names[BIND_MAX] = {
 	"PatternOctaveRaise",
 	"PatternPrevPattern",
 	"PatternNextPattern",
+
+	"PatternOctaveLowerAlt",
+	"PatternOctaveRaiseAlt",
+	"PatternPrevPatternAlt",
+	"PatternNextPatternAlt",
 
 	"PatternSelectBegin",
 	"PatternSelectEnd",
@@ -340,6 +347,7 @@ KeyBindings::KeyBindings() {
 
 	_add_keybind(FILE_NEW, KeyState(GDK_KEY_n, GDK_CONTROL_MASK, true));
 	_add_keybind(FILE_OPEN, KeyState(GDK_KEY_o, GDK_CONTROL_MASK, true));
+	_add_keybind(FILE_IMPORT_IT, KeyState(0, 0, true));
 	_add_keybind(FILE_SAVE, KeyState(GDK_KEY_s, GDK_CONTROL_MASK, true));
 	_add_keybind(FILE_SAVE_AS, KeyState(0, 0, true));
 	_add_keybind(FILE_EXPORT_WAV, KeyState(0, 0, true));
@@ -366,6 +374,7 @@ KeyBindings::KeyBindings() {
 	_add_keybind(TRACK_REMOVE_COLUMN, KeyState(GDK_KEY_bracketleft, GDK_MOD1_MASK, true));
 	_add_keybind(TRACK_ADD_COMMAND_COLUMN, KeyState(GDK_KEY_bracketright, GDK_MOD1_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_REMOVE_COMMAND_COLUMN, KeyState(GDK_KEY_bracketleft, GDK_MOD1_MASK | GDK_CONTROL_MASK, true));
+	_add_keybind(TRACK_MERGE_NEXT, KeyState(0, 0, true));
 	_add_keybind(TRACK_MOVE_LEFT, KeyState(GDK_KEY_Left, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_MOVE_RIGHT, KeyState(GDK_KEY_Right, GDK_SHIFT_MASK | GDK_CONTROL_MASK, true));
 	_add_keybind(TRACK_MUTE, KeyState(GDK_KEY_F9, 0, true, KeyState::MODE_TOGGLE));
@@ -431,10 +440,16 @@ KeyBindings::KeyBindings() {
 	_add_keybind(PATTERN_PAN_WINDOW_UP, KeyState(GDK_KEY_Up, GDK_MOD1_MASK));
 	_add_keybind(PATTERN_PAN_WINDOW_DOWN, KeyState(GDK_KEY_Left, GDK_MOD1_MASK));
 	_add_keybind(PATTERN_CURSOR_NOTE_OFF, KeyState(GDK_KEY_grave));
+
 	_add_keybind(PATTERN_OCTAVE_LOWER, KeyState(GDK_KEY_minus));
 	_add_keybind(PATTERN_OCTAVE_RAISE, KeyState(GDK_KEY_equal));
 	_add_keybind(PATTERN_PREV_PATTERN, KeyState(GDK_KEY_bracketleft));
 	_add_keybind(PATTERN_NEXT_PATTERN, KeyState(GDK_KEY_bracketright));
+
+	_add_keybind(PATTERN_OCTAVE_LOWER_ALT, KeyState(GDK_KEY_KP_Divide));
+	_add_keybind(PATTERN_OCTAVE_RAISE_ALT, KeyState(GDK_KEY_KP_Multiply));
+	_add_keybind(PATTERN_PREV_PATTERN_ALT, KeyState(GDK_KEY_KP_Subtract));
+	_add_keybind(PATTERN_NEXT_PATTERN_ALT, KeyState(GDK_KEY_KP_Add));
 
 	_add_keybind(PATTERN_SELECT_BEGIN, KeyState(GDK_KEY_b, GDK_MOD1_MASK, true));
 	_add_keybind(PATTERN_SELECT_END, KeyState(GDK_KEY_e, GDK_MOD1_MASK, true));

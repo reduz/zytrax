@@ -9,9 +9,13 @@ if (env["enable_lv2"]):
 
 if (env["enable_vst2"]):
 	env.add_sources(targets,"vst2/*.cpp")
+
 if (env["enable_rtaudio"]):
 	env.add_sources(targets,"rtaudio/*.cpp")
 	env.add_sources(targets,"rtaudio/rtaudio/*.cpp")
+
+if (env["enable_jack"]):
+	env.add_sources(targets,"jack/*.cpp")
 
 if (env["enable_rtmidi"]):
 	env.add_sources(targets,"rtmidi/*.cpp")

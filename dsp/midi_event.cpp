@@ -1,4 +1,5 @@
 #include "midi_event.h"
+#include "globals/rstring.h"
 
 const char *MIDIEvent::cc_names[CC_MAX]{
 
@@ -9,6 +10,7 @@ const char *MIDIEvent::cc_names[CC_MAX]{
 	"PortamentoTime",
 	"DataEntryMSB",
 	"MainVolume",
+	"Balance",
 	"Pan",
 	"Expression",
 	"BankSelectLSB",
@@ -39,7 +41,28 @@ const char *MIDIEvent::cc_names[CC_MAX]{
 	"AllSoundsOffCmd",
 	"ResetAllCmd",
 	"LocalCtrlToggle",
-	"AllNotesOff"
+	"AllNotesOff",
+	"MonoMode",
+	"PolyMode"
+};
+
+const char *MIDIEvent::type_names[MIDIEvent::TYPE_MAX] {
+"None",
+"SeqTempo",
+"SeqSignature",
+"SeqBar",
+"SeqBeat",
+"SeqScale",
+"None",
+"StreamTail",
+"NoteOff",
+"NoteOn",
+"NotePressure",
+"Controller",
+"PatchSelect",
+"Aftertouch",
+"PitchBend",
+"SYSEX"
 };
 
 const unsigned char MIDIEvent::cc_indices[CC_MAX]{
@@ -51,6 +74,7 @@ const unsigned char MIDIEvent::cc_indices[CC_MAX]{
 	5,
 	6,
 	7,
+	8,
 	10,
 	11,
 	32,
@@ -80,7 +104,8 @@ const unsigned char MIDIEvent::cc_indices[CC_MAX]{
 	121,
 	122,
 	123,
-	128
+	126,
+	127
 };
 
 Error MIDIEvent::parse(unsigned char *p_raw) {
@@ -176,6 +201,50 @@ bool MIDIEvent::write(unsigned char *p_to) const {
 	}
 
 	return true;
+}
+
+MIDIEvent::operator String() const {
+
+	String evstr = type_names[type];
+	evstr+=":ch="+String::num(channel)+"";
+	switch(type) {
+		case MIDI_NOTE_OFF:
+		case MIDI_NOTE_ON:
+		case MIDI_NOTE_PRESSURE: {
+
+			const char *notename[12]={"C-","C#","D-","D#","E-","F-","F#","G-","G#","A-","A#","B-"};
+			evstr+=":"+String(notename[note.note%12]);
+			evstr+=String::num(note.note/12);
+			evstr+=":"+String::num(note.velocity);
+		} break;
+		case MIDI_AFTERTOUCH: {
+			evstr+=":"+String::num(aftertouch.pressure);
+		} break;
+		case MIDI_CONTROLLER: {
+			bool found = false;
+			for(int i=0;i<CC_MAX;i++) {
+				if (cc_indices[i]==control.index) {
+					evstr+=":"+String(cc_names[i]);
+					found=true;
+					break;
+				}
+			}
+			if (!found) {
+				evstr+=":"+String::num(control.index);
+			}
+			evstr+="="+String::num(control.parameter);
+		} break;
+		case MIDI_PATCH_SELECT: {
+			evstr+=":"+String::num(patch.index);
+		} break;
+		case MIDI_PITCH_BEND: {
+			evstr+=":"+String::num(pitch_bend.bend-8192);
+		} break;
+		default: {
+			evstr+":"+String::num(raw.param1)+":"+String::num(raw.param2);
+		} break;
+	}
+	return evstr;
 }
 
 MIDIEvent::MIDIEvent() {

@@ -30,26 +30,37 @@ public:
 	}
 
 	static int rt_audio_callbacks(void *outputBuffer, void *inputBuffer,
-			unsigned int nFrames,
-			double streamTime,
-			RtAudioStreamStatus status,
-			void *userData) {
+				      unsigned int nFrames,
+				      double streamTime,
+				      RtAudioStreamStatus status,
+				      void *userData) {
 
 		SoundDriverRTAudio *driver = (SoundDriverRTAudio *)userData;
 		return driver->rt_audio_callback(outputBuffer, inputBuffer, nFrames, streamTime, status);
 	}
 
 	int rt_audio_callback(void *outputBuffer, void *inputBuffer,
-			unsigned int nFrames,
-			double streamTime,
-			RtAudioStreamStatus status) {
+			      unsigned int nFrames,
+			      double streamTime,
+			      RtAudioStreamStatus status) {
 
 		if (mutex.try_lock()) {
-			mix((AudioFrame *)outputBuffer, nFrames);
+			int evw;
+			mix((AudioFrame *)outputBuffer, nFrames,nullptr,0,evw);
 			mutex.unlock();
 		}
 		return 0;
 	}
+
+	virtual Vector<MidiDeviceInfo> get_midi_devices() const {
+
+		return Vector<MidiDeviceInfo>();
+	}
+
+	virtual uint32_t get_midi_devices_hash() const {
+		return 0;
+	}
+
 
 	virtual void lock() {
 		mutex.lock();
@@ -90,7 +101,7 @@ public:
 
 		try {
 			rt_audio->openStream(&parameters, NULL, RTAUDIO_FLOAT32, mix_rate, &buffer_frames,
-					rt_audio_callbacks, this);
+					     rt_audio_callbacks, this);
 		} catch (RtAudioError &error) {
 			error.printMessage();
 			return false;

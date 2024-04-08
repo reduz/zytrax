@@ -44,7 +44,7 @@ public:
 		MIX_FREQ_MAX
 	};
 
-	typedef void (*MixCallback)(AudioFrame *p_buffer, int p_frames);
+    typedef void (*MixCallback)(AudioFrame *p_buffer, int p_frames, MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size, int& r_events_written);
 
 private:
 	static int buffer_size_frames[BUFFER_SIZE_MAX];

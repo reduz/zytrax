@@ -1,10 +1,35 @@
 #include "song.h"
 #include "dsp/db.h"
 
+
+
+void Song::_dispatch_routed_event(const MIDIEventRouted & p_event, void *p_self) {
+
+	Song *self = (Song*)p_self;
+	if (self->midi_buffer_pos >= MAX_MIDI_EVENTS_PER_MIX) {
+		return;
+	}
+
+	MIDIEventRouted ev = p_event;
+	self->midi_event_buffer[self->midi_buffer_pos++]=ev;;
+}
+
+void Song::_dispatch_main_thread_event(const MIDIEventRouted & p_event, void *p_self) {
+	Song *self = (Song*)p_self;
+	if (self->main_thread_midi_buffer_pos >= MAX_MIDI_EVENTS_PER_MIX) {
+		return;
+	}
+
+	MIDIEventRouted ev = p_event;
+	self->main_thread_midi_events[self->main_thread_midi_buffer_pos++]=ev;
+}
+
+
 void Song::_process_audio_step() {
 
 	int buffer_len = buffer.size();
 	AudioFrame *buffer_ptr = &buffer[0];
+	midi_buffer_pos = 0;
 
 	//clear
 	for (int i = 0; i < buffer_len; i++) {
@@ -124,7 +149,7 @@ void Song::_process_audio_step() {
 
 		Track *t = tracks[track_process_order[i]];
 		//process tracks
-		const AudioFrame *src_audio = t->process_audio_step();
+		const AudioFrame *src_audio = t->process_audio_step(_dispatch_routed_event,this);
 		//do sends
 		int send_count = t->sends.size();
 		Track::Send *sends = send_count ? &t->sends[0] : NULL;
@@ -157,15 +182,50 @@ void Song::_process_audio_step() {
 	}
 }
 
-void Song::process_audio(AudioFrame *p_output, int p_frames) {
+void Song::_flush_midi_events(int p_events_from_pos,int p_events_to_pos,int &event_write_ofs,MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size) {
+
+	for(uint32_t i=0;i<midi_buffer_pos;i++) {
+		if (event_write_ofs >= p_event_buffer_max_size) {
+			break;
+		}
+
+		MIDIEventRouted ev = midi_event_buffer[i];
+		ev.frame += p_events_from_pos;
+
+		if (ev.frame >= 0 && ev.frame < p_events_to_pos) { //only contemplate what covers this mix.
+			p_event_buffer[event_write_ofs++]=ev;
+		}
+	}
+}
+
+void Song::process_audio(AudioFrame *p_output, int p_frames, MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size, int &r_events_written) {
 
 	int buffer_len = buffer.size();
 	ERR_FAIL_COND(buffer_len == 0);
 	const AudioFrame *buffer_ptr = &buffer[0];
 
+	main_thread_midi_buffer_pos = MIN(main_thread_midi_buffer_pos,p_event_buffer_max_size);
+
+	r_events_written = 0;
+
+	for(int i=0;i<main_thread_midi_buffer_pos;i++) {
+		p_event_buffer[i]=main_thread_midi_events[i];
+		r_events_written++;
+	}
+
+	p_event_buffer+=main_thread_midi_buffer_pos;
+	p_event_buffer_max_size-=main_thread_midi_buffer_pos;
+	main_thread_midi_buffer_pos=0;
+
+
+	int event_write_ofs = 0;
+	int event_read_ofs = -buffer_pos;
+
 	for (int i = 0; i < p_frames; i++) {
 
 		if (buffer_pos >= buffer_len) {
+			_flush_midi_events(event_read_ofs,event_read_ofs + buffer_len,event_write_ofs,p_event_buffer, p_event_buffer_max_size);
+			event_read_ofs += buffer_len;
 			_process_audio_step();
 			buffer_pos = 0;
 		}
@@ -173,6 +233,14 @@ void Song::process_audio(AudioFrame *p_output, int p_frames) {
 		p_output[i] = buffer_ptr[buffer_pos];
 		buffer_pos++;
 	}
+
+	_flush_midi_events(event_read_ofs,event_read_ofs + buffer_pos,event_write_ofs,p_event_buffer, p_event_buffer_max_size);
+
+	for(int i=0;i<event_write_ofs;i++) {
+		p_event_buffer[i]=midi_event_buffer[i];
+	}
+
+	r_events_written += event_write_ofs;
 }
 
 ///////////////
@@ -191,8 +259,8 @@ void Song::pattern_set_beats_per_bar(int p_pattern, int p_beats_per_bar) {
 
 	_AUDIO_LOCK_
 
-	if (!pattern_config.has(p_pattern))
-		pattern_config[p_pattern] = PatternConfig();
+			if (!pattern_config.has(p_pattern))
+			pattern_config[p_pattern] = PatternConfig();
 
 	pattern_config[p_pattern].beats_per_bar = p_beats_per_bar;
 
@@ -210,8 +278,8 @@ void Song::pattern_set_beats(int p_pattern, int p_beats) {
 
 	_AUDIO_LOCK_
 
-	if (!pattern_config.has(p_pattern))
-		pattern_config[p_pattern] = PatternConfig();
+			if (!pattern_config.has(p_pattern))
+			pattern_config[p_pattern] = PatternConfig();
 
 	pattern_config[p_pattern].beats = p_beats;
 
@@ -231,8 +299,8 @@ void Song::pattern_set_swing_beat_divisor(int p_pattern, SwingBeatDivisor p_divi
 
 	_AUDIO_LOCK_
 
-	if (!pattern_config.has(p_pattern))
-		pattern_config[p_pattern] = PatternConfig();
+			if (!pattern_config.has(p_pattern))
+			pattern_config[p_pattern] = PatternConfig();
 
 	pattern_config[p_pattern].swing_beat_divisor = p_divisor;
 
@@ -249,7 +317,7 @@ void Song::order_set(int p_order, int p_pattern) {
 
 	_AUDIO_LOCK_
 
-	ERR_FAIL_COND(p_order < 0 || (p_order > ORDER_MAX && p_order != ORDER_EMPTY && p_order != ORDER_SKIP));
+			ERR_FAIL_COND(p_order < 0 || (p_order > ORDER_MAX && p_order != ORDER_EMPTY && p_order != ORDER_SKIP));
 
 	if (p_order == ORDER_EMPTY)
 		order_list.erase(p_order);
@@ -327,8 +395,8 @@ bool Song::update_process_order() {
 void Song::add_track(Track *p_track) {
 
 	_AUDIO_LOCK_
-	//audio kill
-	p_track->set_process_buffer_size(buffer.size());
+			//audio kill
+			p_track->set_process_buffer_size(buffer.size());
 	p_track->set_sampling_rate(sampling_rate);
 	tracks.push_back(p_track);
 	update_process_order();
@@ -337,15 +405,15 @@ void Song::add_track(Track *p_track) {
 void Song::add_track_at_pos(Track *p_track, int p_pos) {
 
 	_AUDIO_LOCK_
-	tracks.insert(p_pos, p_track);
+			tracks.insert(p_pos, p_track);
 	update_process_order();
 }
 
 void Song::remove_track(int p_idx) {
 
 	_AUDIO_LOCK_
-	//audio kill...
-	ERR_FAIL_INDEX(p_idx, tracks.size());
+			//audio kill...
+			ERR_FAIL_INDEX(p_idx, tracks.size());
 
 	tracks.remove(p_idx);
 	update_process_order();
@@ -606,7 +674,7 @@ void Song::set_process_buffer_size(int p_frames) {
 
 void Song::set_sampling_rate(int p_hz) {
 	_AUDIO_LOCK_
-	sampling_rate = p_hz;
+			sampling_rate = p_hz;
 	for (int i = 0; i < tracks.size(); i++) {
 		tracks[i]->set_sampling_rate(p_hz);
 	}
@@ -653,7 +721,7 @@ bool Song::play(int p_from_order, Tick p_from_tick, bool p_can_loop) {
 
 	_AUDIO_LOCK_
 
-	int order;
+			int order;
 	while (true) {
 		order = order_get(p_from_order);
 
@@ -690,7 +758,7 @@ void Song::play_pattern(int p_pattern, Tick p_from_tick) {
 
 	_AUDIO_LOCK_
 
-	_pre_capture_automations();
+			_pre_capture_automations();
 
 	playback.playing = true;
 	playback.loop_pattern = true;
@@ -706,7 +774,7 @@ void Song::play_event_range(int p_pattern, int p_from_column, int p_to_column, T
 
 	_AUDIO_LOCK_
 
-	_pre_capture_automations();
+			_pre_capture_automations();
 
 	playback.range.active = true;
 	playback.range.pattern = p_pattern;
@@ -717,7 +785,7 @@ void Song::play_event_range(int p_pattern, int p_from_column, int p_to_column, T
 }
 void Song::play_single_event(int p_track, const AudioEffect::Event &p_event) {
 	_AUDIO_LOCK_
-	if (playback.single_event_count == SINGLE_EVENT_MAX) {
+			if (playback.single_event_count == SINGLE_EVENT_MAX) {
 		return;
 	}
 	if (p_track < 0 || p_track >= tracks.size()) {
@@ -739,12 +807,15 @@ void Song::stop() {
 	for (int i = 0; i < tracks.size(); i++) {
 		tracks[i]->stop();
 	}
+
+	midi_buffer_pos = 0;
+	main_thread_midi_buffer_pos=0;
 }
 
 void Song::play_next_pattern() {
 	_AUDIO_LOCK_
 
-	if (!playback.playing || playback.loop_pattern) {
+			if (!playback.playing || playback.loop_pattern) {
 		return;
 	}
 
@@ -770,7 +841,7 @@ void Song::play_next_pattern() {
 void Song::play_prev_pattern() {
 	_AUDIO_LOCK_
 
-	if (!playback.playing || playback.loop_pattern) {
+			if (!playback.playing || playback.loop_pattern) {
 		return;
 	}
 
@@ -819,6 +890,12 @@ Tick Song::get_playing_tick() const {
 	}
 }
 
+
+void Song::set_mute_track(int p_track,bool p_muted) {
+	ERR_FAIL_INDEX(p_track,tracks.size());
+	tracks[p_track]->set_muted(_dispatch_main_thread_event,this,p_muted);
+}
+
 void Song::clear() {
 	for (int i = 0; i < tracks.size(); i++)
 		delete tracks[i];
@@ -832,6 +909,8 @@ void Song::clear() {
 	order_list.clear();
 	pattern_config.clear();
 	track_process_order.clear();
+	midi_buffer_pos = 0;
+	main_thread_midi_buffer_pos=0;
 }
 
 void Song::set_main_volume_db(float p_db) {

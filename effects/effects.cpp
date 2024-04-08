@@ -11,6 +11,7 @@
 #include "effects/internal/effect_phaser.h"
 #include "effects/internal/effect_reverb.h"
 #include "effects/internal/effect_stereo_enhancer.h"
+#include "effects/internal/effect_midi_device.h"
 #include "effects/sf2/synth_sf2.h"
 #include "gui/interface.h"
 
@@ -86,6 +87,9 @@ public:
 		}
 		if (p_info->unique_ID == "sf2") {
 			return new AudioSynthSF2;
+		}
+		if (p_info->unique_ID == "midi_device") {
+			return new AudioEffectMIDIDevice;
 		}
 
 		return NULL;
@@ -459,6 +463,22 @@ void register_effects(AudioEffectFactory *p_factory) {
 		info.version = "1.0";
 		info.synth = false;
 		info.has_ui = false;
+		info.internal = true;
+		info.provider_id = "internal";
+		p_factory->add_audio_effect(info);
+	}
+	{
+		//midi
+		AudioEffectInfo info;
+		info.caption = "MIDI Device";
+		info.description = "Output to a MIDI port";
+		info.author = "Juan Linietsky";
+		info.unique_ID = "midi_device";
+		info.provider_caption = "Internal";
+		info.category = "Internal MIDI";
+		info.version = "1.0";
+		info.synth = true;
+		info.has_ui = true;
 		info.internal = true;
 		info.provider_id = "internal";
 		p_factory->add_audio_effect(info);

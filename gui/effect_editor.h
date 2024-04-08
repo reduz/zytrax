@@ -86,7 +86,7 @@ class EffectEditor : public Gtk::Window {
 			hide();
 		}
 
-		return false;
+		return Gtk::Window::on_key_press_event(key_event);
 	}
 
 public:

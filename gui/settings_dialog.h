@@ -127,6 +127,8 @@ class SettingsDialog : public Gtk::MessageDialog {
 		Gtk::TreeModelColumn<Glib::ustring> text;
 		Gtk::TreeModelColumn<int> index;
 	};
+
+
 	PluginModelColumns plugin_model_columns;
 	Glib::RefPtr<Gtk::ListStore> plugin_list_store;
 	Glib::RefPtr<Gtk::TreeSelection> plugin_tree_selection;
@@ -140,8 +142,41 @@ class SettingsDialog : public Gtk::MessageDialog {
 	void _browse_plugin_path();
 	void _scan_plugins();
 	void _plugin_path_edited(const Glib::ustring &path, const Glib::ustring &text);
-	////////////
+	/////MIDI BANKS///////
 
+	Gtk::VBox banks_vbox;
+	class MIDIBanksModelColumns : public Gtk::TreeModelColumnRecord {
+	public:
+		MIDIBanksModelColumns() {
+			add(label);
+			add(name);
+			add(text);
+			add(index);
+		}
+
+		Gtk::TreeModelColumn<Glib::ustring> label;
+		Gtk::TreeModelColumn<Glib::ustring> name;
+		Gtk::TreeModelColumn<Glib::ustring> text;
+		Gtk::TreeModelColumn<int> index;
+	};
+
+
+	MIDIBanksModelColumns midi_banks_model_columns;
+	Glib::RefPtr<Gtk::ListStore> midi_banks_list_store;
+	Glib::RefPtr<Gtk::TreeSelection> midi_banks_tree_selection;
+	Gtk::TreeViewColumn midi_bank_names_column;
+	Gtk::TreeViewColumn midi_banks_column;
+	Gtk::CellRendererText midi_bank_names_column_text;
+	Gtk::CellRendererText midi_banks_column_text;
+	Gtk::ScrolledWindow midi_banks_scroll;
+	Gtk::TreeView midi_banks_tree;
+	Gtk::HBox midi_banks_hbox;
+	Gtk::Button midi_banks_browse_path;
+
+	void _browse_midi_banks_path();
+	void _midi_banks_path_edited(const Glib::ustring &path, const Glib::ustring &text);
+
+	//////////
 	Gtk::VBox theme_vbox;
 	Gtk::Frame theme_font_frame;
 	Gtk::Grid theme_font_grid;
@@ -295,6 +330,7 @@ public:
 	sigc::signal0<void> update_colors;
 	sigc::signal0<void> update_song_step_buffer;
 	sigc::signal0<void> update_mix_rate;
+	sigc::signal0<void> update_bank_list;
 
 	static void set_default_command(int p_index, const String &p_name, char p_command);
 	static String get_default_command_name(int p_index);
@@ -303,6 +339,11 @@ public:
 
 	void initialize_bindings();
 	SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, AudioEffectFactory *p_fx_factory);
+
+	void save_settings();
+
+	static SettingsDialog *get_singleton() { return singleton; }
+
 	static String get_settings_path();
 };
 

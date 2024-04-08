@@ -62,15 +62,21 @@ bool SoundDriverManager::is_driver_active() {
 
 bool SoundDriverManager::init_driver(int p_driver) {
 
-	if (p_driver == -1)
+	printf("init driver : %i\n",p_driver);
+	if (p_driver == -1) {
 		p_driver = current_driver;
+	}
 
 	ERR_FAIL_INDEX_V(p_driver, sound_driver_count, true); //init current driver, but current is invalid
 
-	if (current_driver >= 0 && current_driver < sound_driver_count && sound_drivers[current_driver]->is_active())
+	if (current_driver >= 0 && current_driver < sound_driver_count && sound_drivers[current_driver]->is_active()) {
 		sound_drivers[current_driver]->finish();
+	}
+
 
 	current_driver = p_driver;
+
+	printf("current is : %s\n",sound_drivers[current_driver]->get_id().utf8().get_data());
 
 	return sound_drivers[current_driver]->init();
 }

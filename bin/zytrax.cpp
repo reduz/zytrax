@@ -18,6 +18,10 @@
 #include "drivers/rtaudio/sound_driver_rtaudio.h"
 #endif
 
+#ifdef JACK_ENABLED
+#include "drivers/jack/sound_driver_jack.h"
+#endif
+
 #ifdef RTMIDI_ENABLED
 #include "drivers/rtmidi/midi_driver_rtmidi.h"
 #endif
@@ -42,6 +46,10 @@ int main(int argc, char *argv[]) {
 	register_rtaudio_driver();
 #endif
 
+#ifdef JACK_ENABLED
+	register_jack_driver();
+#endif
+
 #ifdef RTMIDI_ENABLED
 	register_rtmidi_driver();
 #endif
@@ -62,14 +70,15 @@ int main(int argc, char *argv[]) {
 			if (node.has("audio")) { //audio
 				JSON::Node audio_node = node.get("audio");
 				std::string driver_id = audio_node.get("id").toString();
-
+				printf("Driver ID '%s'\n",driver_id.c_str());
 				for (int i = 0; i < SoundDriverManager::get_driver_count(); i++) {
 					SoundDriver *driver = SoundDriverManager::get_driver(i);
 					if (driver->get_id() == driver_id.c_str()) {
+						printf("found\n");
 						use_driver_index = i;
+						break;
 					}
 
-					break;
 				}
 
 				int mixing_hz = audio_node.get("mixing_hz");
@@ -187,9 +196,40 @@ int main(int argc, char *argv[]) {
 					SettingsDialog::set_default_command(index, name, c);
 				}
 			}
+
+			if (node.has("midi_banks")) { //default commands
+
+				JSON::Node midi_banks = node.get("midi_banks");
+
+				for (int i = 0; i < midi_banks.getCount(); i++) {
+
+					JSON::Node bank = midi_banks.get(i);
+
+					int index = bank.get("index").toInt();
+					String path;
+					path.parse_utf8(bank.get("path").toString().c_str());
+
+					MIDIBankManager::set_device_file_path(index,path);
+				}
+
+			}
+
+			if (node.has("favorite_midi_patches")) { //default commands
+
+				JSON::Node favorites = node.get("favorite_midi_patches");
+
+				for (int i = 0; i < favorites.getCount(); i++) {
+
+					MIDIBankManager::get_favorites().insert(favorites.get(i).toString());
+				}
+
+			}
+
 		}
+
 		SoundDriverManager::init_driver(use_driver_index);
 		MIDIDriverManager::init_input_driver(use_midi_in_driver_index);
+		MIDIBankManager::reload_devices();
 	}
 
 	printf("regfx\n");
@@ -241,16 +281,17 @@ int main(int argc, char *argv[]) {
 
 	printf("go\n");
 
-	Interface window(app.operator->(), &effect_factory, &theme, &key_bindings);
-	window.set_default_size(1280, 720);
+	Interface * window = new Interface(app.operator->(), &effect_factory, &theme, &key_bindings);
+	window->set_default_size(1280, 720);
 #ifdef VST2_ENABLED
-	window.add_editor_plugin_function(get_vst2_editor_function());
+	window->add_editor_plugin_function(get_vst2_editor_function());
 #endif
 #ifdef LV2_ENABLED
-	window.add_editor_plugin_function(get_lv2_editor_function());
+	window->add_editor_plugin_function(get_lv2_editor_function());
 #endif
-	int ret = app->run(window);
+	int ret = app->run(*window);
 
+	delete window;
 	printf("bye\n");
 
 	SoundDriverManager::finish_driver();
@@ -262,6 +303,11 @@ int main(int argc, char *argv[]) {
 #ifdef RTAUDIO_ENABLED
 	cleanup_rtaudio_driver();
 #endif
+
+#ifdef JACK_ENABLED
+	cleanup_jack_driver();
+#endif
+
 #ifdef LV2_ENABLED
 	EffectEditorLV2::finalize_lv2_editor();
 #endif

@@ -10,6 +10,8 @@
 #include "gui/pattern_editor.h"
 #include "gui/settings_dialog.h"
 #include "gui/track_editor.h"
+#include "engine/loader_it.h"
+
 #include <gtkmm.h>
 
 class Interface : public Gtk::ApplicationWindow {
@@ -17,6 +19,7 @@ private:
 	enum {
 		FILE_NEW,
 		FILE_OPEN,
+		FILE_IMPORT_IT,
 		FILE_SAVE,
 		FILE_SAVE_AS,
 		FILE_QUIT,
@@ -70,6 +73,7 @@ private:
 	Glib::RefPtr<Gio::Menu> menu;
 	Glib::RefPtr<Gio::Menu> file_menu;
 	Glib::RefPtr<Gio::Menu> file_menu_file;
+	Glib::RefPtr<Gio::Menu> file_menu_import;
 	Glib::RefPtr<Gio::Menu> file_menu_export;
 	Glib::RefPtr<Gio::Menu> file_menu_exit;
 
@@ -248,7 +252,7 @@ private:
 
 	bool _close_request(GdkEventAny *event);
 
-	static void _process_audio(AudioFrame *p_frames, int p_amount);
+	static void _process_audio(AudioFrame *p_frames, int p_amount, MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size,int &r_events_written);
 	static void _process_midi(double p_delta, const MIDIEvent &p_event);
 
 	void _update_song_process_order();
@@ -274,7 +278,14 @@ private:
 
 	bool _on_editor_window_gained_focus(GdkEventFocus *, Track *p_track);
 
+	Loader_IT loader_it;
+
 public:
+
+	bool play_keyboard_note_for_pattern(GdkEventKey *p_key,bool p_on);
+
+	static Interface *get_singleton() { return singleton; }
+
 	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);
 
 	Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings);

@@ -160,7 +160,10 @@ public:
 	String to_lower() const;
 	String get_extension() const;
 
+	String strip_parentheticals() const;
+
 	String strip_edges();
+	uint32_t hash() const;
 
 	String();
 	String(CharType p_char);

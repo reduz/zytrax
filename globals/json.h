@@ -40,8 +40,12 @@ typedef std::pair<std::string, Node> NamedNode;
 
 class Node {
 public:
-	class iterator : public std::iterator<std::input_iterator_tag, NamedNode> {
+    class iterator {
 	public:
+
+        using iterator_category = std::input_iterator_tag;
+        using value_type = NamedNode;
+
 		iterator() :
 				p(0) {}
 		iterator(NamedNode *o) :
@@ -68,8 +72,12 @@ public:
 	private:
 		NamedNode *p;
 	};
-	class const_iterator : public std::iterator<std::input_iterator_tag, const NamedNode> {
+    class const_iterator {
 	public:
+
+        using iterator_category = std::input_iterator_tag;
+        using value_type = const NamedNode;
+
 		const_iterator() :
 				p(0) {}
 		const_iterator(const NamedNode *o) :

@@ -8,28 +8,75 @@
 #define BEND_VIBRATO_MAX_DEPTH_SEMITONES 1.0
 #define SLIDE_BASE_SPEED 100
 
-AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const Event *p_events, int p_event_count, float p_time, int &r_stamped_event_count) {
+
+void AudioEffectMIDI::_get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch) {
+	r_bank_lsb=0;
+	r_bank_msb=0;
+	r_patch=0;
+}
+
+MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const Event *p_events, int p_event_count, float p_time, int &r_stamped_event_count) {
 
 	int idx = 0;
 
 	//smart parameters
 
+	int bank_lsb, bank_msb, patch;
+	_get_bank_and_patch(bank_lsb, bank_msb, patch);
+
 	if (reset_pending) {
 
-		if (custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].visible || custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].get_command()) {
-
+		{ // Turn off all sound
 			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
-			process_events[idx].event.control.index = 127;
-			process_events[idx].event.control.parameter = 127;
+			process_events[idx].event.control.index = 123; // All notes off
+			process_events[idx].event.control.parameter = 0;
 			process_events[idx].event.channel = midi_channel;
 			process_events[idx].frame = 0;
 			idx++;
+
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 120; // All sound off
+			process_events[idx].event.control.parameter = 0;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 121; // Reset all controllers
+			process_events[idx].event.control.parameter = 0;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
+		}
+
+		for(int i=0;i<MIDIEvent::CC_MAX;i++) {
+			if (cc_use_default_values[i]) {
+				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+				process_events[idx].event.control.index = MIDIEvent::cc_indices[i]; // Reset all controllers
+				process_events[idx].event.control.parameter = cc_default_values[i];
+				process_events[idx].event.channel = midi_channel;
+				process_events[idx].frame = 0;
+				idx++;
+			}
+		}
+
+		if (custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].visible || custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].get_command()) {
+
 			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
 			process_events[idx].event.control.index = 65;
 			process_events[idx].event.control.parameter = 0;
 			process_events[idx].event.channel = midi_channel;
 			process_events[idx].frame = 0;
+			smart_porta_in_use = false;
 			idx++;
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 68;
+			process_events[idx].event.control.parameter = 0;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
 		}
 
 		update_pitch_bend_range = true;
@@ -41,17 +88,32 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 			idx++;
 		}
 
+		{ // bank and patch
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 0; // Bank MSB
+			process_events[idx].event.control.parameter = bank_msb;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 32; // Bank HSB
+			process_events[idx].event.control.parameter = bank_lsb;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
+			process_events[idx].event.type = MIDIEvent::MIDI_PATCH_SELECT;
+			process_events[idx].event.patch.index = patch;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+
+		}
+
+
 		current_pitch_bend = 0;
 		extra_pitch_bend = 0;
-		bend_portamento_last_note = -1;
-		bend_portamento_target_note = -1;
-		prev_bend_portamento = false;
-		prev_bend_slide = false;
-
-		bp_remap_note_off_from = -1;
-		bp_remap_note_off_to = -1;
-		prev_bend_vibrato = 0;
-
 		reset_pending = false;
 	}
 
@@ -81,254 +143,45 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 		process_events[idx].event.channel = midi_channel;
 		process_events[idx].frame = 0;
 		idx++;
+
+		if (mono_mode==MONO_MODE_ENABLE) {
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 126;
+			process_events[idx].event.control.parameter = 1;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+		} if (mono_mode==MONO_MODE_DISABLE) {
+			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+			process_events[idx].event.control.index = 127;
+			process_events[idx].event.control.parameter = 0;
+			process_events[idx].event.channel = midi_channel;
+			process_events[idx].frame = 0;
+			idx++;
+		}
+
 		update_pitch_bend_range = false;
 	}
 
-	//used by bend portamento
-	bool ignore_note_off = false;
-	bool ignore_note_on = false;
 
-	if (custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].visible || custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].get_command()) {
-		//use smart bend
-
-		float bend_portamento = custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].get_normalized();
-
-		if (bend_portamento == 0) {
-
-			bool found_note_or_off = false;
-
-			for (int i = 0; i < p_event_count; i++) {
-				if (p_events[i].type == Event::TYPE_NOTE) {
-					bend_portamento_last_note = p_events[i].param8;
-					found_note_or_off = true;
-				}
-				if (p_events[i].type == Event::TYPE_NOTE_OFF) {
-					found_note_or_off = true;
-				}
-			}
-			bend_portamento_target_note = -1;
-			if (prev_bend_portamento && found_note_or_off) {
-				//send event
-				current_pitch_bend = 0;
-				process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-				process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-				process_events[idx].event.channel = midi_channel;
-				process_events[idx].frame = 0;
-				idx++;
-				//reset pitch bend
-				prev_bend_portamento = false;
-			}
-
-		} else {
-
-			//exclusive
-			if (custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].was_set) {
-				custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].value = 0;
-				custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].value = 0;
-				custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].was_set = false;
-			}
-
-			bool found_note = false;
-			bool found_note_off = false;
-			for (int i = 0; i < p_event_count; i++) {
-				if (p_events[i].type == Event::TYPE_NOTE) {
-					bend_portamento_target_note = p_events[i].param8;
-					found_note = true;
-				}
-				if (p_events[i].type == Event::TYPE_NOTE_OFF) {
-					found_note_off = true;
-				}
-			}
-
-			if (found_note && found_note_off) { //combo (one note ends, another starts)
-				ignore_note_off = true; //do not want
-				if (bend_portamento_last_note != -1) {
-					bp_remap_note_off_from = bend_portamento_target_note;
-					bp_remap_note_off_to = bend_portamento_last_note;
-				}
-			}
-
-			if (found_note) {
-				ignore_note_on = true;
-			}
-
-			if (bend_portamento_last_note != -1 && bend_portamento_target_note != -1) {
-
-				//semitone difference
-				float note_diff = bend_portamento_target_note - bend_portamento_last_note;
-				//convert pitch bend to semitones (for more same speed no matter range);
-				float pitch_bend_semitones = float(current_pitch_bend) * pitch_bend_range / PITCH_BEND_MAX;
-
-				float diff = note_diff - pitch_bend_semitones;
-				if (diff != 0) {
-					pitch_bend_semitones += MIN(ABS(diff) * p_time * bend_portamento * BEND_BASE_SPEED, ABS(diff)) * SIGN(diff);
-
-					current_pitch_bend = int(pitch_bend_semitones * PITCH_BEND_MAX / pitch_bend_range);
-
-					//send event
-					process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-					process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + extra_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-					process_events[idx].event.channel = midi_channel;
-					process_events[idx].frame = 0;
-					idx++;
-				}
-
-				prev_bend_portamento = true;
-			}
-		}
-		custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].was_set = false;
-	}
-
-	if (custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].visible || custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].get_command()) {
-
-		float bend_slide = custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].get_normalized();
-
-		if (bend_slide > 0.0 || prev_bend_slide) {
-
-			if (bend_slide > 0 && custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].was_set) {
-				//they are exclusive
-				custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].value = 0;
-			}
-			bool found_note = false;
-
-			for (int i = 0; i < p_event_count; i++) {
-				if (p_events[i].type == Event::TYPE_NOTE) {
-					found_note = true;
-				}
-			}
-
-			if (found_note) {
-				current_pitch_bend = 0;
-				prev_bend_slide = false;
-			} else {
-
-				double decrease = p_time * SLIDE_BASE_SPEED * bend_slide * double(PITCH_BEND_MAX / pitch_bend_range);
-				current_pitch_bend -= int(decrease);
-				if (current_pitch_bend < PITCH_BEND_MIN) {
-					current_pitch_bend = PITCH_BEND_MIN;
-				}
-
-				//reset pitch bend
-				prev_bend_slide = true;
-			}
-
-			process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-			process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-			process_events[idx].event.channel = midi_channel;
-			process_events[idx].frame = 0;
-			idx++;
-		}
-
-		custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].was_set = false;
-	}
-
-	if (custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].visible || custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].get_command()) {
-
-		float bend_slide = custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].get_normalized();
-
-		if (bend_slide > 0.0 || prev_bend_slide) {
-
-			if (bend_slide > 0 && custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].was_set) {
-				//they are exclusive
-				custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].value = 0;
-			}
-			bool found_note = false;
-
-			for (int i = 0; i < p_event_count; i++) {
-				if (p_events[i].type == Event::TYPE_NOTE) {
-					found_note = true;
-				}
-			}
-
-			if (found_note) {
-				current_pitch_bend = 0;
-				prev_bend_slide = false;
-			} else {
-
-				double decrease = p_time * SLIDE_BASE_SPEED * bend_slide * double(PITCH_BEND_MAX / pitch_bend_range);
-				current_pitch_bend += int(decrease);
-				if (current_pitch_bend < PITCH_BEND_MIN) {
-					current_pitch_bend = PITCH_BEND_MIN;
-				}
-
-				//reset pitch bend
-				prev_bend_slide = true;
-			}
-
-			process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-			process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-			process_events[idx].event.channel = midi_channel;
-			process_events[idx].frame = 0;
-			idx++;
-		}
-
-		custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].was_set = false;
-	}
-
-	if (custom_ports[CUSTOM_MIDI_BEND_VIBRATO].visible || custom_ports[CUSTOM_MIDI_BEND_VIBRATO].get_command()) {
-		int bend_vibrato = int(custom_ports[CUSTOM_MIDI_BEND_VIBRATO].get());
-
-		if (bend_vibrato) {
-
-			if (prev_bend_vibrato == 0) {
-				//turn on
-				bend_vibrato_time = 0;
-			}
-
-			float depth = (float(bend_vibrato % 10) / 9.0) * BEND_VIBRATO_MAX_DEPTH_SEMITONES;
-			float rate = (float(bend_vibrato / 10) / 9.0) * BEND_VIBRATO_MAX_RATE_HZ;
-
-			extra_pitch_bend = (sin(bend_vibrato_time) * depth) * float(PITCH_BEND_MAX) / pitch_bend_range;
-
-			bend_vibrato_time += p_time * rate * 3.14159265359 * 2.0;
-
-			//send event
-			process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-			process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + extra_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-			process_events[idx].event.channel = midi_channel;
-			process_events[idx].frame = 0;
-			idx++;
-
-		} else {
-
-			if (prev_bend_vibrato) {
-
-				//send event
-				extra_pitch_bend = 0;
-				process_events[idx].event.type = MIDIEvent::MIDI_PITCH_BEND;
-				process_events[idx].event.pitch_bend.bend = CLAMP(current_pitch_bend + extra_pitch_bend + PITCH_BEND_MAX, 0, 16383);
-				process_events[idx].event.channel = midi_channel;
-				process_events[idx].frame = 0;
-				idx++;
-			}
-		}
-
-		prev_bend_vibrato = bend_vibrato;
-	}
-
-	{
+	if (true) {
 		if ((custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].visible || custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].get_command()) && custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].was_set) {
 			float value = custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].get();
 			if (value == 0) {
-				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
-				process_events[idx].event.control.index = 127;
-				process_events[idx].event.control.parameter = 127;
-				process_events[idx].event.channel = midi_channel;
-				process_events[idx].frame = 0;
-				idx++;
 				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
 				process_events[idx].event.control.index = 65;
 				process_events[idx].event.control.parameter = 0;
 				process_events[idx].event.channel = midi_channel;
 				process_events[idx].frame = 0;
 				idx++;
-			} else {
 				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
-				process_events[idx].event.control.index = 126;
-				process_events[idx].event.control.parameter = 127;
+				process_events[idx].event.control.index = 68;
+				process_events[idx].event.control.parameter = 0;
 				process_events[idx].event.channel = midi_channel;
 				process_events[idx].frame = 0;
 				idx++;
+				smart_porta_in_use=false;
+			} else {
 				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
 				process_events[idx].event.control.index = 65;
 				process_events[idx].event.control.parameter = 127;
@@ -337,12 +190,20 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 				idx++;
 				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
 				process_events[idx].event.control.index = 5;
-				process_events[idx].event.control.parameter = CLAMP(int(value * 127), 0, 127);
+				process_events[idx].event.control.parameter = 127 - CLAMP(int(value * 127), 0, 127);
 				process_events[idx].event.channel = midi_channel;
 				process_events[idx].frame = 0;
 				idx++;
+				process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
+				process_events[idx].event.control.index = 68;
+				process_events[idx].event.control.parameter = 127;
+				process_events[idx].event.channel = midi_channel;
+				process_events[idx].frame = 0;
+				idx++;
+				smart_porta_in_use=false;
 			}
 			custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].was_set = false;
+
 		}
 
 		if ((custom_ports[CUSTOM_MIDI_PITCH_BEND].visible || custom_ports[CUSTOM_MIDI_PITCH_BEND].get_command()) && custom_ports[CUSTOM_MIDI_PITCH_BEND].was_set) {
@@ -383,15 +244,6 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 			idx++;
 			custom_ports[CUSTOM_MIDI_AFTERTOUCH].was_set = false;
 		}
-
-		if ((custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].visible || custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].get_command()) && custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].was_set) {
-			process_events[idx].event.type = MIDIEvent::MIDI_PATCH_SELECT;
-			process_events[idx].event.patch.index = CLAMP(int(custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].value), 0, 127);
-			process_events[idx].event.channel = midi_channel;
-			process_events[idx].frame = 0;
-			idx++;
-			custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].was_set = false;
-		}
 	}
 
 	//midi macros
@@ -417,15 +269,17 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 	}
 
 	//events
+	const int max_delayed_note_offs = 32;
+	int delayed_note_offs[max_delayed_note_offs];
+	int delayed_note_off_count = 0;
+
 	for (int i = 0; i < p_event_count; i++) {
 		if (idx == INTERNAL_MIDI_EVENT_BUFFER_SIZE) {
 			break;
 		}
 		switch (p_events[i].type) {
 			case Event::TYPE_NOTE: {
-				if (ignore_note_on) {
-					continue;
-				}
+
 				process_events[idx].event.type = MIDIEvent::MIDI_NOTE_ON;
 				process_events[idx].event.note.note = p_events[i].param8;
 
@@ -433,17 +287,24 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 
 			} break;
 			case Event::TYPE_NOTE_OFF: {
-				if (ignore_note_off) {
-					continue;
+				if (smart_porta_in_use) {
+					bool off_on=false;
+					for(int j=i+1;j<p_event_count;j++) {
+						if (p_events[j].type == Event::TYPE_NOTE && p_events[j].offset==p_events[i].offset && p_events[j].param8 != p_events[i].param8) {
+							off_on=true;
+							break;
+						}
+					}
+					if (off_on) {
+						if (delayed_note_off_count < max_delayed_note_offs) {
+							delayed_note_offs[delayed_note_off_count++]=i;
+							continue;
+						}
+
+					}
 				}
 				process_events[idx].event.type = MIDIEvent::MIDI_NOTE_OFF;
-				if (bp_remap_note_off_from == p_events[i].param8) {
-					process_events[idx].event.note.note = bp_remap_note_off_to;
-					bp_remap_note_off_from = -1;
-					bp_remap_note_off_to = -1;
-				} else {
-					process_events[idx].event.note.note = p_events[i].param8;
-				}
+				process_events[idx].event.note.note = p_events[i].param8;
 				process_events[idx].event.note.velocity = uint8_t(CLAMP(p_events[i].paramf * 127.0, 0.0, 127.0));
 			} break;
 			case Event::TYPE_AFTERTOUCH: {
@@ -452,14 +313,29 @@ AudioEffectMIDI::MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const E
 				process_events[idx].event.note.velocity = uint8_t(CLAMP(p_events[i].paramf * 127.0, 0.0, 127.0));
 			} break;
 			case Event::TYPE_BPM: {
-				process_events[idx].event.type = MIDIEvent::SEQ_TEMPO;
-				process_events[idx].event.tempo.tempo = p_events[i].param8;
-
+				//process_events[idx].event.type = MIDIEvent::SEQ_TEMPO;
+				//process_events[idx].event.tempo.tempo = p_events[i].param8;
+				continue;
 			} break;
 		};
 
 		process_events[idx].event.channel = midi_channel;
 		process_events[idx].frame = p_events[i].offset;
+		idx++;
+	}
+
+	for(int i=0;i<delayed_note_off_count;i++ ){
+		if (idx == INTERNAL_MIDI_EVENT_BUFFER_SIZE) {
+			break;
+		}
+
+		int noff_i = delayed_note_offs[i];
+		process_events[idx].event.type = MIDIEvent::MIDI_NOTE_OFF;
+		process_events[idx].event.note.note = p_events[noff_i].param8;
+		process_events[idx].event.note.velocity = uint8_t(CLAMP(p_events[noff_i].paramf * 127.0, 0.0, 127.0));
+
+		process_events[idx].event.channel = midi_channel;
+		process_events[idx].frame = p_events[noff_i].offset + 1; // Has to be immediately after note.
 		idx++;
 	}
 
@@ -490,13 +366,40 @@ bool AudioEffectMIDI::is_cc_visible(MIDIEvent::CC p_cc) const {
 	return cc_ports[p_cc].visible;
 }
 
+void AudioEffectMIDI::set_cc_use_default_value(MIDIEvent::CC p_cc, bool p_enable) {
+	cc_use_default_values[p_cc]=p_enable;
+}
+
+bool AudioEffectMIDI::get_cc_use_default_value(MIDIEvent::CC p_cc) const{
+	return cc_use_default_values[p_cc];
+}
+
+void AudioEffectMIDI::set_cc_default_value(MIDIEvent::CC p_cc, int p_value){
+	cc_default_values[p_cc]=p_value;
+}
+
+int AudioEffectMIDI::get_cc_default_value(MIDIEvent::CC p_cc) const{
+	return cc_default_values[p_cc];
+}
+
+
 void AudioEffectMIDI::set_midi_channel(int p_channel) {
 	ERR_FAIL_INDEX(p_channel, 16);
 	midi_channel = p_channel;
+	_reset_midi();
 }
 int AudioEffectMIDI::get_midi_channel() const {
 	return midi_channel;
 }
+
+void AudioEffectMIDI::set_mono_mode(MonoMode p_mode) {
+	mono_mode=p_mode;
+	_reset_midi();
+}
+AudioEffectMIDI::MonoMode AudioEffectMIDI::get_mono_mode() const {
+	return mono_mode;
+}
+
 
 void AudioEffectMIDI::set_midi_macro(int p_macro, const Vector<uint8_t> &p_bytes) {
 	ERR_FAIL_INDEX(p_macro, CUSTOM_MIDI_MACRO_MAX);
@@ -511,12 +414,20 @@ JSON::Node AudioEffectMIDI::to_json() const {
 
 	JSON::Node node = JSON::object();
 	JSON::Node enabled_ccs = JSON::array();
+	JSON::Node default_val_ccs = JSON::array();
 	for (int i = 0; i < MIDIEvent::CC_MAX; i++) {
 		if (cc_ports[i].visible) {
 			enabled_ccs.add(MIDIEvent::cc_names[i]);
 		}
+		if (cc_use_default_values[i]) {
+			JSON::Node defval = JSON::object();
+			defval.add("cc",MIDIEvent::cc_names[i]);
+			defval.add("value",cc_default_values[i]);
+			default_val_ccs.add(defval);
+		}
 	}
 	node.add("enabled_ccs", enabled_ccs);
+	node.add("default_value_ccs", default_val_ccs);
 	JSON::Node macros = JSON::array();
 	for (int i = 0; i < CUSTOM_MIDI_MACRO_MAX; i++) {
 		if (midi_macro[i].size()) {
@@ -532,6 +443,7 @@ JSON::Node AudioEffectMIDI::to_json() const {
 
 	node.add("midi_channel", midi_channel);
 	node.add("pitch_bend_range", pitch_bend_range);
+	node.add("mono_mode", mono_mode);
 
 	JSON::Node effect_node = _internal_to_json();
 
@@ -553,6 +465,27 @@ Error AudioEffectMIDI::from_json(const JSON::Node &node) {
 		}
 	}
 
+	for (int j = 0; j < MIDIEvent::CC_MAX; j++) {
+		cc_use_default_values[j]=false;
+		cc_default_values[j]=0;
+	}
+
+	if (node.has("default_value_ccs")) {
+		JSON::Node defvals = node.get("default_value_ccs");
+		for (int i = 0; i < defvals.getCount(); i++) {
+			JSON::Node defval = defvals.get(i);
+			std::string ccname= defval.get("cc").toString();
+			int ccval = defval.get("value").toInt();
+			for (int j = 0; j < MIDIEvent::CC_MAX; j++) {
+				if (ccname == MIDIEvent::cc_names[j]) {
+					cc_use_default_values[j]=true;
+					cc_default_values[j]=ccval;
+					break;
+				}
+			}
+		}
+	}
+
 	if (node.has("macros")) {
 		JSON::Node macros = node.get("macros");
 		for (int i = 0; i < macros.getCount(); i++) {
@@ -562,6 +495,10 @@ Error AudioEffectMIDI::from_json(const JSON::Node &node) {
 			ERR_CONTINUE(index < 0 || index >= CUSTOM_MIDI_MACRO_MAX);
 			midi_macro[index] = base64_decode(b64);
 		}
+	}
+
+	if (node.has("mono_mode")) {
+		mono_mode = MonoMode(node.get("mono_mode").toInt());
 	}
 
 	midi_channel = node.get("midi_channel").toInt();
@@ -583,10 +520,6 @@ int AudioEffectMIDI::get_pitch_bend_range() const {
 
 void AudioEffectMIDI::_reset_midi() {
 	reset_pending = true;
-	custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].value = 0;
-	custom_ports[CUSTOM_MIDI_BEND_VIBRATO].value = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].value = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].value = 0;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].value = 0;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND_UP].value = 0;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND_DOWN].value = 0;
@@ -598,36 +531,12 @@ AudioEffectMIDI::AudioEffectMIDI() {
 	midi_channel = 0;
 	//set built in control ports
 
-	custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].name = "Bend Portamento";
-	custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].identifier = "bend_portamento";
-	custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].max = 1.0;
-	custom_ports[CUSTOM_MIDI_BEND_PORTAMENTO].step = 0.001;
-
-	custom_ports[CUSTOM_MIDI_BEND_VIBRATO].name = "Bend Vibrato";
-	custom_ports[CUSTOM_MIDI_BEND_VIBRATO].identifier = "bend_vibrato";
-	custom_ports[CUSTOM_MIDI_BEND_VIBRATO].max = 99;
-	custom_ports[CUSTOM_MIDI_BEND_VIBRATO].step = 1;
-
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].name = "Pitch Bend";
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].identifier = "pitch_bend";
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].value = 0;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].min = -8192;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].max = 8191;
 	custom_ports[CUSTOM_MIDI_PITCH_BEND].step = 1;
-
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].name = "Bend Slide Up";
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].identifier = "bend_slide_up";
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].value = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].min = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].max = 1;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_UP].step = 0.001;
-
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].name = "Bend Slide Down";
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].identifier = "bend_slide_down";
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].value = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].min = 0;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].max = 1;
-	custom_ports[CUSTOM_MIDI_BEND_SLIDE_DOWN].step = 0.001;
 
 	custom_ports[CUSTOM_MIDI_PITCH_BEND_UP].name = "Pitch Bend Up";
 	custom_ports[CUSTOM_MIDI_PITCH_BEND_UP].identifier = "pitch_bend_up";
@@ -655,13 +564,6 @@ AudioEffectMIDI::AudioEffectMIDI() {
 	custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].max = 1.0;
 	custom_ports[CUSTOM_MIDI_SMART_PORTAMENTO].step = 0.001;
 
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].name = "Change Program";
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].identifier = "change_program";
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].value = 0;
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].min = 0;
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].max = 99;
-	custom_ports[CUSTOM_MIDI_CHANGE_PROGRAM].step = 1;
-
 	custom_ports[CUSTOM_MIDI_MACRO].name = "MIDI Macros";
 	custom_ports[CUSTOM_MIDI_MACRO].identifier = "midi_macro";
 	custom_ports[CUSTOM_MIDI_MACRO].max = 99;
@@ -685,13 +587,10 @@ AudioEffectMIDI::AudioEffectMIDI() {
 	cc_ports[MIDIEvent::CC_EXPRESSION].value = 127;
 
 	pitch_bend_range = 2;
-	bend_portamento_last_note = -1;
+	mono_mode = MONO_MODE_DEFAULT;
 
-	prev_bend_vibrato = 0;
 	reset_pending = true;
 	current_pitch_bend = 0;
 	extra_pitch_bend = 0;
-	prev_bend_portamento = false;
 	update_pitch_bend_range = true;
-	prev_bend_slide = false;
 }

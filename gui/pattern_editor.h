@@ -203,6 +203,7 @@ protected:
 	Glib::RefPtr<Gio::Menu> track_menu_add;
 	Glib::RefPtr<Gio::Menu> track_menu_column;
 	Glib::RefPtr<Gio::Menu> track_menu_command;
+	Glib::RefPtr<Gio::Menu> track_menu_merge;
 	Glib::RefPtr<Gio::Menu> track_menu_solo;
 	Glib::RefPtr<Gio::Menu> track_menu_edit;
 	Glib::RefPtr<Gio::Menu> track_menu_remove;
@@ -218,6 +219,7 @@ protected:
 	int _cursor_get_track_begin_column();
 	int _cursor_get_track_end_column();
 
+	std::set<int> pressed_notes;
 public:
 	sigc::signal1<void, int> track_edited;
 	sigc::signal0<void> track_layout_changed;
@@ -260,6 +262,8 @@ public:
 
 	void set_focus_on_track(int p_track);
 	void initialize_menus();
+
+	bool play_keyboard_note(GdkEventKey *p_key,bool p_on);
 
 	PatternEditor(Song *p_song, UndoRedo *p_undo_redo, Theme *p_theme, KeyBindings *p_bindings);
 	~PatternEditor();

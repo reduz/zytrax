@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "effect_editor_default.h"
 #include "effect_editor_sf2.h"
+#include "effect_editor_midi_device.h"
 #include "icons.h"
 
 void Interface::_add_track() {
@@ -241,6 +242,66 @@ void Interface::_on_action_activated(KeyBindings::KeyBind p_bind) {
 						error_box.run();
 						error_box.hide();
 					}
+				}
+			}
+
+		} break;
+		case KeyBindings::FILE_IMPORT_IT: {
+
+			Gtk::FileChooserDialog dialog("Select an Impulse Tracker file to open",
+					Gtk::FILE_CHOOSER_ACTION_OPEN);
+			dialog.set_transient_for(*this);
+			dialog.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+
+			//Add response buttons the the dialog:
+			gboolean swap_buttons;
+			g_object_get(gtk_settings_get_default(), "gtk-alternative-button-order", &swap_buttons, NULL);
+			if (swap_buttons) {
+				dialog.add_button("Select", Gtk::RESPONSE_OK);
+				dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+			} else {
+				dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+				dialog.add_button("Select", Gtk::RESPONSE_OK);
+			}
+
+			auto filter_zt = Gtk::FileFilter::create();
+			filter_zt->set_name("Impulse Tracker files");
+			filter_zt->add_pattern("*.it");
+			filter_zt->add_pattern("*.IT");
+			dialog.add_filter(filter_zt);
+
+			if (song_path != String()) {
+				dialog.set_filename(song_path.utf8().get_data());
+			}
+
+			int result = dialog.run();
+			dialog.hide();
+
+			if (result == Gtk::RESPONSE_OK) {
+
+				active_effect_editors.clear();
+				song.clear();
+				undo_redo.clean();
+
+				String path;
+				path.parse_utf8(dialog.get_filename().c_str());
+
+				loader_it.link_to_song(&song);
+				int err = loader_it.import_it(path);
+
+				save_version = 0;
+				_update_editors();
+				_update_tracks();
+				_update_title();
+				_update_colors();
+				song_path = String();
+
+				if (err != 0) {
+					Gtk::MessageDialog error_box("Error importing IT file", false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+					error_box.set_transient_for(*this);
+					error_box.set_position(Gtk::WIN_POS_CENTER_ON_PARENT);
+					error_box.run();
+					error_box.hide();
 				}
 			}
 
@@ -1101,6 +1162,9 @@ void Interface::_on_application_startup() {
 	file_menu_file->append("Open", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_OPEN).ascii().get_data());
 	file_menu_file->append("Save", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_SAVE).ascii().get_data());
 	file_menu_file->append("Save As", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_SAVE_AS).ascii().get_data());
+	file_menu_import = Gio::Menu::create();
+	file_menu_import->append("Import IT (Impulse Tracker)", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_IMPORT_IT).ascii().get_data());
+	file_menu->append_section(file_menu_import);
 	file_menu_export = Gio::Menu::create();
 	file_menu->append_section(file_menu_export);
 	file_menu_export->append("Export to WAV", key_bindings->get_keybind_detailed_name(KeyBindings::FILE_EXPORT_WAV).ascii().get_data());
@@ -1267,9 +1331,9 @@ bool Interface::_close_request(GdkEventAny *event) {
 	return true;
 }
 
-void Interface::_process_audio(AudioFrame *p_frames, int p_amount) {
+void Interface::_process_audio(AudioFrame *p_frames, int p_amount, MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size, int &r_events_written) {
 
-	singleton->song.process_audio(p_frames, p_amount);
+    singleton->song.process_audio(p_frames, p_amount, p_event_buffer, p_event_buffer_max_size, r_events_written);
 }
 
 void Interface::_process_midi(double p_delta, const MIDIEvent &p_event) {
@@ -1362,6 +1426,12 @@ bool Interface::_on_editor_window_gained_focus(GdkEventFocus *, Track *p_track) 
 
 	return false;
 }
+
+bool Interface::play_keyboard_note_for_pattern(GdkEventKey *p_key,bool p_on) {
+	return pattern_editor.play_keyboard_note(p_key,p_on);
+}
+
+
 Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_factory, Theme *p_theme, KeyBindings *p_key_bindings) :
 		add_effect_dialog(p_fx_factory),
 		song_file(&song, p_fx_factory),
@@ -1644,6 +1714,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	add_editor_plugin_function(&create_default_editor_func);
 	add_editor_plugin_function(&create_sf2_editor);
+	add_editor_plugin_function(&create_midi_device_editor);
 }
 
 Interface::~Interface() {

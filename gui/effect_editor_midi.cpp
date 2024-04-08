@@ -1,5 +1,21 @@
 #include "effect_editor_midi.h"
 
+void EffectEditorMIDI::_mono_changed() {
+
+	Gtk::TreeModel::iterator iter = midi_mono_combo.get_active();
+	if (iter) {
+		Gtk::TreeModel::Row row = *iter;
+		if (row) {
+			//Get the data for the selected row, using our knowledge of the tree
+			//model:
+			int id = row[mono_model_columns.index];
+
+			midi_effect->set_mono_mode(AudioEffectMIDI::MonoMode(id));
+		}
+	}
+}
+
+
 void EffectEditorMIDI::_cc_toggled(const Glib::ustring &path) {
 
 	Gtk::TreeIter iter = cc_list_store->get_iter(path);
@@ -9,6 +25,25 @@ void EffectEditorMIDI::_cc_toggled(const Glib::ustring &path) {
 	midi_effect->set_cc_visible(MIDIEvent::CC(int((*iter)[cc_model_columns.index])), !visible);
 
 	effect_editor->update_automations();
+}
+
+void EffectEditorMIDI::_cc_defval_toggled(const Glib::ustring &path) {
+
+	Gtk::TreeIter iter = cc_list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+	bool def = (*iter)[cc_model_columns.use_default_value];
+	(*iter)[cc_model_columns.use_default_value] = !def;
+	midi_effect->set_cc_use_default_value(MIDIEvent::CC(int((*iter)[cc_model_columns.index])), !def);
+
+}
+
+void EffectEditorMIDI::_cc_defval_edited(const Glib::ustring& path, const Glib::ustring& new_text) {
+	Gtk::TreeIter iter = cc_list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+	int cc = std::stoi(new_text);
+	(*iter)[cc_model_columns.default_value] = cc;
+	midi_effect->set_cc_default_value(MIDIEvent::CC(int((*iter)[cc_model_columns.index])), cc);
+
 }
 
 void EffectEditorMIDI::_midi_channel_changed() {
@@ -98,6 +133,37 @@ EffectEditorMIDI::EffectEditorMIDI(AudioEffectMIDI *p_effect, EffectEditor *p_ed
 	midi_pitch_bend_range_spinbox.get_adjustment()->set_value(midi_effect->get_pitch_bend_range());
 	midi_pitch_bend_range_spinbox.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_midi_pitch_bend_range_changed));
 
+	midi_mono_label.set_text("Mono / Poly Mode:");
+
+	{
+
+		mono_list_store = Gtk::ListStore::create(mono_model_columns);
+		midi_mono_combo.set_model(mono_list_store);
+
+		const char *beat_mono_text[3] = {
+			"Disabled",
+			"Force Mono",
+			"Force Poly",
+		};
+
+		for (int i = 0; i < 3; i++) {
+			Gtk::TreeModel::Row row = *(mono_list_store->append());
+			row[mono_model_columns.name] = beat_mono_text[i];
+			row[mono_model_columns.index] = i;
+
+			if (p_effect->get_mono_mode()==i) {
+				midi_mono_combo.set_active(row);
+			}
+		}
+
+		midi_mono_combo.pack_start(mono_model_columns.name);
+		midi_mono_combo.signal_changed().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_mono_changed));
+	}
+
+	midi_grid.attach(midi_mono_label, 0, 2, 1, 1);
+	midi_mono_label.set_hexpand(true);
+	midi_grid.attach(midi_mono_combo, 1, 2, 1, 1);
+
 	cc_vbox.pack_start(cc_separator, Gtk::PACK_SHRINK);
 	cc_vbox.pack_start(cc_scroll, Gtk::PACK_EXPAND_WIDGET);
 	cc_scroll.add(cc_tree);
@@ -111,9 +177,22 @@ EffectEditorMIDI::EffectEditorMIDI(AudioEffectMIDI *p_effect, EffectEditor *p_ed
 	cc_enabled_check.signal_toggled().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_cc_toggled));
 	cc_column.add_attribute(cc_enabled_check.property_active(), cc_model_columns.visible);
 	cc_column.add_attribute(cc_enabled_text.property_text(), cc_model_columns.name);
+
+	cc_defval_column.set_title("Use Default Value");
+	cc_defval_column.pack_start(cc_defval_enabled_check, false);
+	cc_defval_column.pack_start(cc_defval_edit_check, false);
+	cc_defval_edit_check.property_editable() = true;
+	cc_defval_edit_check.property_adjustment() = Gtk::Adjustment::create(0, 0, 127);
+	cc_defval_enabled_check.signal_toggled().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_cc_defval_toggled));
+	cc_defval_column.add_attribute(cc_defval_enabled_check.property_active(), cc_model_columns.use_default_value);
+	cc_defval_edit_check.signal_edited().connect(sigc::mem_fun(*this, &EffectEditorMIDI::_cc_defval_edited));
+	cc_defval_column.add_attribute(cc_defval_edit_check.property_text(), cc_model_columns.default_value);
+
 	cc_tree.set_model(cc_list_store);
 	cc_tree.append_column(cc_column);
+	cc_tree.append_column(cc_defval_column);
 	cc_tree.get_column(0)->set_expand(true);
+	//cc_tree.get_column(1)->set_expand(true);
 
 	for (int i = 0; i < MIDIEvent::CC_MAX; i++) {
 
@@ -123,6 +202,10 @@ EffectEditorMIDI::EffectEditorMIDI(AudioEffectMIDI *p_effect, EffectEditor *p_ed
 		row[cc_model_columns.name] = MIDIEvent::cc_names[i];
 		row[cc_model_columns.visible] = midi_effect->is_cc_visible(MIDIEvent::CC(i));
 		row[cc_model_columns.index] = i;
+
+		row[cc_model_columns.use_default_value] = p_effect->get_cc_use_default_value(MIDIEvent::CC(i));
+		row[cc_model_columns.default_value] = p_effect->get_cc_default_value(MIDIEvent::CC(i));
+
 	}
 
 	append_page(macro_vbox, "MIDI Macros");

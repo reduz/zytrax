@@ -20,6 +20,7 @@ else:
 
 opts.Add(EnumVariable("platform","Platform to build",detected_platform,("windows","osx","freedesktop")))
 opts.Add(BoolVariable("enable_rtaudio","Use RtAudio as Sound Driver",True))
+opts.Add(BoolVariable("enable_jack","Use Jack as Sound Driver",True))
 opts.Add(BoolVariable("use_jack","Use Jack with RtAudio",False))
 opts.Add(BoolVariable("use_pulseaudio","Use Pulseaudio with RtAudio",True))
 opts.Add(BoolVariable("use_alsa","Use Alsa with RtAudio and RtMidi",True))
@@ -40,6 +41,14 @@ if (detected_platform==""):
 if (env["enable_rtaudio"]):
 
 	env.Append(CXXFLAGS=["-DRTAUDIO_ENABLED"])
+
+if (env["enable_jack"]):
+	try:
+		env.ParseConfig(f'pkg-config --cflags --libs jack')
+		env.Append(CXXFLAGS=["-DJACK_ENABLED"])
+	except SCons.Script.SConsEnvironmentError:
+		print("Jack support requested but pkg-config could not find it, disabling. ");
+		env["enable_jack"]=False
 
 if (env["enable_rtmidi"]):
 

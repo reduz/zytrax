@@ -447,6 +447,70 @@ void SettingsDialog::_plugin_path_edited(const Glib::ustring &path, const Glib::
 	_save_settings();
 }
 
+
+void SettingsDialog::_browse_midi_banks_path() {
+	Gtk::FileChooserDialog dialog("Select a .PAT file",
+			Gtk::FILE_CHOOSER_ACTION_OPEN);
+
+	dialog.set_transient_for(*this);
+
+	auto filter_pat = Gtk::FileFilter::create();
+	filter_pat->set_name("Patch Definition (Band in a Box)");
+	filter_pat->add_pattern("*.pat");
+	dialog.add_filter(filter_pat);
+
+	//Add response buttons the the dialog:
+	gboolean swap_buttons;
+	g_object_get(gtk_settings_get_default(), "gtk-alternative-button-order", &swap_buttons, NULL);
+	if (swap_buttons) {
+		dialog.add_button("Select", Gtk::RESPONSE_OK);
+		dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+	} else {
+		dialog.add_button("Cancel", Gtk::RESPONSE_CANCEL);
+		dialog.add_button("Select", Gtk::RESPONSE_OK);
+	}
+
+	Gtk::TreeModel::iterator iter = midi_banks_tree_selection->get_selected();
+	if (!iter)
+		return;
+
+	Gtk::TreeModel::Row row = *iter;
+	int index = row[midi_banks_model_columns.index];
+
+	String existing = MIDIBankManager::get_device_file_path(index);
+	if (existing != String()) {
+		dialog.set_filename(existing.utf8().get_data());
+	}
+
+	int result = dialog.run();
+	if (result == Gtk::RESPONSE_OK) {
+		String path;
+		path.parse_utf8(dialog.get_filename().c_str());
+		MIDIBankManager::set_device_file_path(index, path);
+		row[midi_banks_model_columns.text] = dialog.get_filename();
+		row[midi_banks_model_columns.name] = MIDIBankManager::get_device_file_name(index).utf8().get_data();
+		MIDIBankManager::reload_devices();
+		update_bank_list.emit();
+		_save_settings();
+	}
+}
+
+void SettingsDialog::_midi_banks_path_edited(const Glib::ustring &path, const Glib::ustring &text) {
+
+	Gtk::TreeIter iter = midi_banks_list_store->get_iter(path);
+	ERR_FAIL_COND(!iter);
+	String s;
+	s.parse_utf8(text.c_str());
+
+	int index = (*iter)[midi_banks_model_columns.index];
+	MIDIBankManager::set_device_file_path(index, s);
+	(*iter)[midi_banks_model_columns.text] = s.utf8().get_data();
+	(*iter)[midi_banks_model_columns.name] = MIDIBankManager::get_device_file_name(index).utf8().get_data();
+	MIDIBankManager::reload_devices();
+	update_bank_list.emit();
+	_save_settings();
+}
+
 void SettingsDialog::_color_selected(int p_index) {
 
 	if (theme_color_list.get_selected() >= 0) {
@@ -556,6 +620,11 @@ void SettingsDialog::initialize_bindings() {
 	}
 }
 
+void SettingsDialog::save_settings() {
+	_save_settings();
+}
+
+
 void SettingsDialog::_save_settings() {
 	String save_to = get_settings_path() + "/settings.json";
 	JSON::Node node = JSON::object();
@@ -644,6 +713,31 @@ void SettingsDialog::_save_settings() {
 		}
 
 		node.add("default_commands", def_commands);
+	}
+
+	{ // MIDI Banks
+		JSON::Node midi_banks = JSON::array();
+		for (int i = 0; i < MIDIBankManager::MAX_DEVICE_FILES; i++) {
+			if (MIDIBankManager::get_device_file_path(i) == "") {
+				continue;
+			}
+			JSON::Node command = JSON::object();
+			command.add("index", i);
+			command.add("path", MIDIBankManager::get_device_file_path(i).utf8().get_data());
+			midi_banks.add(command);
+		}
+
+		node.add("midi_banks", midi_banks);
+	}
+
+	{ // PATCH Favorites
+		JSON::Node favorites = JSON::array();
+		for(std::set<std::string>::const_iterator I = MIDIBankManager::get_favorites().begin() ; I != MIDIBankManager::get_favorites().end() ; I++) {
+
+			favorites.add(*I);
+		}
+
+		node.add("favorite_midi_patches", favorites);
 	}
 
 	save_json(save_to, node);
@@ -962,9 +1056,58 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	scan_plugins.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDialog::_scan_plugins));
 	scan_plugins.set_label("Scan");
 
+
+	//////////////////////
+	notebook.append_page(banks_vbox, "MIDI Banks");
+
+	banks_vbox.pack_start(midi_banks_scroll, Gtk::PACK_EXPAND_WIDGET);
+	midi_banks_scroll.add(midi_banks_tree);
+
+	midi_banks_list_store = Gtk::ListStore::create(midi_banks_model_columns);
+	midi_banks_tree_selection = midi_banks_tree.get_selection();
+
+	midi_banks_tree.append_column("Index", midi_banks_model_columns.label);
+
+	midi_bank_names_column.set_title("Name");
+	midi_bank_names_column.pack_start(midi_bank_names_column_text, false);
+	midi_bank_names_column.add_attribute(midi_bank_names_column_text.property_text(), midi_banks_model_columns.name);
+	midi_banks_tree.append_column(midi_bank_names_column);
+
+
+	midi_banks_column.set_title("Path");
+	midi_banks_column.pack_start(midi_banks_column_text, true);
+	midi_banks_column_text.property_editable() = true;
+	midi_banks_column_text.signal_edited().connect(sigc::mem_fun(*this, &SettingsDialog::_midi_banks_path_edited));
+	midi_banks_column.add_attribute(midi_banks_column_text.property_text(), midi_banks_model_columns.text);
+	midi_banks_tree.append_column(midi_banks_column);
+
+	midi_banks_tree.set_model(midi_banks_list_store);
+	midi_banks_tree.get_column(0)->set_expand(false);
+	midi_banks_tree.get_column(1)->set_expand(false);
+	midi_banks_tree.get_column(2)->set_expand(true);
+
+	for (int i = 0; i < MIDIBankManager::MAX_DEVICE_FILES; i++) {
+
+		Gtk::TreeModel::iterator iter = midi_banks_list_store->append();
+		Gtk::TreeModel::Row row = *iter;
+
+		row[midi_banks_model_columns.label] = String::num(i).utf8().get_data();
+		row[midi_banks_model_columns.name] = MIDIBankManager::get_device_file_name(i).utf8().get_data();
+		row[midi_banks_model_columns.text] = MIDIBankManager::get_device_file_path(i).utf8().get_data();
+		row[midi_banks_model_columns.index] = i;
+
+		if (i == 0) {
+			midi_banks_tree_selection->select(row);
+		}
+	}
+
+	banks_vbox.pack_start(midi_banks_hbox, Gtk::PACK_SHRINK);
+	midi_banks_hbox.pack_start(midi_banks_browse_path, Gtk::PACK_EXPAND_WIDGET);
+	midi_banks_browse_path.signal_clicked().connect(sigc::mem_fun(*this, &SettingsDialog::_browse_midi_banks_path));
+	midi_banks_browse_path.set_label("Browse..");
+
 	//////////////////////
 
-	notebook.append_page(theme_vbox, "Theme Settings");
 
 	theme_vbox.set_spacing(4);
 	theme_vbox.set_margin_left(8);
@@ -1150,24 +1293,22 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	}
 
 	if (!has_default_commands) {
-		default_commands[0].name = "bend_portamento";
+		default_commands[0].name = "smart_portamento";
 		default_commands[0].command = 'g';
-		default_commands[1].name = "bend_vibrato";
-		default_commands[1].command = 'h';
-		default_commands[2].name = "bend_slide_up";
-		default_commands[2].command = 'f';
-		default_commands[3].name = "bend_slide_down";
-		default_commands[3].command = 'e';
-		default_commands[4].name = "cc_Pan";
-		default_commands[4].command = 'w';
-		default_commands[5].name = "cc_Expression";
-		default_commands[5].command = 'm';
-		default_commands[6].name = "cc_Breath";
-		default_commands[6].command = 'b';
-		default_commands[7].name = "cc_Modulation";
-		default_commands[7].command = 'u';
-		default_commands[8].name = "cc_FilterCutoff";
-		default_commands[8].command = 'z';
+		default_commands[1].name = "pitch_bend_up";
+		default_commands[1].command = 'f';
+		default_commands[2].name = "pitch_bend_down";
+		default_commands[2].command = 'e';
+		default_commands[3].name = "cc_Pan";
+		default_commands[3].command = 'w';
+		default_commands[4].name = "cc_Expression";
+		default_commands[4].command = 'm';
+		default_commands[5].name = "cc_Breath";
+		default_commands[5].command = 'b';
+		default_commands[6].name = "cc_Modulation";
+		default_commands[6].command = 'h';
+		default_commands[7].name = "cc_FilterCutoff";
+		default_commands[7].command = 'z';
 	}
 
 	_update_command_list();

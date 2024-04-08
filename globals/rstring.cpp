@@ -1107,6 +1107,24 @@ String String::get_extension() const {
 	return substr(pos + 1, length());
 }
 
+String String::strip_parentheticals() const {
+	String ret;
+	int parenthesis=0;
+	for(int i=0;i<length();i++) {
+		CharType c = operator[](i);
+		if (c=='(') {
+			parenthesis++;
+		} else if (c==')') {
+			parenthesis--;
+		} else if (parenthesis==0) {
+			ret += c;
+		}
+	}
+
+	return ret;
+}
+
+
 String String::to_upper() const {
 
 	String upper = *this;
@@ -1135,4 +1153,36 @@ String String::to_lower() const {
 	}
 
 	return lower;
+}
+
+uint32_t String::hash() const {
+	constexpr uint32_t c1 = 0xcc9e2d51;
+	constexpr uint32_t c2 = 0x1b873593;
+	constexpr uint32_t r1 = 15;
+	constexpr uint32_t r2 = 13;
+	constexpr uint32_t m = 5;
+	constexpr uint32_t n = 0xe6546b64;
+	uint32_t seed = 0xAB982F71;
+
+	uint32_t len = length();
+
+	uint32_t h = seed;
+	for (int i = 0; i < length(); i++) {
+		uint32_t k = operator[](i);
+		k *= c1;
+		k = (k << r1) | (k >> (32 - r1));
+		k *= c2;
+
+		h ^= k;
+		h = ((h << r2) | (h >> (32 - r2))) * m + n;
+	}
+
+	h ^= len;
+	h ^= (h >> 16);
+	h *= 0x85ebca6b;
+	h ^= (h >> 13);
+	h *= 0xc2b2ae35;
+	h ^= (h >> 16);
+
+	return h;
 }

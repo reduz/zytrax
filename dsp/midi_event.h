@@ -2,6 +2,9 @@
 #define MIDI_EVENT_H
 
 #include "globals/error_list.h"
+#include <cstdint>
+
+class String;
 
 struct MIDIEvent {
 public:
@@ -14,6 +17,7 @@ public:
 		CC_PORTAMENTO_TIME,
 		CC_DATA_ENTRY_MSB,
 		CC_MAIN_VOLUME,
+		CC_BALANCE,
 		CC_PAN,
 		CC_EXPRESSION,
 		CC_BANK_SELECT_LSB,
@@ -45,6 +49,8 @@ public:
 		CC_RESET_ALL_CC_CMD,
 		CC_LOCAL_CTRL_TOGGLE,
 		CC_ALL_NOTES_OFF,
+		CC_MONO_MODE,
+		CC_POLY_MODE,
 		CC_MAX
 	};
 
@@ -67,7 +73,10 @@ public:
 		MIDI_AFTERTOUCH = 0xD, //channel pressure
 		MIDI_PITCH_BEND = 0xE,
 		MIDI_SYSEX = 0xF, //this will not be used here for now anway
+		TYPE_MAX=0x10,
 	};
+
+	static const char *type_names[TYPE_MAX];
 
 	unsigned char type; //see Type enum
 	unsigned char channel; // 0 - 15
@@ -143,8 +152,21 @@ public:
 
 	Error parse(unsigned char *p_raw);
 	bool write(unsigned char *p_to) const;
+
+	operator String() const;
 	MIDIEvent();
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned char data1, unsigned char data2);
 	MIDIEvent(Type p_type, unsigned char p_chan, unsigned short data);
 };
+
+struct MIDIEventStamped {
+	int32_t frame = 0;
+	MIDIEvent event;
+};
+
+struct MIDIEventRouted : public MIDIEventStamped {
+	uint32_t port_hash;
+};
+
+
 #endif // EVENT_H

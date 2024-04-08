@@ -306,6 +306,9 @@ void PatternEditor::initialize_menus() {
 	track_menu->append_section(track_menu_command);
 	track_menu_command->append("Add Command Column", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_ADD_COMMAND_COLUMN).ascii().get_data());
 	track_menu_command->append("Remove Command Column", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_REMOVE_COMMAND_COLUMN).ascii().get_data());
+	track_menu_merge = Gio::Menu::create();
+	track_menu->append_section(track_menu_merge);
+	track_menu_merge->append("Merge Next Track", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_MERGE_NEXT).ascii().get_data());
 	track_menu_solo = Gio::Menu::create();
 	track_menu->append_section(track_menu_solo);
 	track_menu_solo->append("Mute", key_bindings->get_keybind_detailed_name(KeyBindings::TRACK_MUTE).ascii().get_data());
@@ -720,6 +723,7 @@ void PatternEditor::_validate_menus() {
 	key_bindings->set_action_enabled(KeyBindings::TRACK_REMOVE_COMMAND_COLUMN, current_track >= 0 && song->get_track(current_track)->get_command_column_count() > 0);
 	key_bindings->set_action_enabled(KeyBindings::TRACK_MOVE_LEFT, current_track > 0);
 	key_bindings->set_action_enabled(KeyBindings::TRACK_MOVE_RIGHT, current_track >= 0 && current_track < song->get_track_count() - 1);
+	key_bindings->set_action_enabled(KeyBindings::TRACK_MERGE_NEXT, current_track >= 0);
 	key_bindings->set_action_enabled(KeyBindings::TRACK_MUTE, current_track >= 0);
 	key_bindings->set_action_checked(KeyBindings::TRACK_MUTE, current_track >= 0 && song->get_track(current_track)->is_muted());
 	key_bindings->set_action_enabled(KeyBindings::TRACK_SOLO, current_track >= 0);
@@ -884,6 +888,75 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				undo_redo->commit_action();
 
 			} break;
+			case KeyBindings::TRACK_MERGE_NEXT: {
+				if (current_track +1 >= song->get_track_count()) {
+					break;
+				}
+
+				int remove_track = current_track + 1;
+
+				undo_redo->begin_action("Merge Next");
+				undo_redo->do_method(song, &Song::remove_track, remove_track);
+				undo_redo->undo_method(song, &Song::add_track_at_pos,
+						song->get_track(remove_track),
+						remove_track);
+				for (int i = 0; i < song->get_track_count(); i++) {
+					if (i == remove_track) {
+						continue;
+					}
+					Track *track = song->get_track(i);
+					for (int j = 0; j < track->get_send_count(); j++) {
+						int send_to = track->get_send_track(j);
+						if (send_to == Track::SEND_SPEAKERS) {
+							continue; //nothing to do
+						}
+						int removed = 0;
+						if (send_to < remove_track) {
+							continue;
+
+						} else if (send_to > remove_track) {
+							undo_redo->do_method(track, &Track::set_send_track, j - removed, send_to - 1);
+							undo_redo->undo_method(track, &Track::set_send_track, j - removed, send_to);
+						} else {
+							//removee
+							undo_redo->do_method(track, &Track::remove_send, j - removed);
+							undo_redo->undo_method(track, &Track::add_send, remove_track, j - removed);
+							undo_redo->undo_method(track, &Track::set_send_amount, j - removed, track->get_send_amount(j));
+							undo_redo->undo_method(track, &Track::set_send_mute, j - removed, track->is_send_muted(j));
+							removed++;
+						}
+					}
+				}
+
+				Track *ctrack = song->get_track(current_track);
+
+				undo_redo->do_method(ctrack,&Track::set_columns,ctrack->get_column_count() + song->get_track(remove_track)->get_column_count());
+				for(int i=0;i<Song::MAX_PATTERN;i++) {
+					List<Track::PosNote> pnote;
+					song->get_track(remove_track)->get_notes_in_range(i,0,song->pattern_get_beats(i) * TICKS_PER_BEAT,&pnote);
+					for (List<Track::PosNote>::Element *E=pnote.front();E;E=E->next()) {
+						Track::PosNote pn = E->get();
+						pn.pos.column+=ctrack->get_column_count();
+						undo_redo->do_method(ctrack,&Track::set_note,i,pn.pos,pn.note);
+						undo_redo->undo_method(ctrack,&Track::set_note,i,pn.pos,Track::Note());
+					}
+				}
+
+				undo_redo->undo_method(ctrack,&Track::set_columns,ctrack->get_column_count());
+
+				undo_redo->do_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_method(this, &PatternEditor::_redraw);
+				undo_redo->undo_data(song->get_track(remove_track));
+				undo_redo->do_method(this, &PatternEditor::_validate_menus);
+				undo_redo->undo_method(this, &PatternEditor::_validate_menus);
+				undo_redo->do_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
+				undo_redo->commit_action();
+
+				for (int i = 0; i < song->get_track(remove_track)->get_audio_effect_count(); i++) {
+					erase_effect_editor_request.emit(song->get_track(remove_track)->get_audio_effect(i));
+				}
+			} break;
 			case KeyBindings::TRACK_SOLO: {
 
 				bool unsolo = true;
@@ -907,14 +980,15 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				for (int i = 0; i < song->get_track_count(); i++) {
 
 					if (unsolo) {
-						undo_redo->do_method(song->get_track(i), &Track::set_muted,
+						undo_redo->do_method(song, &Song::set_mute_track, i,
 								false);
 					} else {
-						undo_redo->do_method(song->get_track(i), &Track::set_muted,
+						undo_redo->do_method(song, &Song::set_mute_track, i,
 								i != current_track);
 					}
-					undo_redo->undo_method(song->get_track(i), &Track::set_muted,
+					undo_redo->undo_method(song, &Song::set_mute_track, i,
 							song->get_track(i)->is_muted());
+
 				}
 				undo_redo->do_method(this, &PatternEditor::_redraw);
 				undo_redo->undo_method(this, &PatternEditor::_redraw);
@@ -926,11 +1000,11 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 			case KeyBindings::TRACK_MUTE: {
 
 				undo_redo->begin_action("Mute");
-				undo_redo->do_method(song->get_track(current_track), &Track::set_muted,
+				undo_redo->do_method(song, &Song::set_mute_track, current_track,
 						!song->get_track(current_track)->is_muted());
-				undo_redo->undo_method(song->get_track(current_track),
-						&Track::set_muted,
+				undo_redo->undo_method(song, &Song::set_mute_track, current_track,
 						song->get_track(current_track)->is_muted());
+
 				undo_redo->do_method(this, &PatternEditor::_redraw);
 				undo_redo->undo_method(this, &PatternEditor::_redraw);
 				undo_redo->do_method(this, &PatternEditor::_validate_menus);
@@ -2267,18 +2341,18 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 				volume_mask_changed.emit();
 			}
 		}
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_LOWER)) {
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_LOWER) || key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_LOWER_ALT)) {
 		if (current_octave > 0) {
 			current_octave--;
 			octave_changed.emit();
 		}
 
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_RAISE)) {
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_RAISE) || key_bindings->is_keybind(key_event, KeyBindings::PATTERN_OCTAVE_RAISE_ALT)) {
 		if (current_octave < 8) {
 			current_octave++;
 			octave_changed.emit();
 		}
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PREV_PATTERN)) {
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PREV_PATTERN) || key_bindings->is_keybind(key_event, KeyBindings::PATTERN_PREV_PATTERN_ALT)) {
 		if (current_pattern > 0) {
 			current_pattern--;
 			pattern_changed.emit();
@@ -2286,7 +2360,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 			queue_draw();
 		}
 
-	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_NEXT_PATTERN)) {
+	} else if (key_bindings->is_keybind(key_event, KeyBindings::PATTERN_NEXT_PATTERN) || key_bindings->is_keybind(key_event, KeyBindings::PATTERN_NEXT_PATTERN_ALT)) {
 		if (current_pattern < Song::MAX_PATTERN - 1) {
 			current_pattern++;
 			pattern_changed.emit();
@@ -3832,6 +3906,60 @@ void PatternEditor::set_focus_on_track(int p_track) {
 			return;
 		}
 	}
+}
+
+bool PatternEditor::play_keyboard_note(GdkEventKey *p_key,bool p_on) {
+
+	for (int i = KeyBindings::PIANO_C0; i <= KeyBindings::PIANO_E2; i++) {
+		if (key_bindings->is_keybind(p_key, KeyBindings::KeyBind(i))) {
+
+			int note = i - KeyBindings::PIANO_C0;
+
+			if (p_on && pressed_notes.find(note) != pressed_notes.end()) {
+				return true;
+			}
+
+			if (p_on) {
+				pressed_notes.insert(note);
+			} else {
+				pressed_notes.erase(note);
+			}
+
+			AudioEffect::Event ev;
+			ev.type = p_on ? AudioEffect::Event::TYPE_NOTE : AudioEffect::Event::TYPE_NOTE_OFF;
+			ev.param8 = current_octave * 12 + note;
+			ev.paramf = 0.9;
+			ev.offset=0;
+
+			song->play_single_event( song->get_event_column_track( cursor.column ), ev);
+
+			return true;
+		}
+	}
+
+	if (p_on && key_bindings->is_keybind(p_key,KeyBindings::PLAYBACK_STOP)) {
+
+		song->stop();
+		return true;
+	}
+
+	if (p_on && (key_bindings->is_keybind(p_key, KeyBindings::PATTERN_OCTAVE_LOWER) || key_bindings->is_keybind(p_key, KeyBindings::PATTERN_OCTAVE_LOWER_ALT))) {
+		if (current_octave > 0) {
+			current_octave--;
+			octave_changed.emit();
+			return true;
+		}
+	}
+
+	if (p_on && (key_bindings->is_keybind(p_key, KeyBindings::PATTERN_OCTAVE_RAISE) || key_bindings->is_keybind(p_key, KeyBindings::PATTERN_OCTAVE_RAISE_ALT))) {
+		if (current_octave < 8) {
+			current_octave++;
+			octave_changed.emit();
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void PatternEditor::on_parsing_error(

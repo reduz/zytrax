@@ -2,11 +2,11 @@
 #define TRACK_H
 
 #include "audio_effect.h"
-#include "audio_lock.h"
-#include "list.h"
-#include "map.h"
-#include "value_stream.h"
-#include "vector.h"
+#include "engine/audio_lock.h"
+#include "globals/list.h"
+#include "globals/map.h"
+#include "globals/value_stream.h"
+#include "globals/vector.h"
 
 #define TICKS_PER_BEAT 192
 typedef uint64_t Tick;
@@ -81,6 +81,7 @@ public:
 		uint8_t volume;
 		inline bool is_empty() const { return (note == EMPTY && volume == EMPTY); }
 		bool operator==(Note p_note) const { return note == p_note.note && volume == p_note.volume; }
+		bool operator!=(Note p_note) const { return note != p_note.note || volume != p_note.volume; }
 
 		Note(uint8_t p_note = EMPTY, uint8_t p_volume = EMPTY) {
 			note = p_note;
@@ -259,7 +260,7 @@ private:
 
 	void process_events(int p_pattern, Tick p_offset, Tick p_from_tick, Tick p_to_tick, int p_bpm, int p_swing_divisor, float p_swing, int p_from = -1, int p_to = -1);
 	void add_single_event(const AudioEffect::Event &p_event);
-	const AudioFrame *process_audio_step();
+	const AudioFrame *process_audio_step(AudioEffect::MidiEventRoutedDispatchCallback p_event_dispatch_callback = nullptr, void *p_event_dispatch_userdata = nullptr);
 
 	bool first_mix;
 
@@ -323,7 +324,7 @@ public:
 	void get_commands_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, int &r_first, int &r_count) const;
 	void get_commands_in_range(int p_pattern, const Pos &p_from, const Pos &p_to, List<PosCommand> *r_commands) const;
 
-	void set_muted(bool p_mute);
+	void set_muted(AudioEffect::MidiEventRoutedDispatchCallback p_callback,void* p_ud,bool p_mute);
 	bool is_muted() const;
 
 	int get_event_column_count() const;

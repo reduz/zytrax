@@ -4,8 +4,8 @@
 #include "dsp/frame.h"
 #include "dsp/midi_event.h"
 #include "globals/json.h"
-#include "rstring.h"
-#include "vector.h"
+#include "globals/rstring.h"
+#include "globals/vector.h"
 #include <memory>
 
 class AudioEffect;
@@ -134,6 +134,11 @@ public:
 
 	virtual void set_process_block_size(int p_size) = 0;
 	virtual void set_sampling_rate(int p_hz) = 0;
+
+	typedef void (*MidiEventRoutedDispatchCallback)(const MIDIEventRouted&,void *); // Used for going to external devices
+
+	virtual void set_routed_midi_event_dispatch_callback(MidiEventRoutedDispatchCallback p_callback, void *p_userdata) {}
+
 	//info
 	virtual String get_name() const = 0;
 	virtual String get_unique_id() const = 0;
@@ -143,6 +148,8 @@ public:
 	virtual ControlPort *get_control_port(int p_port) = 0;
 
 	virtual void reset() = 0;
+
+	virtual void mute() {}
 
 	/* Load/Save */
 

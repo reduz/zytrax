@@ -1,7 +1,7 @@
 #ifndef SONG_H
 #define SONG_H
 
-#include "track.h"
+#include "engine/track.h"
 
 class Song {
 public:
@@ -14,7 +14,8 @@ public:
 		ORDER_EMPTY = 0xFFFFF,
 		ORDER_SKIP = 0xFFFFE,
 		MAX_PATTERN = 999,
-		SINGLE_EVENT_MAX = 1024
+		SINGLE_EVENT_MAX = 1024,
+		MAX_MIDI_EVENTS_PER_MIX = 0xFFFFF
 	};
 
 	enum SwingBeatDivisor {
@@ -59,6 +60,10 @@ private:
 
 	Vector<AudioFrame> buffer;
 	int buffer_pos;
+	MIDIEventRouted midi_event_buffer[MAX_MIDI_EVENTS_PER_MIX];
+	int midi_buffer_pos = 0;
+	MIDIEventRouted main_thread_midi_events[MAX_MIDI_EVENTS_PER_MIX];
+	int main_thread_midi_buffer_pos = 0;
 
 	void _process_audio_step();
 
@@ -102,14 +107,20 @@ private:
 
 	void _pre_capture_automations();
 	void _restore_automations();
+	static void _dispatch_routed_event(const MIDIEventRouted & p_event, void *p_self);
+	void _flush_midi_events(int p_events_from_pos,int p_events_to_pos,int &event_write_ofs,MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size);
+
+	static void _dispatch_main_thread_event(const MIDIEventRouted & p_event, void *p_self);
 
 public:
+
+
 	bool update_process_order();
 
 	void set_process_buffer_size(int p_frames);
 	void set_sampling_rate(int p_hz);
 
-	void process_audio(AudioFrame *p_output, int p_frames);
+	void process_audio(AudioFrame *p_output, int p_frames, MIDIEventRouted *p_event_buffer, int p_event_buffer_max_size, int &r_events_written);
 
 	void pattern_set_beats_per_bar(int p_pattern, int p_beats_per_bar);
 	int pattern_get_beats_per_bar(int p_pattern) const;
@@ -166,6 +177,8 @@ public:
 	void play_next_pattern();
 	void play_prev_pattern();
 	void play_single_event(int p_track, const AudioEffect::Event &p_event);
+
+	void set_mute_track(int p_track,bool p_muted);
 
 	void stop();
 	bool is_playing() const;

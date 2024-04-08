@@ -415,7 +415,7 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 		name.parse_utf8(track.get("name").toString().c_str());
 		t->set_name(name);
 		t->set_mix_volume_db(track.get("volume").toFloat());
-		t->set_muted(track.get("muted").toBool());
+		t->set_muted(nullptr,nullptr,track.get("muted").toBool());
 		int columns = track.get("columns").toInt();
 		t->set_columns(MAX(1, columns));
 		int command_columns = track.get("command_columns").toInt();
@@ -765,7 +765,8 @@ Error SongFile::export_wav(const String &p_path, int p_export_hz, ExportWavPatte
 	song->play(0, 0, false);
 	int current_order = -1;
 	while (song->is_playing()) {
-		song->process_audio(block, block_size);
+		int evw;
+		song->process_audio(block, block_size,nullptr,0,evw);
 		for (int i = 0; i < block_size; i++) {
 			int32_t l = int32_t(CLAMP(double(block[i].l), -1.0, 1.0) * double(2147483647.0));
 			int32_t r = int32_t(CLAMP(double(block[i].r), -1.0, 1.0) * double(2147483647.0));

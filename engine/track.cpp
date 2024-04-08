@@ -796,13 +796,23 @@ void Track::get_events_in_range(int p_pattern, const Pos &p_from, const Pos &p_t
 	}
 }
 
-void Track::set_muted(bool p_mute) {
+void Track::set_muted(AudioEffect::MidiEventRoutedDispatchCallback p_callback, void *p_ud, bool p_mute) {
 
 	_AUDIO_LOCK_
 
 	if (muted == p_mute) {
 		return;
 	}
+	if (p_mute) {
+		for(int i=0;i<effects.size();i++) {
+			if (effects[i]) {
+				effects[i]->set_routed_midi_event_dispatch_callback(p_callback,p_ud);
+				effects[i]->mute();
+				effects[i]->set_routed_midi_event_dispatch_callback(nullptr,nullptr);
+			}
+		}
+	}
+
 	muted = p_mute;
 	first_mix = true; //clear memories when unmuted
 }
@@ -1138,7 +1148,7 @@ void Track::process_events(int p_pattern, Tick p_offset, Tick p_from_tick, Tick 
 	}
 }
 
-const AudioFrame *Track::process_audio_step() {
+const AudioFrame *Track::process_audio_step(AudioEffect::MidiEventRoutedDispatchCallback p_event_dispatch_callback, void *p_event_dispatch_userdata) {
 
 	//see if any of the effects uses the secondary input
 	int effect_count = effects.size();
@@ -1175,11 +1185,14 @@ const AudioFrame *Track::process_audio_step() {
 			if (effects_ptr[i]->is_skipped()) {
 				continue;
 			}
+
+			effects_ptr[i]->set_routed_midi_event_dispatch_callback(p_event_dispatch_callback,p_event_dispatch_userdata);
 			if (effects_ptr[i]->has_secondary_input()) {
 				effects_ptr[i]->process_with_secondary(event_buffer, event_buffer_size, process_buffer_src_ptr, input_buffer_ptr, process_buffer_dst_ptr, first_mix);
 			} else {
 				effects_ptr[i]->process(event_buffer, event_buffer_size, process_buffer_src_ptr, process_buffer_dst_ptr, first_mix);
 			}
+			effects_ptr[i]->set_routed_midi_event_dispatch_callback(nullptr, nullptr);
 
 			SWAP(process_buffer_src_ptr, process_buffer_dst_ptr);
 		}
