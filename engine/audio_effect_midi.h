@@ -13,8 +13,8 @@ public:
 		CUSTOM_MIDI_PITCH_BEND_UP,
 		CUSTOM_MIDI_PITCH_BEND_DOWN,
 		CUSTOM_MIDI_SMART_PORTAMENTO,
+		CUSTOM_MIDI_PITCH_BEND_PORTAMENTO,
 		CUSTOM_MIDI_AFTERTOUCH,
-		CUSTOM_MIDI_MACRO,
 		CUSTOM_MIDI_MAX,
 	};
 
@@ -29,10 +29,18 @@ public:
 		MONO_MODE_DISABLE
 	};
 
+	struct NRPNInfo {
+		int msb =0;
+		int lsb = 0;
+		int default_value = 0;
+		String descriptor;
+	};
+
 private:
 	enum {
 		INTERNAL_MIDI_EVENT_BUFFER_SIZE = 16384,
-		PITCH_BEND_MAX = 8192,
+		PITCH_BEND_BASE = 8192,
+		PITCH_BEND_MAX = 8191,
 		PITCH_BEND_MIN = -8192
 	};
 
@@ -40,21 +48,29 @@ private:
 	bool cc_use_default_values[MIDIEvent::CC_MAX] = {};
 	int cc_default_values[MIDIEvent::CC_MAX] = {};
 	ControlPortDefault custom_ports[CUSTOM_MIDI_MAX];
-	Vector<uint8_t> midi_macro[CUSTOM_MIDI_MACRO_MAX];
+
+	Vector<NRPNInfo> nrpn;
 
 	MIDIEventStamped process_events[INTERNAL_MIDI_EVENT_BUFFER_SIZE];
 
 	int midi_channel;
 	int pitch_bend_range; //in semitones
 	MonoMode mono_mode;
+	float curve_exponent = 1.8;
 
-	bool smart_porta_in_use;
+	bool smart_porta_in_use = false;
+	bool bend_porta_in_use = false;
+	bool reset_bend = false;
 
 	bool reset_pending;
-	int current_pitch_bend;
+	float current_pitch_bend;
 	int extra_pitch_bend;	
+	int target_pitch_bend = 0;
+
+	int last_note = -1;
 
 	bool update_pitch_bend_range;
+
 
 protected:
 	void _reset_midi();
@@ -76,11 +92,17 @@ public:
 	void set_midi_channel(int p_channel);
 	int get_midi_channel() const;
 
+	void set_curve_exponent(float p_exponent);
+	float get_curve_exponent() const;
+
 	void set_mono_mode(MonoMode p_mode);
 	MonoMode get_mono_mode() const;
 
-	void set_midi_macro(int p_macro, const Vector<uint8_t> &p_bytes);
-	Vector<uint8_t> get_midi_macro(int p_macro) const;
+	void set_nrpn(int p_msb, int p_lsb, int p_default_value, const String& p_description);
+	bool has_nrpn(int p_msb, int p_lsb) const;
+	void clear_nrpn(int p_msb, int p_lsb);
+	Vector<NRPNInfo> get_nrpns() const;
+
 
 	virtual int get_control_port_count() const;
 	virtual ControlPort *get_control_port(int p_port);
@@ -91,6 +113,7 @@ public:
 	void set_pitch_bend_range(int p_semitones);
 	int get_pitch_bend_range() const;
 	AudioEffectMIDI();
+	~AudioEffectMIDI();
 };
 
 #endif // AUDIO_EFFECT_MIDI_H

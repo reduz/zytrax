@@ -84,8 +84,9 @@ public:
 				jack_midi_clear_buffer(buffers[i]);
 			}
 
+			//printf("Midi events written: %i\n",midi_events_written);
 			for(uint32_t i=0;i<midi_events_written;i++) {
-				//printf("JACK:-> %s\n",String(midi_events[i].event).utf8().get_data());
+			//	printf("JACK:-> %s\n",String(midi_events[i].event).utf8().get_data());
 				for(uint32_t j=0;j<midi_output_count;j++) {
 					if (midi_outputs[j].device.hash == midi_events[i].port_hash) {
 						// Event belongs here.

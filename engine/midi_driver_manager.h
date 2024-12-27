@@ -86,6 +86,15 @@ private:
 
 	static Vector<Bank> banks;
 
+	struct NRPN {
+		String device_name;
+		char msb;
+		char lsb;
+		String name;
+	};
+
+	static Vector<NRPN> nrpn_list;
+
 	static void _load_device_file(int p_index, String p_file);
 
 	static std::set<std::string> favorites;
@@ -108,6 +117,12 @@ public:
 	static int get_bank_patch_index(int p_bank,int p_patch);
 	static int get_bank_patch_msb(int p_bank,int p_patch);
 	static int get_bank_patch_lsb(int p_bank,int p_patch);
+
+	static int get_nrpn_count();
+	static int get_nrpn_msb(int p_index);
+	static int get_nrpn_lsb(int p_index);
+	static String get_nrpn_name(int p_index);
+	static String get_nrpn_device_name(int p_index);
 
 	static void set_favorite(std::string p_device,std::string p_bank,int p_msb, int p_lsb, int p_patch_index,bool p_favorite);
 	static bool is_favorite(std::string p_device,std::string p_bank,int p_msb, int p_lsb, int p_patch_index);

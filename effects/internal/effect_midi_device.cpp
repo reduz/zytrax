@@ -216,7 +216,7 @@ void AudioEffectMIDIDevice::reset() {
 
 AudioEffectMIDIDevice::AudioEffectMIDIDevice() {
 
-
+	set_pitch_bend_range(12); // whole octave by default in MIDI devices.
 }
 AudioEffectMIDIDevice::~AudioEffectMIDIDevice() {
 }

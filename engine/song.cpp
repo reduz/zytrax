@@ -236,9 +236,9 @@ void Song::process_audio(AudioFrame *p_output, int p_frames, MIDIEventRouted *p_
 
 	_flush_midi_events(event_read_ofs,event_read_ofs + buffer_pos,event_write_ofs,p_event_buffer, p_event_buffer_max_size);
 
-	for(int i=0;i<event_write_ofs;i++) {
+	/*for(int i=0;i<event_write_ofs;i++) {
 		p_event_buffer[i]=midi_event_buffer[i];
-	}
+	}*/
 
 	r_events_written += event_write_ofs;
 }

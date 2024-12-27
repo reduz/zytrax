@@ -216,6 +216,7 @@ protected:
 	Glib::RefPtr<Gio::Menu> automation_menu_remove;
 	Gtk::Menu automation_popup;
 
+	bool _cursor_is_single_track();
 	int _cursor_get_track_begin_column();
 	int _cursor_get_track_end_column();
 

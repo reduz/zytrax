@@ -153,6 +153,17 @@ int PatternEditor::get_visible_rows() const {
 	return visible_rows;
 }
 
+bool PatternEditor::_cursor_is_single_track() {
+
+	Track *track;
+	int automation;
+	int column;
+	int command;
+	get_cursor_column_data(&track, command, automation, column);
+	ERR_FAIL_COND_V(!track, false);
+	return track->get_column_count()==1;
+}
+
 int PatternEditor::_cursor_get_track_begin_column() {
 
 	Track *track;
@@ -1131,9 +1142,9 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				undo_redo->undo_method(this, &PatternEditor::_notify_track_layout_changed);
 				undo_redo->commit_action();
 
-				for (int i = 0; i < song->get_track(current_track)->get_audio_effect_count(); i++) {
-					erase_effect_editor_request.emit(song->get_track(current_track)->get_audio_effect(i));
-				}
+				//for (int i = 0; i < song->get_track(current_track)->get_audio_effect_count(); i++) {
+				//	erase_effect_editor_request.emit(song->get_track(current_track)->get_audio_effect(i));
+				//}
 
 			} break;
 
@@ -2201,7 +2212,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		to.tick = song->pattern_get_beats(current_pattern) * TICKS_PER_BEAT;
 		to.column = cursor.column;
 
-		if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TRACK_INSERT)) {
+		if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TRACK_INSERT) || _cursor_is_single_track()) {
 			from.column = _cursor_get_track_begin_column();
 			to.column = _cursor_get_track_end_column();
 		}
@@ -2257,7 +2268,7 @@ bool PatternEditor::on_key_press_event(GdkEventKey *key_event) {
 		to.tick = song->pattern_get_beats(current_pattern) * TICKS_PER_BEAT;
 		to.column = cursor.column;
 
-		if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TRACK_DELETE)) {
+		if (key_bindings->is_keybind(key_event, KeyBindings::CURSOR_TRACK_DELETE) || _cursor_is_single_track()) {
 			from.column = _cursor_get_track_begin_column();
 			to.column = _cursor_get_track_end_column();
 		}

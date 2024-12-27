@@ -46,6 +46,8 @@ class EffectEditorMIDI : public Gtk::Notebook {
 	Gtk::Grid midi_grid;
 	Gtk::Label midi_channel_label;
 	Gtk::SpinButton midi_channel_spinbox;
+	Gtk::Label curve_exponent_label;
+	Gtk::SpinButton curve_exponent_spinbox;
 	Gtk::Label midi_pitch_bend_range_label;
 	Gtk::SpinButton midi_pitch_bend_range_spinbox;
 	Gtk::Label midi_mono_label;
@@ -56,6 +58,9 @@ class EffectEditorMIDI : public Gtk::Notebook {
 	Gtk::ScrolledWindow cc_scroll;
 	Gtk::CellRendererToggle cc_enabled_check;
 	Gtk::CellRendererText cc_enabled_text;
+	Gtk::Image channel_warning_image;
+	Gtk::Label channel_warning_text;
+	bool channel_warning_visible = false;
 
 	Gtk::CellRendererToggle cc_defval_enabled_check;
 	Gtk::CellRendererSpin cc_defval_edit_check;
@@ -64,26 +69,42 @@ class EffectEditorMIDI : public Gtk::Notebook {
 	Gtk::TreeViewColumn cc_defval_column;
 	Gtk::TreeView cc_tree;
 
-	Gtk::VBox macro_vbox;
-	class MacroModelColumns : public Gtk::TreeModelColumnRecord {
+	Gtk::VBox nrpn_vbox;
+	class NRPNModelColumns : public Gtk::TreeModelColumnRecord {
 	public:
-		MacroModelColumns() {
-			add(label);
-			add(text);
-			add(index);
+		NRPNModelColumns() {
+			add(enable);
+			add(msb);
+			add(lsb);
+			add(name);
+			add(description);
+			add(default_value);
 		}
 
-		Gtk::TreeModelColumn<Glib::ustring> label;
-		Gtk::TreeModelColumn<Glib::ustring> text;
-		Gtk::TreeModelColumn<int> index;
+		Gtk::TreeModelColumn<bool> enable;
+		Gtk::TreeModelColumn<int> msb;
+		Gtk::TreeModelColumn<int> lsb;
+		Gtk::TreeModelColumn<Glib::ustring> name;
+		Gtk::TreeModelColumn<Glib::ustring> description;
+		Gtk::TreeModelColumn<int> default_value;
 	};
-	MacroModelColumns macro_model_columns;
-	Glib::RefPtr<Gtk::ListStore> macro_list_store;
-	Glib::RefPtr<Gtk::TreeSelection> macro_tree_selection;
-	Gtk::TreeViewColumn macro_column;
-	Gtk::CellRendererText macro_column_text;
-	Gtk::ScrolledWindow macro_scroll;
-	Gtk::TreeView macro_tree;
+	NRPNModelColumns nrpn_model_columns;
+	Glib::RefPtr<Gtk::ListStore> nrpn_list_store;
+	Glib::RefPtr<Gtk::TreeSelection> nrpn_tree_selection;
+	Gtk::TreeViewColumn nrpn_column;
+	Gtk::CellRendererText nrpn_column_text;
+	Gtk::ScrolledWindow nrpn_scroll;
+
+	Gtk::CellRendererToggle nrpn_enabled_check;
+	Gtk::CellRendererText nrpn_enabled_text;
+
+	Gtk::CellRendererSpin nrpn_defval_edit_check;
+
+	//Gtk::TreeViewColumn nrpn_column;
+	Gtk::TreeViewColumn nrpn_defval_column;
+
+	Gtk::TreeView nrpn_tree;
+
 
 	void _mono_changed();
 
@@ -91,13 +112,21 @@ class EffectEditorMIDI : public Gtk::Notebook {
 	void _cc_defval_toggled(const Glib::ustring &path);
 	void _cc_defval_edited(const Glib::ustring& path, const Glib::ustring& new_text);
 
+	void _nrpn_toggled(const Glib::ustring &path);
+	void _nrpn_defval_edited(const Glib::ustring& path, const Glib::ustring& new_text);
+
 	void _midi_channel_changed();
+	void _curve_exponent_changed();
 	void _midi_pitch_bend_range_changed();
-	void _macro_edited(const Glib::ustring &path, const Glib::ustring &text);
 
 	String _get_text_from_hex(const Vector<uint8_t> &p_hex);
 
+
 public:
+
+	void update_channel_warning();
+
+	void set_nrpns(const Vector<AudioEffectMIDI::NRPNInfo> &p_nrpn);
 	EffectEditorMIDI(AudioEffectMIDI *p_effect, EffectEditor *p_effect_editor);
 };
 

@@ -124,6 +124,7 @@ void MIDIBankManager::_load_device_file(int p_index, String p_file) {
 	int bank_index=-1;
 	bool bank_empty = true;
 	bool zerobased = false;
+	bool reading_nrpn = false;
 
 	while(!feof(f)) {
 		uint8_t c = fgetc(f);
@@ -155,8 +156,11 @@ void MIDIBankManager::_load_device_file(int p_index, String p_file) {
 			int bracket_open = s.find("[");
 			if (bracket_open != -1) {
 				int bracket_close = s.find("]");
-				if (bracket_close!=-1) {
+				if (bracket_close!=-1) {					
 					bank_name=s.substr(bracket_open+1,bracket_close-bracket_open-1).strip_edges();
+					if (bank_name.to_lower()=="nrpn") {
+						reading_nrpn=true;
+					}
 					bank_empty=true;
 				}
 				continue;
@@ -164,43 +168,73 @@ void MIDIBankManager::_load_device_file(int p_index, String p_file) {
 
 			int equals = s.find("=");
 			if (equals!=-1) {
-				String number = s.get_slice("=",0).strip_edges();
 
-				int patch_index=0;
-				int bank_msb=0;
-				int bank_lsb=0;
+				if (reading_nrpn) {
+					String nrpn = s.get_slice("=",0).strip_edges().to_lower();
+					nrpn.replace(" ","");
+					if (nrpn.length() >=4 ) {
+						NRPN n;
+						char v = 0;
+						for(int i=0;i<4;i++) {
+							char c= nrpn[i];
+							char nibble;
+							if (c>='0' && c<='9') {
+								nibble = c - '0';
+							} else if (c>='a' && c<='f') {
+								nibble = 10 + (c - 'a');
+							}
 
-				int nc = number.get_slice_count(".");
-				if (nc>=1) {
-					patch_index = number.get_slice(".",0).to_int();
-					if (!zerobased) {
-						patch_index--;
+							switch(i) {
+								case 0: v = nibble << 4; break;
+								case 1: v |= nibble; n.msb=nibble; break;
+								case 2: v = nibble << 4; break;
+								case 3: v |= nibble; n.lsb=nibble; break;
+							}
+						}
+
+						n.name = s.get_slice("=",1).strip_edges();
+						n.device_name = device_files[p_index].name;
+						nrpn_list.push_back(n);
 					}
-				}
-				if (nc>=2) {
-					bank_msb = number.get_slice(".",1).to_int();
-				}
-				if (nc>=3) {
-					bank_lsb = number.get_slice(".",2).to_int();
-				}
+				} else {
+					String number = s.get_slice("=",0).strip_edges();
 
-				String name = s.get_slice("=",1).strip_edges();
+					int patch_index=0;
+					int bank_msb=0;
+					int bank_lsb=0;
 
-				if (bank_empty) {
-					Bank bank;
-					bank.device_name=device_files[p_index].name;
-					bank.name = bank_name;
-					bank_index=banks.size();
-					banks.push_back(bank);
-					bank_empty=false;
+					int nc = number.get_slice_count(".");
+					if (nc>=1) {
+						patch_index = number.get_slice(".",0).to_int();
+						if (!zerobased) {
+							patch_index--;
+						}
+					}
+					if (nc>=2) {
+						bank_msb = number.get_slice(".",1).to_int();
+					}
+					if (nc>=3) {
+						bank_lsb = number.get_slice(".",2).to_int();
+					}
+
+					String name = s.get_slice("=",1).strip_edges();
+
+					if (bank_empty) {
+						Bank bank;
+						bank.device_name=device_files[p_index].name;
+						bank.name = bank_name;
+						bank_index=banks.size();
+						banks.push_back(bank);
+						bank_empty=false;
+					}
+
+					Bank::Patch p;
+					p.index=patch_index;
+					p.lsb=bank_lsb;
+					p.msb=bank_msb;
+					p.name=name;
+					banks[bank_index].patch_list.push_back(p);
 				}
-
-				Bank::Patch p;
-				p.index=patch_index;
-				p.lsb=bank_lsb;
-				p.msb=bank_msb;
-				p.name=name;
-				banks[bank_index].patch_list.push_back(p);
 
 				//printf("Device: %s - Bank: %s - MSB: %i - LSB: %i - Patch (%i): %s\n",banks[bank_index].device_name.utf8().get_data(),banks[bank_index].name.utf8().get_data(),p.msb,p.lsb,p.index,p.name.utf8().get_data());
 			}
@@ -418,6 +452,35 @@ int MIDIBankManager::get_bank_patch_lsb(int p_bank,int p_patch) {
 	ERR_FAIL_INDEX_V(p_patch,banks[p_bank].patch_list.size(),0);
 	return banks[p_bank].patch_list[p_patch].lsb;
 }
+
+int MIDIBankManager::get_nrpn_count() {
+	return nrpn_list.size();
+}
+
+int MIDIBankManager::get_nrpn_msb(int p_index) {
+	ERR_FAIL_INDEX_V(p_index,nrpn_list.size(),0);
+	return nrpn_list[p_index].msb;
+}
+
+int MIDIBankManager::get_nrpn_lsb(int p_index) {
+	ERR_FAIL_INDEX_V(p_index,nrpn_list.size(),0);
+	return nrpn_list[p_index].lsb;
+
+}
+
+String MIDIBankManager::get_nrpn_name(int p_index) {
+	ERR_FAIL_INDEX_V(p_index,nrpn_list.size(),String());
+	return nrpn_list[p_index].name;
+
+}
+
+String MIDIBankManager::get_nrpn_device_name(int p_index) {
+	ERR_FAIL_INDEX_V(p_index,nrpn_list.size(),String());
+	return nrpn_list[p_index].device_name;
+}
+
+Vector<MIDIBankManager::NRPN> MIDIBankManager::nrpn_list;
+
 
 std::set<std::string> MIDIBankManager::favorites;
 

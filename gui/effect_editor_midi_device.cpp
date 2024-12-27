@@ -52,6 +52,8 @@ void EffectEditorMIDIDevice::_port_selection_changed() {
 			effect_midi_device->set_port_hash(hash);
 		}
 	}
+
+	effect_editor_midi.update_channel_warning();
 }
 
 void EffectEditorMIDIDevice::_device_selection_changed() {
@@ -71,6 +73,9 @@ void EffectEditorMIDIDevice::_device_selection_changed() {
 	effect_midi_device->set_device_layout_name(selected);
 
 	_update_patches();
+
+	effect_editor_midi.update_channel_warning();
+
 }
 
 void EffectEditorMIDIDevice::_patch_selection_changed() {
@@ -204,6 +209,25 @@ void EffectEditorMIDIDevice::_update_patches() {
 			}
 		}
 	}
+
+	// NRPN list
+
+	Vector<AudioEffectMIDI::NRPNInfo> nrpns;
+
+	for (int i = 0; i < MIDIBankManager::get_nrpn_count(); i++) {
+		if (MIDIBankManager::get_nrpn_device_name(i) != device_name) {
+			continue;
+		}
+
+		AudioEffectMIDI::NRPNInfo ninfo;
+		ninfo.msb = MIDIBankManager::get_nrpn_msb(i);
+		ninfo.lsb = MIDIBankManager::get_nrpn_lsb(i);
+		ninfo.descriptor = MIDIBankManager::get_nrpn_name(i);
+		ninfo.default_value=0;
+		nrpns.push_back(ninfo);
+	}
+
+	effect_editor_midi.set_nrpns(nrpns);
 
 	updating = false;
 }

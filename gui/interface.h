@@ -284,6 +284,8 @@ public:
 
 	bool play_keyboard_note_for_pattern(GdkEventKey *p_key,bool p_on);
 
+	Song* get_song() { return &song; }
+
 	static Interface *get_singleton() { return singleton; }
 
 	void add_editor_plugin_function(EffectEditorPluginFunc p_plugin);

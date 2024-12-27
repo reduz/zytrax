@@ -100,6 +100,8 @@ const unsigned char MIDIEvent::cc_indices[CC_MAX]{
 	97,
 	98,
 	99,
+	100,
+	101,
 	120,
 	121,
 	122,
@@ -191,11 +193,11 @@ bool MIDIEvent::write(unsigned char *p_to) const {
 		p_to[1] = aftertouch.pressure;
 		p_to[2] = 0;
 	} else if (type == MIDI_PITCH_BEND) {
-		p_to[0] = 0xD;
+		p_to[0] = 0xE;
 		p_to[0] <<= 4;
 		p_to[0] |= channel;
-		p_to[1] = pitch_bend.bend >> 7;
-		p_to[2] = pitch_bend.bend & 0x7F;
+		p_to[2] = pitch_bend.bend >> 7;
+		p_to[1] = pitch_bend.bend & 0x7F;
 	} else {
 		return false;
 	}

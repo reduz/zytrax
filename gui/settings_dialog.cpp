@@ -1293,22 +1293,24 @@ SettingsDialog::SettingsDialog(Theme *p_theme, KeyBindings *p_key_bindings, Audi
 	}
 
 	if (!has_default_commands) {
-		default_commands[0].name = "smart_portamento";
+		default_commands[0].name = "bend_portamento";
 		default_commands[0].command = 'g';
-		default_commands[1].name = "pitch_bend_up";
-		default_commands[1].command = 'f';
-		default_commands[2].name = "pitch_bend_down";
-		default_commands[2].command = 'e';
-		default_commands[3].name = "cc_Pan";
-		default_commands[3].command = 'w';
-		default_commands[4].name = "cc_Expression";
-		default_commands[4].command = 'm';
-		default_commands[5].name = "cc_Breath";
-		default_commands[5].command = 'b';
-		default_commands[6].name = "cc_Modulation";
-		default_commands[6].command = 'h';
-		default_commands[7].name = "cc_FilterCutoff";
-		default_commands[7].command = 'z';
+		default_commands[1].name = "smart_portamento";
+		default_commands[1].command = 's';
+		default_commands[2].name = "pitch_bend_up";
+		default_commands[2].command = 'f';
+		default_commands[3].name = "pitch_bend_down";
+		default_commands[3].command = 'e';
+		default_commands[4].name = "cc_Pan";
+		default_commands[4].command = 'w';
+		default_commands[5].name = "cc_Expression";
+		default_commands[5].command = 'm';
+		default_commands[6].name = "cc_Breath";
+		default_commands[6].command = 'b';
+		default_commands[7].name = "cc_Modulation";
+		default_commands[7].command = 'h';
+		default_commands[8].name = "cc_FilterCutoff";
+		default_commands[8].command = 'z';
 	}
 
 	_update_command_list();
