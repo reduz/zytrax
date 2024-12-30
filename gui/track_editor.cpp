@@ -1147,7 +1147,7 @@ TrackRackEditor::~TrackRackEditor() {
 	}
 
 	if (send_menu) {
-		delete menu;
+		delete send_menu;
 	}
 }
 

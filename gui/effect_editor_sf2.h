@@ -27,9 +27,22 @@ class EffectEditorSF2 : public Gtk::VBox {
 	Glib::RefPtr<Gtk::ListStore> list_store;
 	Glib::RefPtr<Gtk::TreeSelection> tree_selection;
 
+	Gtk::Label patch_search_label;
+	Gtk::Entry patch_search_entry;
+	Gtk::HBox patch_search_hbox;
+
 	Gtk::ScrolledWindow scroll;
 
-	Gtk::TreeView tree;
+
+	struct PatchListTree : public Gtk::TreeView {
+
+		//hide on escape
+		virtual bool on_key_press_event(GdkEventKey *key_event) override;
+		virtual bool on_key_release_event(GdkEventKey *key_event) override;
+
+	};
+
+	PatchListTree tree;
 
 	void _open_soundfont();
 	void _selection_changed();

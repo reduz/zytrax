@@ -12,6 +12,8 @@
 #include "effects/internal/effect_reverb.h"
 #include "effects/internal/effect_stereo_enhancer.h"
 #include "effects/internal/effect_midi_device.h"
+#include "effects/internal/effect_distortion.h"
+#include "effects/internal/synth_sinewave.h"
 #include "effects/sf2/synth_sf2.h"
 #include "gui/interface.h"
 
@@ -54,6 +56,9 @@ public:
 		if (p_info->unique_ID == "amplifier") {
 			return new AudioEffectAmplifier;
 		}
+		if (p_info->unique_ID == "distortion") {
+			return new AudioEffectDistortion;
+		}
 		if (p_info->unique_ID == "stereo_enhancer") {
 			return new AudioEffectStereoEnhancer;
 		}
@@ -84,6 +89,9 @@ public:
 		}
 		if (p_info->unique_ID == "filter_high_shelf") {
 			return new AudioEffectFilter(Filter::HIGHSHELF);
+		}
+		if (p_info->unique_ID == "synth_sinewave") {
+			return new SynthSinewave;
 		}
 		if (p_info->unique_ID == "sf2") {
 			return new AudioSynthSF2;
@@ -287,6 +295,22 @@ void register_effects(AudioEffectFactory *p_factory) {
 		p_factory->add_audio_effect(info);
 	}
 	{
+		//Distortion
+		AudioEffectInfo info;
+		info.caption = "Distortion";
+		info.description = "Distortion";
+		info.author = "Juan Linietsky";
+		info.unique_ID = "distortion";
+		info.provider_caption = "Internal";
+		info.category = "Internal Effects";
+		info.version = "1.0";
+		info.synth = false;
+		info.has_ui = false;
+		info.internal = true;
+		info.provider_id = "internal";
+		p_factory->add_audio_effect(info);
+	}
+	{
 		//Stereo Enhancer
 		AudioEffectInfo info;
 		info.caption = "Stereo Enhancer";
@@ -479,6 +503,22 @@ void register_effects(AudioEffectFactory *p_factory) {
 		info.version = "1.0";
 		info.synth = true;
 		info.has_ui = true;
+		info.internal = true;
+		info.provider_id = "internal";
+		p_factory->add_audio_effect(info);
+	}
+	{
+		//midi
+		AudioEffectInfo info;
+		info.caption = "Sinewave Synth";
+		info.description = "Play a sinewave";
+		info.author = "Juan Linietsky";
+		info.unique_ID = "synth_sinewave";
+		info.provider_caption = "Internal";
+		info.category = "Internal MIDI";
+		info.version = "1.0";
+		info.synth = true;
+		info.has_ui = false;
 		info.internal = true;
 		info.provider_id = "internal";
 		p_factory->add_audio_effect(info);

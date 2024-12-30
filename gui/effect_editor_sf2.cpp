@@ -1,4 +1,5 @@
 #include "effect_editor_sf2.h"
+#include "gui/interface.h"
 
 void EffectEditorSF2::_open_soundfont() {
 
@@ -66,12 +67,20 @@ void EffectEditorSF2::_update_patches() {
 	updating = true;
 	list_store->clear();
 
+	String filter;
+	filter.parse_utf8(patch_search_entry.get_text().c_str());
+
 	for (int i = 0; i < synth_sf2->get_preset_count(); i++) {
+
+		String patch_name =synth_sf2->get_preset_name(i);
+		if (filter != String() && patch_name.findn(filter)==-1) {
+			continue;
+		}
 
 		Gtk::TreeModel::iterator iter = list_store->append();
 		Gtk::TreeModel::Row row = *iter;
 
-		row[model_columns.name] = synth_sf2->get_preset_name(i).utf8().get_data();
+		row[model_columns.name] = patch_name.utf8().get_data();
 		row[model_columns.index] = i;
 
 		if (i == synth_sf2->get_preset()) {
@@ -79,6 +88,25 @@ void EffectEditorSF2::_update_patches() {
 		}
 	}
 	updating = false;
+}
+
+bool EffectEditorSF2::PatchListTree::on_key_press_event(GdkEventKey *key_event) {
+	if (::Interface::get_singleton()->play_keyboard_note_for_pattern(key_event,true)) {
+		return true;
+	}
+
+	return Gtk::TreeView::on_key_press_event(key_event);
+
+
+}
+
+bool EffectEditorSF2::PatchListTree::on_key_release_event(GdkEventKey *key_event)  {
+
+	if (::Interface::get_singleton()->play_keyboard_note_for_pattern(key_event,false)) {
+		return true;
+	}
+
+	return Gtk::TreeView::on_key_release_event(key_event);
 }
 
 EffectEditorSF2::EffectEditorSF2(AudioSynthSF2 *p_sf2, EffectEditor *p_editor) :
@@ -94,6 +122,14 @@ EffectEditorSF2::EffectEditorSF2(AudioSynthSF2 *p_sf2, EffectEditor *p_editor) :
 	open_soundfont.signal_clicked().connect(sigc::mem_fun(*this, &EffectEditorSF2::_open_soundfont));
 
 	vbox.pack_start(open_soundfont, Gtk::PACK_SHRINK);
+
+	vbox.pack_start(patch_search_hbox, Gtk::PACK_SHRINK);
+	patch_search_hbox.pack_start(patch_search_label,Gtk::PACK_SHRINK);
+	patch_search_label.set_text("Search: ");
+	patch_search_hbox.pack_start(patch_search_entry,Gtk::PACK_EXPAND_WIDGET);
+	patch_search_entry.signal_changed().connect(sigc::mem_fun(*this, &EffectEditorSF2::_update_patches));
+
+
 	vbox.pack_start(scroll, Gtk::PACK_EXPAND_WIDGET);
 	scroll.add(tree);
 

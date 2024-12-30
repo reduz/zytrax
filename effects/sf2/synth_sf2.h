@@ -5,18 +5,29 @@
 #include "globals/map.h"
 #include "globals/vector.h"
 #include "tsf.h"
+#include <map>
 
 class AudioSynthSF2 : public AudioEffectMIDI {
 private:
-	std::shared_ptr<Vector<uint8_t> > sf2_data;
+	struct SF2Data {
+		uint32_t users = 0;
+		tsf *soundfont = nullptr;
+
+	};
+
+	static std::map<String,SF2Data> sf2_map;
+
 	String data_key;
-	tsf *soundfont;
 	int preset;
 	int mix_rate;
 	int block_size;
+	String sf2_path;
+	tsf *soundfont_copy = nullptr;
 
 	void _update_mixer();
 	void _load_soundfont();
+	bool _load_sf2();
+	void _unload_sf2();
 
 public:
 	virtual int _get_internal_control_port_count() const;
@@ -29,10 +40,6 @@ public:
 	virtual void set_sampling_rate(int p_hz);
 
 	virtual void reset();
-
-	virtual String get_shared_data_key() const;
-	virtual std::shared_ptr<Vector<uint8_t> > get_shared_data() const;
-	virtual void set_shared_data(const std::shared_ptr<Vector<uint8_t> > &p_shared_data);
 
 	/*info */
 	virtual String get_name() const;

@@ -199,12 +199,12 @@ protected:
 
 	void _update_menu(bool p_muted, bool p_is_fx);
 
-	Gtk::Menu *menu;
+	Gtk::Menu *menu = nullptr;
 	Gtk::CheckMenuItem menu_item_mute;
 	Gtk::SeparatorMenuItem menu_item_separator;
 	Gtk::MenuItem menu_item_remove;
 
-	Gtk::Menu *send_menu;
+	Gtk::Menu *send_menu = nullptr;
 	Vector<Gtk::MenuItem *> available_tracks;
 
 	void _insert_send_to_track(int p_idx);

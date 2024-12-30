@@ -179,7 +179,7 @@ void EffectEditorMIDI::update_channel_warning() {
 		for(int j=0;j<track->get_audio_effect_count();j++) {
 			AudioEffect * ae = track->get_audio_effect(j);
 			AudioEffectMIDIDevice *md2 = dynamic_cast<AudioEffectMIDIDevice*>(ae);
-			if (md2 == md) {
+			if (md2 == nullptr || md2 == md) {
 				continue; // same, do not check
 			}
 
