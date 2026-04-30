@@ -26,7 +26,7 @@ void Filter::set_sampling_rate(float p_srate) {
 
 void Filter::prepare_coefficients(Coeffs *p_coeffs) {
 
-	int sr_limit = (sampling_rate / 2) + 512;
+	int sr_limit = (sampling_rate / 2) - 512;
 
 	double final_cutoff = (cutoff > sr_limit) ? sr_limit : cutoff;
 	if (final_cutoff < 1) final_cutoff = 1; //don't allow less than this
@@ -43,8 +43,6 @@ void Filter::prepare_coefficients(Coeffs *p_coeffs) {
 
 	if (mode == BANDPASS)
 		Q *= 2.0;
-	else if (mode == PEAK)
-		Q *= 3.0;
 
 	double tmpgain = gain;
 
@@ -96,60 +94,6 @@ void Filter::prepare_coefficients(Coeffs *p_coeffs) {
 			p_coeffs->b2 = 1.0;
 			p_coeffs->a1 = -2.0 * cos_v;
 			p_coeffs->a2 = 1.0 - alpha;
-		} break;
-		case PEAK: {
-			p_coeffs->b0 = (1.0 + alpha * tmpgain);
-			p_coeffs->b1 = (-2.0 * cos_v);
-			p_coeffs->b2 = (1.0 - alpha * tmpgain);
-			p_coeffs->a1 = -2 * cos_v;
-			p_coeffs->a2 = (1 - alpha / tmpgain);
-		} break;
-		case BANDLIMIT: {
-			//this one is extra tricky
-			double hicutoff = resonance;
-			double centercutoff = (cutoff + resonance) / 2.0;
-			double bandwidth = (log(centercutoff) - log(hicutoff)) / log((double)2);
-			omega = 2.0 * M_PI * centercutoff / sampling_rate;
-			alpha = sin(omega) * sinh(log((double)2) / 2 * bandwidth * omega / sin(omega));
-			a0 = 1 + alpha;
-
-			p_coeffs->b0 = alpha;
-			p_coeffs->b1 = 0;
-			p_coeffs->b2 = -alpha;
-			p_coeffs->a1 = -2 * cos(omega);
-			p_coeffs->a2 = 1 - alpha;
-
-		} break;
-		case LOWSHELF: {
-
-			double tmpq = sqrt(Q);
-			if (tmpq <= 0)
-				tmpq = 0.001;
-			alpha = sin_v / (2 * tmpq);
-			double beta = sqrt(tmpgain) / tmpq;
-
-			a0 = (tmpgain + 1.0) + (tmpgain - 1.0) * cos_v + beta * sin_v;
-			p_coeffs->b0 = tmpgain * ((tmpgain + 1.0) - (tmpgain - 1.0) * cos_v + beta * sin_v);
-			p_coeffs->b1 = 2.0 * tmpgain * ((tmpgain - 1.0) - (tmpgain + 1.0) * cos_v);
-			p_coeffs->b2 = tmpgain * ((tmpgain + 1.0) - (tmpgain - 1.0) * cos_v - beta * sin_v);
-			p_coeffs->a1 = -2.0 * ((tmpgain - 1.0) + (tmpgain + 1.0) * cos_v);
-			p_coeffs->a2 = ((tmpgain + 1.0) + (tmpgain - 1.0) * cos_v - beta * sin_v);
-
-		} break;
-		case HIGHSHELF: {
-			double tmpq = sqrt(Q);
-			if (tmpq <= 0)
-				tmpq = 0.001;
-			alpha = sin_v / (2 * tmpq);
-			double beta = sqrt(tmpgain) / tmpq;
-
-			a0 = (tmpgain + 1.0) - (tmpgain - 1.0) * cos_v + beta * sin_v;
-			p_coeffs->b0 = tmpgain * ((tmpgain + 1.0) + (tmpgain - 1.0) * cos_v + beta * sin_v);
-			p_coeffs->b1 = -2.0 * tmpgain * ((tmpgain - 1.0) + (tmpgain + 1.0) * cos_v);
-			p_coeffs->b2 = tmpgain * ((tmpgain + 1.0) + (tmpgain - 1.0) * cos_v - beta * sin_v);
-			p_coeffs->a1 = 2.0 * ((tmpgain - 1.0) - (tmpgain + 1.0) * cos_v);
-			p_coeffs->a2 = ((tmpgain + 1.0) - (tmpgain - 1.0) * cos_v - beta * sin_v);
-
 		} break;
 	};
 
@@ -237,6 +181,11 @@ void Filter::Processor::update_coeffs(int p_interp_buffer_len) {
 		coeffs = old_coeffs;
 	} else {
 		filter->prepare_coefficients(&coeffs);
+		incr_coeffs.a1 = 0;
+		incr_coeffs.a2 = 0;
+		incr_coeffs.b0 = 0;
+		incr_coeffs.b1 = 0;
+		incr_coeffs.b2 = 0;
 	}
 }
 

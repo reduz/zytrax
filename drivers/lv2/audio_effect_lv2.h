@@ -36,16 +36,41 @@
 class AudioEffectLV2 : public AudioEffectMIDI {
 
 	const LilvPlugin *plugin;
-
 	LilvInstance *instance;
 	LilvInstance *instance2; //stereo pair
-
 	LV2_Extension_Data_Feature ext_data;
 
 	// URI BS
-
 	struct CStringKey {
-		const char *cstring;
+		char *owned_string; // Owns a copy of the string
+		const char *cstring; // Points to owned_string
+
+		CStringKey() :
+				owned_string(nullptr), cstring(nullptr) {}
+
+		CStringKey(const char *p_str) {
+			owned_string = p_str ? strdup(p_str) : nullptr;
+			cstring = owned_string;
+		}
+
+		CStringKey(const CStringKey &p_other) {
+			owned_string = p_other.cstring ? strdup(p_other.cstring) : nullptr;
+			cstring = owned_string;
+		}
+
+		CStringKey &operator=(const CStringKey &p_other) {
+			if (this != &p_other) {
+				free(owned_string);
+				owned_string = p_other.cstring ? strdup(p_other.cstring) : nullptr;
+				cstring = owned_string;
+			}
+			return *this;
+		}
+
+		~CStringKey() {
+			free(owned_string);
+		}
+
 		bool operator<(const CStringKey &p_key) const {
 			return strcmp(cstring, p_key.cstring) < 0;
 		}
@@ -53,6 +78,7 @@ class AudioEffectLV2 : public AudioEffectMIDI {
 
 	Map<CStringKey, LV2_URID> uri_id_map;
 	Map<LV2_URID, CStringKey> id_uri_map;
+	LV2_URID next_urid; // Tracks next URID to assign, starts at 1
 
 	std::atomic_flag locked = ATOMIC_FLAG_INIT;
 
@@ -60,9 +86,9 @@ class AudioEffectLV2 : public AudioEffectMIDI {
 	const char *id_to_urim(LV2_URID id);
 
 	LV2_Atom_Forge forge;
-
-	LV2_URID_Map map; ///< URI => Int map
+	LV2_URID_Map map;   ///< URI => Int map
 	LV2_URID_Unmap unmap; ///< Int => URI map
+
 	struct {
 		LV2_URID atom_Float;
 		LV2_URID atom_Int;
@@ -98,13 +124,11 @@ class AudioEffectLV2 : public AudioEffectMIDI {
 	uint32_t midi_event_id; ///< MIDI event class ID in event context
 
 	//buffers
-
 	LV2_Evbuf *evbuf;
 
-	Vector<Vector<float> > in_buffers;
+	Vector<Vector<float>> in_buffers;
 	Vector<float *> in_buffer_ptrs;
-
-	Vector<Vector<float> > out_buffers;
+	Vector<Vector<float>> out_buffers;
 	Vector<float *> out_buffer_ptrs;
 
 	float samplerate_port;
@@ -120,31 +144,25 @@ class AudioEffectLV2 : public AudioEffectMIDI {
 
 		virtual String get_name() const { return name; }
 		virtual String get_identifier() const { return identifier; }
-
 		virtual float get_min() const { return min * multiplier; }
 		virtual float get_max() const { return max * multiplier; }
 		virtual float get_step() const { return 0; }
 		virtual float get() const { return value * multiplier; }
 		virtual bool is_visible() const { return true; }
-
-		virtual void set(float p_val) { value /= multiplier; }
+		virtual void set(float p_val) { value = p_val / multiplier; } // FIX #1: was ignoring p_val
 	};
 
 	Vector<LV2ControlPort *> control_ports;
-
 	float out_control_trash;
-
 	int buffer_size;
 	int sampling_rate;
 
 	void _update_buffers_and_ports();
-
 	void _plugin_init();
 	void _plugin_finish();
 
 	String name;
 	String identifier;
-
 	bool has_ui;
 
 	void _process_events(const Event *p_events, int p_event_count);
@@ -162,9 +180,9 @@ public:
 	virtual bool has_secondary_input() const;
 	virtual void process(const Event *p_events, int p_event_count, const AudioFrame *p_in, AudioFrame *p_out, bool p_prev_active);
 	virtual void process_with_secondary(const Event *p_events, int p_event_count, const AudioFrame *p_in, const AudioFrame *p_secondary, AudioFrame *p_out, bool p_prev_active);
-
 	virtual void set_process_block_size(int p_size);
 	virtual void set_sampling_rate(int p_hz);
+
 	//info
 	virtual String get_name() const;
 	virtual String get_unique_id() const;
@@ -172,11 +190,9 @@ public:
 
 	virtual int _get_internal_control_port_count() const;
 	virtual ControlPort *_get_internal_control_port(int p_index);
-
 	virtual void reset();
 
 	/* Load/Save */
-
 	virtual JSON::Node _internal_to_json() const;
 	virtual Error _internal_from_json(const JSON::Node &node);
 

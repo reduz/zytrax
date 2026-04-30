@@ -37,6 +37,7 @@ protected:
 	virtual void _beat(int p_bar,int p_offset) {}
 	virtual Voice *create_voice() = 0;
 	virtual void _post_process(AudioFrame *p_out) {} // may not want to.
+	virtual void _block_size_changed(int p_block_size) {}
 
 	void _setup(); // call on constructor
 private:

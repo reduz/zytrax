@@ -802,7 +802,7 @@ String AudioEffectVST2::ControlPortVST2::get_value_as_text() const {
 	label[kVstMaxLabelLen] = 0;
 	String s;
 	s.parse_utf8(label);
-	return s + label;
+	return s;
 }
 
 Error AudioEffectVST2::open(const String &p_path, const String &p_unique_id, const String &p_name, const String &p_provider_id) {

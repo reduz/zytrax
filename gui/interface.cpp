@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "effect_editor_default.h"
 #include "effect_editor_sf2.h"
+#include "effect_editor_chionic.h"
 #include "effect_editor_midi_device.h"
 #include "icons.h"
 
@@ -1714,6 +1715,7 @@ Interface::Interface(Gtk::Application *p_application, AudioEffectFactory *p_fx_f
 
 	add_editor_plugin_function(&create_default_editor_func);
 	add_editor_plugin_function(&create_sf2_editor);
+	add_editor_plugin_function(&create_chionic_editor);
 	add_editor_plugin_function(&create_midi_device_editor);
 }
 
@@ -1722,10 +1724,12 @@ Interface::~Interface() {
 	for (int i = 0; i < menu_items.size(); i++) {
 		delete menu_items[i];
 	}
+
 	for (int i = 0; i < racks.size(); i++) {
 		delete racks[i].rack;
 		delete racks[i].volume;
 	}
+
 	if (rack_filler) {
 		delete rack_filler;
 	}

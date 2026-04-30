@@ -6,6 +6,11 @@ AudioEffectProviderLV2::URIS AudioEffectProviderLV2::uris;
 
 AudioEffect *AudioEffectProviderLV2::instantiate_effect(const AudioEffectInfo *p_info) {
 
+	// Fix #5: Check provider_id once before the loop, not every iteration.
+	if (p_info->provider_id != "LV2") {
+		return NULL;
+	}
+
 	if (!plugins) {
 		lilv_world_load_all(world);
 		plugins = lilv_world_get_all_plugins(world);
@@ -13,12 +18,7 @@ AudioEffect *AudioEffectProviderLV2::instantiate_effect(const AudioEffectInfo *p
 
 	LilvIter *plug_itr = lilv_plugins_begin(plugins);
 
-	for (int i = 0; i < lilv_plugins_size(plugins); ++i) {
-		if (p_info->provider_id != "LV2") {
-			plug_itr = lilv_plugins_next(plugins, plug_itr);
-			continue;
-		}
-
+	for (int i = 0; i < lilv_plugins_size(plugins); i++) {
 		const LilvPlugin *plugin = lilv_plugins_get(plugins, plug_itr);
 
 		const LilvNode *node = lilv_plugin_get_uri(plugin);
@@ -49,8 +49,12 @@ void AudioEffectProviderLV2::scan_effects(AudioEffectFactory *p_factory, ScanCal
 
 	int valid_effects = 0;
 
+	// Fix #3: Create native_ui_type once before the loop.
+	static const char *ui_type_uri = "http://lv2plug.in/ns/extensions/ui#Gtk3UI";
+	LilvNode *native_ui_type = lilv_new_uri(world, ui_type_uri);
+
 	LilvIter *plug_itr = lilv_plugins_begin(plugins);
-	for (int i = 0; i < lilv_plugins_size(plugins); ++i) {
+	for (int i = 0; i < lilv_plugins_size(plugins); i++) {
 		const LilvPlugin *plugin = lilv_plugins_get(plugins, plug_itr);
 
 		//lets see if this is useful
@@ -72,20 +76,15 @@ void AudioEffectProviderLV2::scan_effects(AudioEffectFactory *p_factory, ScanCal
 				}
 			}
 			if ((lilv_port_is_a(plugin, port, uris.event_port) || lilv_port_is_a(plugin, port, uris.atom_port)) && lilv_port_is_a(plugin, port, uris.input_port)) {
-
 				event_input++;
 			}
 			if ((lilv_port_is_a(plugin, port, uris.event_port) || lilv_port_is_a(plugin, port, uris.atom_port)) && lilv_port_is_a(plugin, port, uris.output_port)) {
-
 				event_output++;
 			}
 		}
 
-		static const char *ui_type_uri = "http://lv2plug.in/ns/extensions/ui#Gtk3UI";
 		bool has_ui = false;
-
-		const LilvNode *ui_type;
-		const LilvNode *native_ui_type = lilv_new_uri(world, ui_type_uri);
+		const LilvNode *ui_type = NULL;
 		LilvUIs *supported_uis = lilv_plugin_get_uis(plugin);
 		LILV_FOREACH(uis, u, supported_uis) {
 			const LilvUI *this_ui = lilv_uis_get(supported_uis, u);
@@ -97,6 +96,9 @@ void AudioEffectProviderLV2::scan_effects(AudioEffectFactory *p_factory, ScanCal
 				break;
 			}
 		}
+		// Fix #4: Free supported_uis after use.
+		lilv_uis_free(supported_uis);
+
 		bool valid = false;
 
 		if (has_ui) {
@@ -163,15 +165,17 @@ void AudioEffectProviderLV2::scan_effects(AudioEffectFactory *p_factory, ScanCal
 		if (valid) {
 
 			AudioEffectInfo info;
-			const LilvNode *node = lilv_plugin_get_uri(plugin);
+			const LilvNode *uri_node = lilv_plugin_get_uri(plugin);
 			info.provider_id = "LV2";
-			info.unique_ID.parse_utf8(lilv_node_as_uri(node));
+			info.unique_ID.parse_utf8(lilv_node_as_uri(uri_node));
 
-			node = lilv_plugin_get_name(plugin);
-			info.caption.parse_utf8(lilv_node_as_string(node));
+			// Fix #2: lilv_plugin_get_name returns an owned node — must free it.
+			LilvNode *name_node = lilv_plugin_get_name(plugin);
+			info.caption.parse_utf8(lilv_node_as_string(name_node));
+			lilv_node_free(name_node);
 
-			node = lilv_plugin_class_get_label(lilv_plugin_get_class(plugin));
-			info.category.parse_utf8(lilv_node_as_string(node));
+			const LilvNode *class_node = lilv_plugin_class_get_label(lilv_plugin_get_class(plugin));
+			info.category.parse_utf8(lilv_node_as_string(class_node));
 
 			info.provider_caption = "LADSPAv2";
 			info.synth = event_input == 1;
@@ -185,13 +189,17 @@ void AudioEffectProviderLV2::scan_effects(AudioEffectFactory *p_factory, ScanCal
 			}
 			valid_effects++;
 		} else {
-			const LilvNode *node = lilv_plugin_get_name(plugin);
-
-			printf("discarded %s ins %i, outs %i, events %i, ui %i\n", lilv_node_as_string(node), input_count, output_count, event_input, int(has_ui));
+			// Fix #2: Same issue in the discard branch.
+			LilvNode *name_node = lilv_plugin_get_name(plugin);
+			printf("discarded %s ins %i, outs %i, events %i, ui %i\n", lilv_node_as_string(name_node), input_count, output_count, event_input, int(has_ui));
+			lilv_node_free(name_node);
 		}
 
 		plug_itr = lilv_plugins_next(plugins, plug_itr);
 	}
+
+	// Fix #3: Free native_ui_type after the loop.
+	lilv_node_free(native_ui_type);
 
 	printf("Total valid effects: %i\n", valid_effects);
 }
@@ -209,6 +217,12 @@ AudioEffectProviderLV2::AudioEffectProviderLV2(int *argc, char ***argv) {
 	plugins = NULL;
 	singleton = this;
 	world = lilv_world_new();
+
+	// Fix #7: Bail out if world creation failed.
+	if (!world) {
+		printf("ERROR: Failed to create LilvWorld\n");
+		return;
+	}
 
 	uris.atom_port = lilv_new_uri(world, LILV_URI_ATOM_PORT);
 	uris.audio_port = lilv_new_uri(world, LILV_URI_AUDIO_PORT);
@@ -243,66 +257,51 @@ AudioEffectProviderLV2::AudioEffectProviderLV2(int *argc, char ***argv) {
 	uris.port_minimum_size = lilv_new_uri(world, LV2_RESIZE_PORT__minimumSize);
 	uris.atom_chunk = lilv_new_uri(world, LV2_ATOM__Chunk);
 	uris.atom_sequence = lilv_new_uri(world, LV2_ATOM__Sequence);
+}
 
-#if 0
-	suil_init(argc, argv, SUIL_ARG_NONE);
+// Fix #1: Destructor frees all owned URI nodes and the world.
+AudioEffectProviderLV2::~AudioEffectProviderLV2() {
 
-	symap = symap_new();
-	lv2_atom_forge_init(&forge, &map);
-	env = serd_env_new(NULL);
+	if (!world) {
+		return;
+	}
 
-	serd_env_set_prefix_from_strings(
-			env, (const uint8_t *)"patch", (const uint8_t *)LV2_PATCH_PREFIX);
-	serd_env_set_prefix_from_strings(
-			env, (const uint8_t *)"time", (const uint8_t *)LV2_TIME_PREFIX);
-	serd_env_set_prefix_from_strings(
-			env, (const uint8_t *)"xsd", (const uint8_t *)NS_XSD);
+	lilv_node_free(uris.atom_port);
+	lilv_node_free(uris.audio_port);
+	lilv_node_free(uris.control_port);
+	lilv_node_free(uris.cv_port);
+	lilv_node_free(uris.event_port);
+	lilv_node_free(uris.input_port);
+	lilv_node_free(uris.midi_event);
+	lilv_node_free(uris.output_port);
+	lilv_node_free(uris.port);
+	lilv_node_free(uris.port_minimum_size);
+	lilv_node_free(uris.atom_chunk);
+	lilv_node_free(uris.atom_sequence);
 
-	sratom = sratom_new(&jalv.map);
-	ui_sratom = sratom_new(&jalv.map);
-	sratom_set_env(sratom, jalv.env);
-	sratom_set_env(ui_sratom, env);
+	lilv_node_free(uris.lv2_AudioPort);
+	lilv_node_free(uris.lv2_CVPort);
+	lilv_node_free(uris.lv2_ControlPort);
+	lilv_node_free(uris.lv2_InputPort);
+	lilv_node_free(uris.lv2_OutputPort);
+	lilv_node_free(uris.lv2_connectionOptional);
+	lilv_node_free(uris.lv2_control);
+	lilv_node_free(uris.lv2_default);
+	lilv_node_free(uris.lv2_enumeration);
+	lilv_node_free(uris.lv2_integer);
+	lilv_node_free(uris.lv2_maximum);
+	lilv_node_free(uris.lv2_minimum);
+	lilv_node_free(uris.lv2_name);
+	lilv_node_free(uris.lv2_reportsLatency);
+	lilv_node_free(uris.lv2_sampleRate);
+	lilv_node_free(uris.lv2_symbol);
+	lilv_node_free(uris.lv2_toggled);
 
-	midi_event_id = uri_to_id(this, "http://lv2plug.in/ns/ext/event", LV2_MIDI__MidiEvent);
+	lilv_node_free(uris.work_interface);
 
-	urids.atom_Float = symap_map(symap, LV2_ATOM__Float);
-	urids.atom_Int = symap_map(symap, LV2_ATOM__Int);
-	urids.atom_Object = symap_map(symap, LV2_ATOM__Object);
-	urids.atom_Path = symap_map(symap, LV2_ATOM__Path);
-	urids.atom_String = symap_map(symap, LV2_ATOM__String);
-	urids.atom_eventTransfer = symap_map(symap, LV2_ATOM__eventTransfer);
-	urids.bufsz_maxBlockLength = symap_map(symap, LV2_BUF_SIZE__maxBlockLength);
-	urids.bufsz_minBlockLength = symap_map(symap, LV2_BUF_SIZE__minBlockLength);
-	urids.bufsz_sequenceSize = symap_map(symap, LV2_BUF_SIZE__sequenceSize);
-	urids.log_Error = symap_map(symap, LV2_LOG__Error);
-	urids.log_Trace = symap_map(symap, LV2_LOG__Trace);
-	urids.log_Warning = symap_map(symap, LV2_LOG__Warning);
-	urids.midi_MidiEvent = symap_map(symap, LV2_MIDI__MidiEvent);
-	urids.param_sampleRate = symap_map(symap, LV2_PARAMETERS__sampleRate);
-	urids.patch_Get = symap_map(symap, LV2_PATCH__Get);
-	urids.patch_Put = symap_map(symap, LV2_PATCH__Put);
-	urids.patch_Set = symap_map(symap, LV2_PATCH__Set);
-	urids.patch_body = symap_map(symap, LV2_PATCH__body);
-	urids.patch_property = symap_map(symap, LV2_PATCH__property);
-	urids.patch_value = symap_map(symap, LV2_PATCH__value);
-	urids.time_Position = symap_map(symap, LV2_TIME__Position);
-	urids.time_bar = symap_map(symap, LV2_TIME__bar);
-	urids.time_barBeat = symap_map(symap, LV2_TIME__barBeat);
-	urids.time_beatUnit = symap_map(symap, LV2_TIME__beatUnit);
-	urids.time_beatsPerBar = symap_map(symap, LV2_TIME__beatsPerBar);
-	urids.time_beatsPerMinute = symap_map(symap, LV2_TIME__beatsPerMinute);
-	urids.time_frame = symap_map(symap, LV2_TIME__frame);
-	urids.time_speed = symap_map(symap, LV2_TIME__speed);
-	urids.ui_updateRate = symap_map(symap, LV2_UI__updateRate);
+	lilv_world_free(world);
 
-	temp_dir = "/tmp/jalv-XXXXXX/";
-
-	memset(&jalv, '\0', sizeof(Jalv));
-	jalv.prog_name = argv[0];
-	jalv.block_length = 4096; /* Should be set by backend */
-	jalv.midi_buf_size = 1024; /* Should be set by backend */
-	jalv.play_state = JALV_PAUSED;
-	jalv.bpm = 120.0f;
-	jalv.control_in = (uint32_t)-1;
-#endif
+	if (singleton == this) {
+		singleton = NULL;
+	}
 }

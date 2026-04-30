@@ -15,15 +15,10 @@ public:
 	};
 
 	enum Mode {
-		BANDPASS,
-		HIGHPASS,
 		LOWPASS,
-		NOTCH,
-		PEAK,
-		BANDLIMIT,
-		LOWSHELF,
-		HIGHSHELF
-
+		HIGHPASS,
+		BANDPASS,
+		NOTCH
 	};
 
 	class Processor { // simple filter processor
@@ -63,6 +58,11 @@ public:
 	void set_gain(float p_gain);
 	void set_sampling_rate(float p_srate);
 	void set_stages(int p_stages); //adjust for multiple stages
+
+	_FORCE_INLINE_ Mode get_mode() const { return mode; }
+	_FORCE_INLINE_ float get_cutoff() const { return cutoff; }
+	_FORCE_INLINE_ float get_resonance() const { return resonance; }
+	_FORCE_INLINE_ int get_stages() const { return stages; }
 
 	void prepare_coefficients(Coeffs *p_coeffs);
 

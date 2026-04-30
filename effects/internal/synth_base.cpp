@@ -241,6 +241,7 @@ void SynthBase::process_with_secondary(const Event *p_events, int p_event_count,
 
 void SynthBase::set_process_block_size(int p_size) {
 	process_block_size = p_size;
+	_block_size_changed(p_size);
 }
 
 void SynthBase::set_sampling_rate(int p_hz) {

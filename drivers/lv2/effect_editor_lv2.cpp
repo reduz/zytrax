@@ -4,7 +4,6 @@
 #define UI_TYPE "http://lv2plug.in/ns/extensions/ui#Gtk3UI"
 
 static LV2_URI_Map_Feature uri_map = { NULL, &AudioEffectLV2::uri_to_id };
-
 static LV2_Extension_Data_Feature ext_data = { NULL };
 
 static LV2_Feature uri_map_feature = { NS_EXT "uri-map", NULL };
@@ -23,8 +22,11 @@ bool EffectEditorLV2::initialize() {
 }
 
 void EffectEditorLV2::_port_write_func(void *ud, uint32_t port_index, uint32_t buffer_size, uint32_t protocol, void const *buffer) {
+	// TODO: Forward UI port writes to the DSP instance.
 }
+
 uint32_t EffectEditorLV2::_port_index_func(void *ud, const char *port_symbol) {
+	// TODO: Resolve port symbol to actual port index via lilv_plugin_get_port_by_symbol.
 	return 0;
 }
 
@@ -34,21 +36,27 @@ EffectEditorLV2::EffectEditorLV2(AudioEffectLV2 *p_lv2, EffectEditor *p_editor, 
 		effect_editor_midi(p_lv2, p_editor) {
 
 	lv2_effect = p_lv2;
+	ui_instance = nullptr;
+	widget = nullptr;
 
 	pack_start(effect_editor_midi, Gtk::PACK_EXPAND_WIDGET);
 
 	const LV2_Feature parent_feature = {
 		LV2_UI__parent, nullptr //?
 	};
+
 	const LV2_Feature instance_feature = {
 		NS_EXT "instance-access", lilv_instance_get_handle(p_lv2->get_instance())
 	};
+
 	const LV2_Feature data_feature = {
 		LV2_DATA_ACCESS_URI, &ext_data
 	};
+
 	const LV2_Feature idle_feature = {
 		LV2_UI__idleInterface, NULL
 	};
+
 	const LV2_Feature *ui_features[] = {
 		&uri_map_feature, &map_feature, &unmap_feature,
 		&instance_feature,
@@ -79,12 +87,14 @@ EffectEditorLV2::EffectEditorLV2(AudioEffectLV2 *p_lv2, EffectEditor *p_editor, 
 	lilv_free(binary_path);
 	lilv_free(bundle_path);
 
-	GtkWidget *w = (GtkWidget *)suil_instance_get_widget(
-			ui_instance);
-
-	widget = Glib::wrap(w);
-
-	effect_editor_midi.prepend_page(*widget, "LV2 Plugin");
+	// Fix #4: Check that suil_instance_new succeeded before using it.
+	if (ui_instance) {
+		GtkWidget *w = (GtkWidget *)suil_instance_get_widget(ui_instance);
+		if (w) {
+			widget = Glib::wrap(w);
+			effect_editor_midi.prepend_page(*widget, "LV2 Plugin");
+		}
+	}
 
 	//need window to be mapped, so wait
 	init_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectEditorLV2::initialize),
@@ -94,16 +104,32 @@ EffectEditorLV2::EffectEditorLV2(AudioEffectLV2 *p_lv2, EffectEditor *p_editor, 
 }
 
 EffectEditorLV2::~EffectEditorLV2() {
-	delete widget;
+
+	// Fix #6: Disconnect the timer to prevent callback on destroyed object.
+	init_timer.disconnect();
+
+	// Fix #5: Don't delete a Glib::wrap'd widget — just remove it from container.
+	// The widget is owned by the SuilInstance / GTK container, not by us.
+	if (widget) {
+		widget->hide();
+		remove(*widget);
+		widget = nullptr;
+	}
+
+	// Fix #3: Free the suil instance.
+	if (ui_instance) {
+		suil_instance_free(ui_instance);
+		ui_instance = nullptr;
+	}
 }
 
 void EffectEditorLV2::initialize_lv2_editor() {
-
 	ui_host = suil_host_new(_port_write_func, _port_index_func, NULL, NULL);
 }
 
 void EffectEditorLV2::finalize_lv2_editor() {
 	suil_host_free(ui_host);
+	ui_host = nullptr;
 }
 
 static Gtk::Widget *create_lv2_editor(AudioEffect *p_lv2, EffectEditor *p_editor) {
@@ -114,25 +140,40 @@ static Gtk::Widget *create_lv2_editor(AudioEffect *p_lv2, EffectEditor *p_editor
 
 	AudioEffectLV2 *effect = (AudioEffectLV2 *)p_lv2;
 
-	const LilvNode *ui_type;
-	const LilvNode *native_ui_type = lilv_new_uri(AudioEffectProviderLV2::get_world(), UI_TYPE);
+	const LilvNode *ui_type = nullptr;
+	LilvNode *native_ui_type = lilv_new_uri(AudioEffectProviderLV2::get_world(), UI_TYPE);
 	LilvUIs *supported_uis = lilv_plugin_get_uis(effect->get_plugin());
+
+	// Fix #1: No shadowing — assign to outer `ui` variable.
 	const LilvUI *ui = nullptr;
 	LILV_FOREACH(uis, u, supported_uis) {
-		const LilvUI *ui = lilv_uis_get(supported_uis, u);
-		if (lilv_ui_is_supported(ui,
+		const LilvUI *this_ui = lilv_uis_get(supported_uis, u);
+		if (lilv_ui_is_supported(this_ui,
 					suil_ui_supported,
 					native_ui_type,
 					&ui_type)) {
+			ui = this_ui;
 			break;
 		}
 	}
 
-	ERR_FAIL_COND_V(ui == nullptr, nullptr);
+	if (ui == nullptr) {
+		// Fix #2: Free owned resources on error path.
+		lilv_uis_free(supported_uis);
+		lilv_node_free(native_ui_type);
+		return nullptr;
+	}
 
-	return new EffectEditorLV2(effect, p_editor, ui, ui_type, native_ui_type);
+	EffectEditorLV2 *editor = new EffectEditorLV2(effect, p_editor, ui, ui_type, native_ui_type);
+
+	// Fix #2: Free owned resources after use.
+	lilv_uis_free(supported_uis);
+	lilv_node_free(native_ui_type);
+
+	return editor;
 }
 
 EffectEditorPluginFunc get_lv2_editor_function() {
 	return &create_lv2_editor;
 }
+

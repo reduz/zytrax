@@ -23,6 +23,7 @@ void EffectEditorSF2::_open_soundfont() {
 	auto filter_zt = Gtk::FileFilter::create();
 	filter_zt->set_name("SoundFont 2");
 	filter_zt->add_pattern("*.sf2");
+	filter_zt->add_pattern("*.sf3");
 	dialog.add_filter(filter_zt);
 
 	int result = dialog.run();

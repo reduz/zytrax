@@ -29,7 +29,7 @@ opts.Add(BoolVariable("use_wasapi","Enable Wasapi",True))
 opts.Add(BoolVariable("use_directsound","Enable Wasapi",True))
 opts.Add(BoolVariable("enable_rtmidi","Use RtMidi as MIDI Driver",True))
 opts.Add(BoolVariable("use_winmm","Enable WinMM for RtMidi",True))
-opts.Add(BoolVariable("enable_lv2","Enable LV2",False)) # Experimental, no UI
+opts.Add(BoolVariable("enable_lv2","Enable LV2",True)) # Experimental, no UI
 
 opts.Update(env)  # update environment
 Help(opts.GenerateHelpText(env))  # generate help

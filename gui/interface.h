@@ -285,6 +285,7 @@ public:
 	bool play_keyboard_note_for_pattern(GdkEventKey *p_key,bool p_on);
 
 	Song* get_song() { return &song; }
+	Theme *get_theme() { return theme; }
 
 	static Interface *get_singleton() { return singleton; }
 

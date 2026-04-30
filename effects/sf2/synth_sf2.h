@@ -4,8 +4,9 @@
 #include "engine/audio_effect_midi.h"
 #include "globals/map.h"
 #include "globals/vector.h"
-#include "tsf.h"
 #include <map>
+
+struct tsf;
 
 class AudioSynthSF2 : public AudioEffectMIDI {
 private:

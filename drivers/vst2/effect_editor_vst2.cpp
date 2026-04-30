@@ -1,12 +1,16 @@
 #include "effect_editor_vst2.h"
 //keep this for order
+//keep this for order
 #include "audio_effect_provider_vst2.h"
 #include "effect_editor_x11.h"
 
 #ifdef WINDOWS_ENABLED
 void EffectPlaceholderVST2Win32::_vst_resize(void *self, int w, int h) {
 	EffectPlaceholderVST2Win32 *ph = (EffectPlaceholderVST2Win32 *)self;
-	return;
+	// [FIX] Actually handle the resize instead of returning immediately.
+	ph->vst_w = w;
+	ph->vst_h = h;
+	ph->set_size_request(w, h);
 }
 
 void EffectPlaceholderVST2Win32::resize_editor(int left, int top, int right, int bottom) {
@@ -204,9 +208,9 @@ bool EffectPlaceholderVST2Win32::on_visibility_notify_event(GdkEventVisibility *
 	return false;
 }
 
+// [FIX] Removed early return that made the drawing code dead.
 bool EffectPlaceholderVST2Win32::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	const Gtk::Allocation allocation = get_allocation();
-	return false;
 
 	Gdk::RGBA rgba;
 	rgba.set_red(0);
@@ -217,12 +221,17 @@ bool EffectPlaceholderVST2Win32::on_draw(const Cairo::RefPtr<Cairo::Context> &cr
 
 	cr->rectangle(0, 0, allocation.get_width(), allocation.get_height());
 	cr->fill();
+
+	return true;
 }
 
 EffectPlaceholderVST2Win32::EffectPlaceholderVST2Win32(AudioEffectVST2 *p_vst_effect) :
 		// The GType name will actually be gtkmm__CustomObject_mywidget
 		Glib::ObjectBase("filler"),
 		Gtk::Widget() {
+
+	// [FIX] Explicitly set has_window for custom widget with its own GdkWindow.
+	set_has_window(true);
 
 	vst_effect = p_vst_effect;
 	vst_w = 1;
@@ -237,6 +246,9 @@ EffectPlaceholderVST2Win32::EffectPlaceholderVST2Win32(AudioEffectVST2 *p_vst_ef
 
 	vst_effect->open_user_interface(vst_window);
 
+	// [FIX] Register resize callback so the plugin can request resizes.
+	vst_effect->set_resize_callback(_vst_resize, this);
+
 	//allocate size for this VST here
 	vst_effect->get_user_interface_size(vst_w, vst_h);
 	set_size_request(vst_w, vst_h);
@@ -245,6 +257,9 @@ EffectPlaceholderVST2Win32::EffectPlaceholderVST2Win32(AudioEffectVST2 *p_vst_ef
 }
 
 EffectPlaceholderVST2Win32::~EffectPlaceholderVST2Win32() {
+	// [FIX] Disconnect the timer before destroying to prevent use-after-free.
+	update_timer.disconnect();
+
 	vst_effect->close_user_interface();
 
 	DestroyWindow(vst_window);
@@ -287,14 +302,23 @@ void finalize_vst2_editor() {
 #endif
 }
 
+// [FIX] Retry until socket is actually ready, and validate xid.
 bool EffectEditorVST2::initialize() {
 #ifdef FREEDESKTOP_ENABLED
+	if (socket_initialized) {
+		return false; // Already done, disconnect timer.
+	}
+	if (xid == 0) {
+		// Editor not ready yet, keep retrying.
+		return true;
+	}
 	socket.add_id(xid);
 	int w, h;
 	vstfx_get_window_size(vst_effect, &w, &h);
 	socket.set_size_request(w, h);
+	socket_initialized = true;
 #endif
-	return false;
+	return false; // Done, disconnect timer.
 }
 
 EffectEditorVST2::EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_editor) :
@@ -313,9 +337,12 @@ EffectEditorVST2::EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_edito
 	pack_start(effect_editor_midi, Gtk::PACK_EXPAND_WIDGET);
 
 #ifdef FREEDESKTOP_ENABLED
+	// [FIX] Initialize tracking state before use.
+	xid = 0;
+	socket_initialized = false;
+
 	effect_editor_midi.prepend_page(socket, "VST2 Plugin");
 	xid = vstfx_run_editor(p_vst, this);
-
 #endif
 	//need window to be mapped, so wait
 	init_timer = Glib::signal_timeout().connect(sigc::mem_fun(*this, &EffectEditorVST2::initialize),
@@ -325,6 +352,9 @@ EffectEditorVST2::EffectEditorVST2(AudioEffectVST2 *p_vst, EffectEditor *p_edito
 }
 
 EffectEditorVST2::~EffectEditorVST2() {
+	// [FIX] Disconnect timer before destruction to prevent use-after-free.
+	init_timer.disconnect();
+
 #ifdef FREEDESKTOP_ENABLED
 	vstfx_destroy_editor(vst_effect);
 #endif

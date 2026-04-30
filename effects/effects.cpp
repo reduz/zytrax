@@ -14,6 +14,7 @@
 #include "effects/internal/effect_midi_device.h"
 #include "effects/internal/effect_distortion.h"
 #include "effects/internal/synth_sinewave.h"
+#include "effects/chionic/synth_chionic.h"
 #include "effects/sf2/synth_sf2.h"
 #include "gui/interface.h"
 
@@ -77,24 +78,15 @@ public:
 		}
 		if (p_info->unique_ID == "filter_notch") {
 			return new AudioEffectFilter(Filter::NOTCH);
-		}
-		if (p_info->unique_ID == "filter_peak") {
-			return new AudioEffectFilter(Filter::PEAK);
-		}
-		if (p_info->unique_ID == "filter_band_limit") {
-			return new AudioEffectFilter(Filter::BANDLIMIT);
-		}
-		if (p_info->unique_ID == "filter_low_shelf") {
-			return new AudioEffectFilter(Filter::LOWSHELF);
-		}
-		if (p_info->unique_ID == "filter_high_shelf") {
-			return new AudioEffectFilter(Filter::HIGHSHELF);
-		}
+		}	
 		if (p_info->unique_ID == "synth_sinewave") {
 			return new SynthSinewave;
 		}
 		if (p_info->unique_ID == "sf2") {
 			return new AudioSynthSF2;
+		}
+		if (p_info->unique_ID == "chionic") {
+			return new SynthChionic;
 		}
 		if (p_info->unique_ID == "midi_device") {
 			return new AudioEffectMIDIDevice;
@@ -424,73 +416,7 @@ void register_effects(AudioEffectFactory *p_factory) {
 		p_factory->add_audio_effect(info);
 	}
 
-	{
-		//filter
-		AudioEffectInfo info;
-		info.caption = "Peak Filter";
-		info.description = "Standard peak filter";
-		info.author = "Juan Linietsky";
-		info.unique_ID = "filter_peak";
-		info.provider_caption = "Internal";
-		info.category = "Internal Effects";
-		info.version = "1.0";
-		info.synth = false;
-		info.has_ui = false;
-		info.internal = true;
-		info.provider_id = "internal";
-		p_factory->add_audio_effect(info);
-	}
 
-	{
-		//filter
-		AudioEffectInfo info;
-		info.caption = "Band Limit Filter";
-		info.description = "Standard band limit filter";
-		info.author = "Juan Linietsky";
-		info.unique_ID = "filter_band_limit";
-		info.provider_caption = "Internal";
-		info.category = "Internal Effects";
-		info.version = "1.0";
-		info.synth = false;
-		info.has_ui = false;
-		info.internal = true;
-		info.provider_id = "internal";
-		p_factory->add_audio_effect(info);
-	}
-
-	{
-		//filter
-		AudioEffectInfo info;
-		info.caption = "Low Shelf Filter";
-		info.description = "Standard low shelf filter";
-		info.author = "Juan Linietsky";
-		info.unique_ID = "filter_low_shelf";
-		info.provider_caption = "Internal";
-		info.category = "Internal Effects";
-		info.version = "1.0";
-		info.synth = false;
-		info.has_ui = false;
-		info.internal = true;
-		info.provider_id = "internal";
-		p_factory->add_audio_effect(info);
-	}
-
-	{
-		//filter
-		AudioEffectInfo info;
-		info.caption = "High Shelf Filter";
-		info.description = "Standard high shelf filter";
-		info.author = "Juan Linietsky";
-		info.unique_ID = "filter_high_shelf";
-		info.provider_caption = "Internal";
-		info.category = "Internal Effects";
-		info.version = "1.0";
-		info.synth = false;
-		info.has_ui = false;
-		info.internal = true;
-		info.provider_id = "internal";
-		p_factory->add_audio_effect(info);
-	}
 	{
 		//midi
 		AudioEffectInfo info;
@@ -519,6 +445,22 @@ void register_effects(AudioEffectFactory *p_factory) {
 		info.version = "1.0";
 		info.synth = true;
 		info.has_ui = false;
+		info.internal = true;
+		info.provider_id = "internal";
+		p_factory->add_audio_effect(info);
+	}
+	{
+		//chionic
+		AudioEffectInfo info;
+		info.caption = "Chionic Synth / Sampler";
+		info.description = "Additive synth and sampler";
+		info.author = "Juan Linietsky";
+		info.unique_ID = "chionic";
+		info.provider_caption = "Internal";
+		info.category = "Internal Synths";
+		info.version = "1.0";
+		info.synth = true;
+		info.has_ui = true;
 		info.internal = true;
 		info.provider_id = "internal";
 		p_factory->add_audio_effect(info);

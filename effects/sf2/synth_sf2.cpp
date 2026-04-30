@@ -2,6 +2,11 @@
 #include "engine/sound_driver_manager.h"
 #include "globals/md5.h"
 
+#define STB_VORBIS_IMPLEMENTATION
+#include "stb_vorbis.c"
+#define TSF_IMPLEMENTATION
+#define STB_VORBIS_INCLUDE_STB_VORBIS_H
+#include "tsf.h"
 
 std::map<String,AudioSynthSF2::SF2Data> AudioSynthSF2::sf2_map;
 

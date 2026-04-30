@@ -6,16 +6,22 @@ LV2_URID AudioEffectLV2::uri_to_idm(const char *uri) {
 	//this whole API is ***** anyway, so a simple spinlock will do
 	LV2_URID ret;
 	while (locked.test_and_set(std::memory_order_acquire)) {
+		// FIX #8: Add pause hint to avoid hammering the bus
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+		__builtin_ia32_pause();
+#elif defined(__aarch64__)
+		__asm__ volatile("yield");
+#endif
 	}
-	CStringKey urics;
-	urics.cstring = uri;
-	const Map<CStringKey, LV2_URID>::Element *E = uri_id_map.find(urics);
+	CStringKey uics(uri); // FIX #3: CStringKey now owns a copy of the string
+	const Map<CStringKey, LV2_URID>::Element *E = uri_id_map.find(uics);
 	if (E) {
 		ret = E->get();
 	} else {
-		ret = uri_id_map.size();
-		uri_id_map[urics] = ret;
-		id_uri_map[ret] = urics;
+		// FIX #6: Start URIDs at 1; URID 0 is reserved/invalid in LV2
+		ret = next_urid++;
+		uri_id_map[uics] = ret;
+		id_uri_map[ret] = uics;
 	}
 	locked.clear(std::memory_order_release);
 	return ret;
@@ -25,13 +31,19 @@ const char *AudioEffectLV2::id_to_urim(LV2_URID id) {
 
 	const char *ret = NULL;
 	while (locked.test_and_set(std::memory_order_acquire)) {
+		// FIX #8: Add pause hint
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+		__builtin_ia32_pause();
+#elif defined(__aarch64__)
+		__asm__ volatile("yield");
+#endif
 	}
-	CStringKey urics;
 	const Map<LV2_URID, CStringKey>::Element *E = id_uri_map.find(id);
 	if (E) {
 		ret = E->get().cstring;
 	} else {
-		ERR_PRINT("wtf requested an uri for an existing ID?");
+		// FIX #7: Corrected error message (ID was not found, not "existing")
+		ERR_PRINT("Requested URI for a non-existing ID");
 	}
 	locked.clear(std::memory_order_release);
 	return ret;
@@ -179,6 +191,9 @@ void AudioEffectLV2::set_sampling_rate(int p_hz) {
 	if (sampling_rate == p_hz) {
 		return;
 	}
+	// FIX #2: Actually update the sampling rate and rebuild
+	sampling_rate = p_hz;
+	_update_buffers_and_ports();
 }
 //info
 String AudioEffectLV2::get_name() const {
@@ -396,8 +411,14 @@ void AudioEffectLV2::_plugin_init() {
 		const LilvPort *port = lilv_plugin_get_port_by_index(plugin, i);
 
 		if ((lilv_port_is_a(plugin, port, uris.event_port) || lilv_port_is_a(plugin, port, uris.atom_port)) && lilv_port_is_a(plugin, port, uris.input_port)) {
-			//input port, create an event buffer and connect it
-			bool old_type = lilv_port_is_a(plugin, port, uris.input_port);
+			// FIX #11: Check for old event port type vs atom port (was always true before)
+			bool old_type = lilv_port_is_a(plugin, port, uris.event_port);
+
+			// FIX #12: Free previous evbuf if we already created one (multiple event inputs)
+			if (evbuf) {
+				lv2_evbuf_free(evbuf);
+			}
+
 			evbuf = lv2_evbuf_new(512 * 1024,
 					old_type ? LV2_EVBUF_EVENT : LV2_EVBUF_ATOM,
 					uri_to_idm(lilv_node_as_string(uris.atom_chunk)),
@@ -437,11 +458,16 @@ void AudioEffectLV2::_plugin_init() {
 			}
 
 			cport->identifier = identifier;
-			cport->min = lilv_node_as_float(lilv_port_get(plugin, port, uris.lv2_minimum));
-			cport->max = lilv_node_as_float(lilv_port_get(plugin, port, uris.lv2_maximum));
-			cport->value = lilv_node_as_float(lilv_port_get(plugin, port, uris.lv2_default));
-			//bool is_toggle = lilv_node_as_bool( lilv_port_get(plugin,port,uris.lv2_toggled) );
-			//bool is_enum = lilv_node_as_bool( lilv_port_get(plugin,port,uris.lv2_enumeration) );
+
+			// FIX #9: Null-check lilv_port_get results before calling lilv_node_as_float
+			const LilvNode *min_node = lilv_port_get(plugin, port, uris.lv2_minimum);
+			const LilvNode *max_node = lilv_port_get(plugin, port, uris.lv2_maximum);
+			const LilvNode *def_node = lilv_port_get(plugin, port, uris.lv2_default);
+
+			cport->min = min_node ? lilv_node_as_float(min_node) : 0.0f;
+			cport->max = max_node ? lilv_node_as_float(max_node) : 1.0f;
+			cport->value = def_node ? lilv_node_as_float(def_node) : cport->min;
+
 			cport->name.parse_utf8(lilv_node_as_string(lilv_port_get_name(plugin, port)));
 
 			lilv_instance_connect_port(instance, i, &cport->value);
@@ -465,10 +491,11 @@ void AudioEffectLV2::_plugin_init() {
 	}
 
 	{
-		const LilvNode *node = lilv_plugin_get_name(plugin);
-		identifier.parse_utf8(lilv_node_as_uri(node));
-		node = lilv_plugin_get_name(plugin);
-		name.parse_utf8(lilv_node_as_string(node));
+		// FIX #10: Use lilv_plugin_get_uri for identifier, not lilv_plugin_get_name
+		const LilvNode *uri_node = lilv_plugin_get_uri(plugin);
+		identifier.parse_utf8(lilv_node_as_uri(uri_node));
+		const LilvNode *name_node = lilv_plugin_get_name(plugin);
+		name.parse_utf8(lilv_node_as_string(name_node));
 	}
 
 	_update_buffers_and_ports();
@@ -493,7 +520,14 @@ void AudioEffectLV2::_update_buffers_and_ports() {
 
 	in_buffers.clear();
 	out_buffers.clear();
+	// FIX #4: Also clear the pointer vectors
+	in_buffer_ptrs.clear();
+	out_buffer_ptrs.clear();
 
+	// FIX #5: First pass - allocate all buffers. Second pass - collect pointers.
+	// This avoids pointer invalidation from Vector reallocation during push_back.
+
+	// Count audio ports first to pre-allocate
 	for (int i = 0; i < plugin_port_count; i++) {
 		const LilvPort *port = lilv_plugin_get_port_by_index(plugin, i);
 		if (lilv_port_is_a(plugin, port, uris.audio_port)) {
@@ -502,18 +536,11 @@ void AudioEffectLV2::_update_buffers_and_ports() {
 				Vector<float> buffer;
 				buffer.resize(buffer_size);
 				out_buffers.push_back(buffer);
-				float *ptr = &out_buffers[out_buffers.size() - 1][0];
-				lilv_instance_connect_port(instance, i, ptr);
-				out_buffer_ptrs.push_back(ptr);
 
 				if (instance2) {
-
 					Vector<float> buffer2;
 					buffer2.resize(buffer_size);
 					out_buffers.push_back(buffer2);
-					float *ptr2 = &out_buffers[out_buffers.size() - 1][0];
-					lilv_instance_connect_port(instance2, i, ptr2);
-					out_buffer_ptrs.push_back(ptr2);
 				}
 
 			} else if (lilv_port_is_a(plugin, port, uris.input_port)) {
@@ -521,18 +548,48 @@ void AudioEffectLV2::_update_buffers_and_ports() {
 				Vector<float> buffer;
 				buffer.resize(buffer_size);
 				in_buffers.push_back(buffer);
-				float *ptr = &in_buffers[in_buffers.size() - 1][0];
-				lilv_instance_connect_port(instance, i, ptr);
-				in_buffer_ptrs.push_back(ptr);
 
 				if (instance2) {
-
 					Vector<float> buffer2;
 					buffer2.resize(buffer_size);
 					in_buffers.push_back(buffer2);
-					float *ptr2 = &in_buffers[in_buffers.size() - 1][0];
+				}
+			}
+		}
+	}
+
+	// Second pass - now that vectors won't reallocate, collect pointers and connect ports
+	int in_idx = 0;
+	int out_idx = 0;
+	for (int i = 0; i < plugin_port_count; i++) {
+		const LilvPort *port = lilv_plugin_get_port_by_index(plugin, i);
+		if (lilv_port_is_a(plugin, port, uris.audio_port)) {
+			if (lilv_port_is_a(plugin, port, uris.output_port)) {
+
+				float *ptr = &out_buffers[out_idx][0];
+				lilv_instance_connect_port(instance, i, ptr);
+				out_buffer_ptrs.push_back(ptr);
+				out_idx++;
+
+				if (instance2) {
+					float *ptr2 = &out_buffers[out_idx][0];
+					lilv_instance_connect_port(instance2, i, ptr2);
+					out_buffer_ptrs.push_back(ptr2);
+					out_idx++;
+				}
+
+			} else if (lilv_port_is_a(plugin, port, uris.input_port)) {
+
+				float *ptr = &in_buffers[in_idx][0];
+				lilv_instance_connect_port(instance, i, ptr);
+				in_buffer_ptrs.push_back(ptr);
+				in_idx++;
+
+				if (instance2) {
+					float *ptr2 = &in_buffers[in_idx][0];
 					lilv_instance_connect_port(instance2, i, ptr2);
 					in_buffer_ptrs.push_back(ptr2);
+					in_idx++;
 				}
 			}
 		}
@@ -554,11 +611,16 @@ AudioEffectLV2::AudioEffectLV2() {
 	evbuf = NULL;
 	buffer_size = 128;
 	sampling_rate = 44100;
+	next_urid = 1; // FIX #6: Start URIDs at 1, 0 is reserved
 }
 
 AudioEffectLV2::~AudioEffectLV2() {
 	_plugin_finish();
 	for (int i = 0; i < control_ports.size(); i++) {
 		delete control_ports[i];
+	}
+	// Clean up evbuf
+	if (evbuf) {
+		lv2_evbuf_free(evbuf);
 	}
 }

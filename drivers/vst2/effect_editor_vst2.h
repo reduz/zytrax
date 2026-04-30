@@ -2,6 +2,7 @@
 #define EFFECT_EDITOR_VST2_H
 
 #include "gui/effect_editor_midi.h"
+
 #ifdef WINDOWS_ENABLED
 #include <gdk/gdkwin32.h>
 #else
@@ -14,18 +15,18 @@
 class AudioEffectVST2;
 
 #ifdef WINDOWS_ENABLED
-class EffectPlaceholderVST2Win32 : public Gtk::Widget {
 
+class EffectPlaceholderVST2Win32 : public Gtk::Widget {
 	AudioEffectVST2 *vst_effect;
 	Glib::RefPtr<Gdk::Window> m_refGdkWindow;
+
 	int vst_w;
 	int vst_h;
-
 	HWND vst_window;
 
 	sigc::connection update_timer;
-	static void _vst_resize(void *self, int w, int h);
 
+	static void _vst_resize(void *self, int w, int h);
 	bool _update_window_position();
 	void resize_editor(int left, int top, int right, int bottom);
 
@@ -46,17 +47,17 @@ public:
 #endif
 
 class EffectEditorVST2 : public Gtk::VBox {
-
 	AudioEffectVST2 *vst_effect;
 	EffectEditorMIDI effect_editor_midi;
-#ifdef WINDOWS_ENABLED
 
+#ifdef WINDOWS_ENABLED
 	EffectPlaceholderVST2Win32 vst_placeholder;
 #endif
 
 #ifdef FREEDESKTOP_ENABLED
 	int xid;
 	Gtk::Socket socket;
+	bool socket_initialized;
 #endif
 
 	sigc::connection init_timer;
