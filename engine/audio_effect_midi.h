@@ -74,7 +74,7 @@ private:
 
 protected:
 	void _reset_midi();
-	virtual void _get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch);
+	virtual bool _get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch); ///< False when the effect keeps its own patch and it must not be touched
 	MIDIEventStamped *_process_midi_events(const Event *p_events, int p_event_count, float p_time, int &r_stamped_event_count);
 	virtual int _get_internal_control_port_count() const = 0;
 	virtual ControlPort *_get_internal_control_port(int p_index) = 0;

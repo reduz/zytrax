@@ -9,10 +9,13 @@
 #define SLIDE_BASE_SPEED 100
 
 
-void AudioEffectMIDI::_get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch) {
+bool AudioEffectMIDI::_get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch) {
 	r_bank_lsb=0;
 	r_bank_msb=0;
 	r_patch=0;
+	// ZyTrax has no patch of its own for this effect (a plugin keeps its own),
+	// so there is nothing to restore and sending one would clobber it.
+	return false;
 }
 
 MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const Event *p_events, int p_event_count, float p_time, int &r_stamped_event_count) {
@@ -22,7 +25,7 @@ MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const Event *p_events, i
 	//smart parameters
 
 	int bank_lsb, bank_msb, patch;
-	_get_bank_and_patch(bank_lsb, bank_msb, patch);
+	bool restore_bank_and_patch = _get_bank_and_patch(bank_lsb, bank_msb, patch);
 
 	if (reset_pending) {
 
@@ -88,7 +91,7 @@ MIDIEventStamped *AudioEffectMIDI::_process_midi_events(const Event *p_events, i
 			idx++;
 		}
 
-		{ // bank and patch
+		if (restore_bank_and_patch) { // bank and patch
 			process_events[idx].event.type = MIDIEvent::MIDI_CONTROLLER;
 			process_events[idx].event.control.index = 0; // Bank MSB
 			process_events[idx].event.control.parameter = bank_msb;
@@ -673,7 +676,7 @@ Error AudioEffectMIDI::from_json(const JSON::Node &node) {
 	}
 
 	if (node.has("curve_exponent")) {
-		mono_mode = MonoMode(node.get("curve_exponent").toFloat());
+		curve_exponent = node.get("curve_exponent").toFloat();
 	}
 
 	midi_channel = node.get("midi_channel").toInt();

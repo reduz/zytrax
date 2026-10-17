@@ -11,6 +11,7 @@ void MIDIInputDriver::event(double p_stamp, const MIDIEvent &p_event) {
 MIDIInputDriver *MIDIDriverManager::input_drivers[MIDIDriverManager::MAX_MIDI_DRIVERS];
 int MIDIDriverManager::input_driver_count = 0;
 int MIDIDriverManager::input_current_driver = -1;
+String MIDIDriverManager::input_current_driver_id;
 
 MIDIDriverManager::EventCallback MIDIDriverManager::event_callback = NULL;
 
@@ -26,7 +27,7 @@ void MIDIDriverManager::unlock_driver() {
 }
 
 bool MIDIDriverManager::init_input_driver(int p_driver) {
-	ERR_FAIL_COND_V(p_driver != -1 && p_driver < 0 && p_driver >= input_driver_count, false);
+	ERR_FAIL_COND_V(p_driver != -1 && (p_driver < 0 || p_driver >= input_driver_count), false);
 
 	if (input_current_driver != -1 && input_drivers[input_current_driver]->is_active()) {
 		input_drivers[input_current_driver]->finish();
@@ -35,8 +36,26 @@ bool MIDIDriverManager::init_input_driver(int p_driver) {
 	input_current_driver = p_driver;
 
 	if (input_current_driver != -1) {
+		input_current_driver_id = input_drivers[input_current_driver]->get_id();
 		return input_drivers[input_current_driver]->init();
 	}
+
+	input_current_driver_id = String();
+	return false;
+}
+
+bool MIDIDriverManager::init_input_driver_by_id(const String &p_id) {
+
+	for (int i = 0; i < input_driver_count; i++) {
+		if (input_drivers[i]->get_id() == p_id) {
+			return init_input_driver(i);
+		}
+	}
+
+	// Not connected right now, so nothing to open, but remember which one was
+	// wanted so the preference is not lost when settings are saved again.
+	init_input_driver(-1);
+	input_current_driver_id = p_id;
 
 	return false;
 }
@@ -58,6 +77,10 @@ MIDIInputDriver *MIDIDriverManager::get_input_driver(int p_which) {
 
 int MIDIDriverManager::get_current_input_driver_index() {
 	return input_current_driver;
+}
+
+String MIDIDriverManager::get_current_input_driver_id() {
+	return input_current_driver_id;
 }
 
 void MIDIDriverManager::add_input_driver(MIDIInputDriver *p_driver) {
@@ -177,18 +200,20 @@ void MIDIBankManager::_load_device_file(int p_index, String p_file) {
 						char v = 0;
 						for(int i=0;i<4;i++) {
 							char c= nrpn[i];
-							char nibble;
+							char nibble = 0;
 							if (c>='0' && c<='9') {
 								nibble = c - '0';
 							} else if (c>='a' && c<='f') {
 								nibble = 10 + (c - 'a');
+							} else if (c>='A' && c<='F') {
+								nibble = 10 + (c - 'A');
 							}
 
 							switch(i) {
 								case 0: v = nibble << 4; break;
-								case 1: v |= nibble; n.msb=nibble; break;
+								case 1: v |= nibble; n.msb=v; break;
 								case 2: v = nibble << 4; break;
-								case 3: v |= nibble; n.lsb=nibble; break;
+								case 3: v |= nibble; n.lsb=v; break;
 							}
 						}
 

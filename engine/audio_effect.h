@@ -202,7 +202,7 @@ public:
 			if (v >= 0 && v < enum_values.size()) {
 				return enum_values[v];
 			} else {
-				String::num(v);
+				return String::num(v);
 			}
 		} else {
 			if (value > 0.5) {

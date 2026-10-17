@@ -21,4 +21,10 @@ if (env["enable_rtmidi"]):
 	env.add_sources(targets,"rtmidi/*.cpp")
 	env.add_sources(targets,"rtmidi/rtmidi/*.cpp")
 
+if (env["platform"] == "osx"):
+	import glob
+	au_dir = Dir('.').abspath + '/au'
+	for mm_f in glob.glob(au_dir + '/*.mm'):
+		targets.append(env.ObjCXX(mm_f))
+
 env.libs+=env.Library('drivers', targets);

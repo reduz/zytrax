@@ -500,4 +500,17 @@ KeyBindings::KeyBindings() {
 	_add_keybind(PIANO_D2, KeyState(GDK_KEY_o));
 	_add_keybind(PIANO_Ds2, KeyState(GDK_KEY_0));
 	_add_keybind(PIANO_E2, KeyState(GDK_KEY_p));
+
+#ifdef OSX_ENABLED
+	// On macOS swap Ctrl→Cmd (Meta) for any binding that uses Ctrl but not Alt.
+	// Bindings that combine Ctrl+Alt are tracker-standard and stay untouched.
+	for (int i = 0; i < BIND_MAX; i++) {
+		guint s = binds[i].state;
+		if ((s & GDK_CONTROL_MASK) && !(s & GDK_MOD1_MASK)) {
+			s = (s & ~GDK_CONTROL_MASK) | GDK_META_MASK;
+			binds[i].state = s;
+			binds[i].initial_state = s;
+		}
+	}
+#endif
 }

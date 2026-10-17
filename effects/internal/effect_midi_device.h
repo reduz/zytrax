@@ -24,7 +24,7 @@ class AudioEffectMIDIDevice : public AudioEffectMIDI {
 protected:
 
 
-	virtual void _get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch);
+	virtual bool _get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch);
 
 	virtual int _get_internal_control_port_count() const;
 	virtual ControlPort *_get_internal_control_port(int p_index);

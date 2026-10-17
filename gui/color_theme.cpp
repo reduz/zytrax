@@ -45,6 +45,23 @@ void Theme::select_font_face(const Cairo::RefPtr<Cairo::Context> &cr) {
 	cr->select_font_face(font_desc.get_family(), Cairo::FONT_SLANT_NORMAL, font_desc.get_weight() > Pango::WEIGHT_MEDIUM ? Cairo::FONT_WEIGHT_BOLD : Cairo::FONT_WEIGHT_NORMAL);
 	cr->set_font_size(font_desc.get_size() / Pango::SCALE);
 }
+
+int Theme::get_char_width(const Cairo::RefPtr<Cairo::Context> &cr) {
+
+	// Believe it or not, this the only reliable way to get the width of
+	// a monospace char in GTK. Yes.
+	// Stay in floating point until the very end: Quartz hands out fractional
+	// advances (Menlo Bold 15 advances 9.03), so truncating each extent on its
+	// own rounds the cell down to 8 and every column drifts a pixel per char.
+
+	Cairo::TextExtents te;
+	cr->get_text_extents("XXX", te);
+	double fw = te.x_advance;
+	cr->get_text_extents("XX", te);
+	fw -= te.x_advance;
+
+	return int(fw + 0.5);
+}
 Theme::Theme() {
 
 	colors[COLOR_BACKGROUND] = make_rgba(0, 0, 0);
@@ -76,7 +93,11 @@ Theme::Theme() {
 	colors[COLOR_PATTERN_EDITOR_AUTOMATION_NAME] = make_rgba(217, 217, 180);
 
 	//	fonts[FONT_PATTERN].face = "FreeMono";
+#ifdef OSX_ENABLED
+	font = "Menlo Bold 15";
+#else
 	font = "Consolas Bold 15";
+#endif
 
 	constants[CONSTANT_PATTERN_EDITOR_TRACK_SEPARATION] = 5;
 	constants[CONSTANT_PATTERN_EDITOR_COLUMN_SEPARATION] = 10;

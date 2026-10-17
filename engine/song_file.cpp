@@ -480,7 +480,7 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 						name.parse_utf8(I->first.c_str());
 						int exists = false;
 						for (int k = 0; k < dummy->ports.size(); k++) {
-							if (dummy->ports[i].name == name) {
+							if (dummy->ports[k].name == name) {
 								exists = true;
 								break;
 							}
@@ -565,7 +565,8 @@ Error SongFile::load(const String &p_path, List<MissingPlugin> *r_missing_plugin
 		JSON::Node sends = track.get("sends");
 		for (int j = 0; j < sends.getCount(); j++) {
 			JSON::Node send = sends.get(j);
-			t->add_send(send.get("to_track").toInt(), send.get("amount").toFloat());
+			t->add_send(send.get("to_track").toInt());
+			t->set_send_amount(t->get_send_count() - 1, send.get("amount").toFloat());
 		}
 
 		song->add_track(t);

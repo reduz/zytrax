@@ -83,11 +83,7 @@ bool FilterArrayEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
 
-	Cairo::TextExtents te;
-	cr->get_text_extents("XXX", te);
-	int fw = te.width;
-	cr->get_text_extents("XX", te);
-	fw -= te.width;
+	int fw = Theme::get_char_width(cr);
 
 	if (w<1)
 		return false;
@@ -215,7 +211,7 @@ bool FilterArrayEditor::on_button_press_event(GdkEventButton *event) {
 	if (event->button == 3 && drag.index==-1) {
 
 		if (drag.over>=0) {
-			for(int i=drag.over;i<filters;i++) {
+			for(int i=drag.over;i<filters-1;i++) {
 				filter[i]=filter[i+1];
 			}
 			filters--;
@@ -261,8 +257,10 @@ bool FilterArrayEditor::on_motion_notify_event(GdkEventMotion *motion_event) {
 			if (distance>10)
 				continue;
 
-			if (closest==-1 || closest_dist>distance)
+			if (closest==-1 || closest_dist>distance) {
 				closest=i;
+				closest_dist=distance;
+			}
 
 		}
 

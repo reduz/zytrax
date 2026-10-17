@@ -639,13 +639,9 @@ void SettingsDialog::_save_settings() {
 			}
 		}
 
-		std::string midi_driver_id;
-		if (MIDIDriverManager::get_current_input_driver_index() >= 0) {
-			MIDIInputDriver *driver = MIDIDriverManager::get_input_driver(MIDIDriverManager::get_current_input_driver_index());
-			if (driver) {
-				midi_driver_id = driver->get_id().utf8().get_data();
-			}
-		}
+		/* Not taken from the current index, since that is -1 when the chosen
+		   device is not plugged in, and the choice must survive that. */
+		std::string midi_driver_id = MIDIDriverManager::get_current_input_driver_id().utf8().get_data();
 
 		audio_node.add("id", driver_id);
 		audio_node.add("mixing_hz", SoundDriverManager::get_mix_frequency());

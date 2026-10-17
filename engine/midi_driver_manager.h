@@ -39,6 +39,7 @@ private:
 	static MIDIInputDriver *input_drivers[MAX_MIDI_DRIVERS];
 	static int input_driver_count;
 	static int input_current_driver;
+	static String input_current_driver_id;
 
 	friend class MIDIInputDriver;
 	static EventCallback event_callback;	
@@ -47,12 +48,14 @@ public:
 	static void unlock_driver(); ///< Protect audio thread variables from ui,game,etc (non-audio) threads
 
 	static bool init_input_driver(int p_driver = -1); ///< -1 is current
+	static bool init_input_driver_by_id(const String &p_id); ///< Remembers p_id even if the device is not connected
 	static void finish_input_driver();
 	static bool is_input_driver_active();
 	static int get_input_driver_count();
 	static MIDIInputDriver *get_input_driver(int p_which = -1); ///< -1 is current
 
 	static int get_current_input_driver_index();
+	static String get_current_input_driver_id(); ///< Survives the device being disconnected, unlike the index
 
 	static void add_input_driver(MIDIInputDriver *p_driver);
 	static void set_event_callback(EventCallback p_callback);

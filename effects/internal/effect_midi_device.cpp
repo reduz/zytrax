@@ -129,11 +129,13 @@ bool AudioEffectMIDIDevice::has_secondary_input() const {
 	return false;
 }
 
-void AudioEffectMIDIDevice::_get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch) {
+bool AudioEffectMIDIDevice::_get_bank_and_patch(int &r_bank_lsb, int &r_bank_msb,int &r_patch) {
 
 	r_bank_lsb = bank_lsb;
 	r_bank_msb = bank_msb;
 	r_patch = patch;
+	// The patch is ours, chosen in the device editor, so restore it on reset.
+	return true;
 }
 
 void AudioEffectMIDIDevice::process(const Event *p_events, int p_event_count, const AudioFrame *p_in, AudioFrame *p_out, bool p_prev_active) {

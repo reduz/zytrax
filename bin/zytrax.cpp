@@ -4,6 +4,11 @@
 #include "drivers/vst2/factory_wrapper_vst2.h"
 #endif
 
+#ifdef OSX_ENABLED
+#include "drivers/au/factory_wrapper_au.h"
+#include "drivers/au/osx_appearance.h"
+#endif
+
 #ifdef LV2_ENABLED
 #include "drivers/lv2/audio_effect_provider_lv2.h"
 #include "drivers/lv2/effect_editor_lv2.h"
@@ -35,6 +40,11 @@ int main(int argc, char *argv[]) {
 	effect_factory.add_provider(provider_vst2);
 #endif
 
+#ifdef OSX_ENABLED
+	AudioEffectProvider *provider_au = create_au_provider();
+	effect_factory.add_provider(provider_au);
+#endif
+
 	printf("two\n");
 #ifdef LV2_ENABLED
 	AudioEffectProviderLV2 provider_lv2(&argc, &argv);
@@ -64,6 +74,7 @@ int main(int argc, char *argv[]) {
 		JSON::Node node;
 		int use_driver_index = SoundDriverManager::get_driver_count() ? 0 : -1;
 		int use_midi_in_driver_index = MIDIDriverManager::get_input_driver_count() ? 0 : -1;
+		String use_midi_in_driver_id;
 
 		if (load_json(path, node) == OK) {
 
@@ -96,15 +107,8 @@ int main(int argc, char *argv[]) {
 					SoundDriverManager::set_step_buffer_size(SoundDriverManager::BufferSize(block_size));
 				}
 
-				std::string midi_driver_id = audio_node.get("midi_in_id").toString();
-
-				for (int i = 0; i < MIDIDriverManager::get_input_driver_count(); i++) {
-					MIDIInputDriver *driver = MIDIDriverManager::get_input_driver(i);
-					if (driver->get_id() == midi_driver_id.c_str()) {
-						use_midi_in_driver_index = i;
-					}
-
-					break;
+				if (audio_node.has("midi_in_id")) {
+					use_midi_in_driver_id.parse_utf8(audio_node.get("midi_in_id").toString().c_str());
 				}
 			}
 
@@ -228,12 +232,24 @@ int main(int argc, char *argv[]) {
 		}
 
 		SoundDriverManager::init_driver(use_driver_index);
-		MIDIDriverManager::init_input_driver(use_midi_in_driver_index);
+		if (use_midi_in_driver_id != String()) {
+			/* Keeps the id remembered even if the device is not plugged in right now. */
+			MIDIDriverManager::init_input_driver_by_id(use_midi_in_driver_id);
+		} else {
+			MIDIDriverManager::init_input_driver(use_midi_in_driver_index);
+		}
 		MIDIBankManager::reload_devices();
 	}
 
 	printf("regfx\n");
 	register_effects(&effect_factory);
+
+#ifdef OSX_ENABLED
+	/* Follow the macOS system appearance so the UI doesn't render light on a dark desktop */
+	if (osx_is_dark_mode()) {
+		theme.color_scheme = Theme::COLOR_SCHEME_DARK;
+	}
+#endif
 
 	/* make it dark */
 	if (theme.color_scheme == Theme::COLOR_SCHEME_DARK) {
@@ -288,6 +304,9 @@ int main(int argc, char *argv[]) {
 #endif
 #ifdef LV2_ENABLED
 	window->add_editor_plugin_function(get_lv2_editor_function());
+#endif
+#ifdef OSX_ENABLED
+	window->add_editor_plugin_function(get_au_editor_function());
 #endif
 	int ret = app->run(*window);
 

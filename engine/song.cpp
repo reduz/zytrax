@@ -416,6 +416,21 @@ void Song::remove_track(int p_idx) {
 			ERR_FAIL_INDEX(p_idx, tracks.size());
 
 	tracks.remove(p_idx);
+
+	//fix up sends in remaining tracks: drop sends to the removed track,
+	//and shift indices above the removed track down by one.
+	for (int i = 0; i < tracks.size(); i++) {
+		Track *t = tracks[i];
+		for (int j = t->get_send_count() - 1; j >= 0; j--) {
+			int send = t->get_send_track(j);
+			if (send == p_idx) {
+				t->remove_send(j);
+			} else if (send > p_idx) {
+				t->set_send_track(j, send - 1);
+			}
+		}
+	}
+
 	update_process_order();
 }
 

@@ -1276,7 +1276,7 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 						break;
 					case KeyBindings::PATTERN_SELECTION_LOWER_NOTES_OCTAVE:
 						amount = -12;
-						action = "Raise Octave";
+						action = "Lower Octave";
 						break;
 				}
 
@@ -1368,7 +1368,7 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				}
 
 				bool valid = false;
-				for (int i = selection.begin_column; i <= selection.begin_column; i++) {
+				for (int i = selection.begin_column; i <= selection.end_column; i++) {
 					Track::Event ev_first = song->get_event(current_pattern, i, selection.begin_tick);
 					Track::Event ev_last = song->get_event(current_pattern, i, selection.end_tick);
 					if (ev_first.type == Track::Event::TYPE_NOTE && ev_first.a != Track::Note::EMPTY && ev_last.a != Track::Note::EMPTY) {
@@ -1395,7 +1395,7 @@ void PatternEditor::_on_action_activated(KeyBindings::KeyBind p_bind) {
 				Tick tick_from = selection.begin_tick;
 				Tick tick_to = selection.end_tick;
 
-				for (int i = selection.begin_column; i <= selection.begin_column; i++) {
+				for (int i = selection.begin_column; i <= selection.end_column; i++) {
 					Track::Event ev_first = song->get_event(current_pattern, i, selection.begin_tick);
 					Track::Event ev_last = song->get_event(current_pattern, i, selection.end_tick);
 					if (ev_first.type == Track::Event::TYPE_NOTE && ev_first.a != Track::Note::EMPTY && ev_last.a != Track::Note::EMPTY) {
@@ -3038,14 +3038,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
 
-	// Believe it or not, this the only reliable way to get the width of
-	// a monospace char in GTK. Yes.
-
-	Cairo::TextExtents te;
-	cr->get_text_extents("XXX", te);
-	int fw = te.width;
-	cr->get_text_extents("XX", te);
-	fw -= te.width;
+	int fw = Theme::get_char_width(cr);
 
 	int fh = fe.height;
 	int fa = fe.ascent;
@@ -3094,7 +3087,7 @@ bool PatternEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 						is_playing ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_ROW_BEAT]);
 
 		} else {
-			char text[3] = { '0' + (subbeat / 10), '0' + (subbeat % 10), 0 };
+			char text[3] = { (char)('0' + (subbeat / 10)), (char)('0' + (subbeat % 10)), 0 };
 			_draw_text(cr, fw, top_ofs + i * fh + fa, text,
 					is_playing ? theme->colors[Theme::COLOR_PATTERN_EDITOR_CURSOR] : theme->colors[Theme::COLOR_PATTERN_EDITOR_ROW_SUB_BEAT]);
 		}

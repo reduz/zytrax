@@ -215,11 +215,7 @@ bool MasterVU::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		Cairo::FontExtents fe;
 		cr->get_font_extents(fe);
 
-		Cairo::TextExtents te;
-		cr->get_text_extents("XXX", te);
-		int fw = te.width;
-		cr->get_text_extents("XX", te);
-		fw -= te.width;
+		int fw = Theme::get_char_width(cr);
 
 		int new_width = fw;
 		int new_height = fe.height;

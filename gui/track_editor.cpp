@@ -215,11 +215,7 @@ bool TrackRackVolume::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 		Cairo::FontExtents fe;
 		cr->get_font_extents(fe);
 
-		Cairo::TextExtents te;
-		cr->get_text_extents("XXX", te);
-		int fw = te.width;
-		cr->get_text_extents("XX", te);
-		fw -= te.width;
+		int fw = Theme::get_char_width(cr);
 
 		int new_width = fw * min_width_chars + fe.height + separator * 2;
 		int new_height = fe.height;
@@ -506,7 +502,7 @@ void TrackRackEditor::_mouse_button_event(GdkEventButton *event, bool p_press) {
 						item->show();
 						item->set_label(track_name.utf8().get_data());
 						bool can_add = track_idx != i;
-						if (song->get_track(i)->has_send(i)) {
+						if (song->get_track(track_idx)->has_send(i)) {
 							can_add = false;
 						}
 

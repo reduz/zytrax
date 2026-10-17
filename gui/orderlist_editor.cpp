@@ -169,7 +169,7 @@ bool OrderlistEditor::on_key_press_event(GdkEventKey *key_event) {
 		for (int i = cursor.row; i <= Song::ORDER_MAX; i++) {
 
 			int existing = song->order_get(i);
-			int fresh = i == cursor.row == Song::ORDER_MAX ? Song::ORDER_EMPTY : song->order_get(i + 1);
+			int fresh = i == Song::ORDER_MAX ? Song::ORDER_EMPTY : song->order_get(i + 1);
 			if (existing == fresh) {
 				continue;
 			}
@@ -402,14 +402,7 @@ bool OrderlistEditor::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 	Cairo::FontExtents fe;
 	cr->get_font_extents(fe);
 
-	// Believe it or not, this the only reliable way to get the width of
-	// a monospace char in GTK. Yes.
-
-	Cairo::TextExtents te;
-	cr->get_text_extents("XXX", te);
-	int fw = te.width;
-	cr->get_text_extents("XX", te);
-	fw -= te.width;
+	int fw = Theme::get_char_width(cr);
 
 	int fh = fe.height;
 	int fa = fe.ascent;

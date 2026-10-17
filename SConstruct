@@ -7,9 +7,9 @@ env = Environment(CPPPATH=['#/globals','#gui','#.'],ENV=os.environ)
 
 
 env.ParseConfig("pkg-config gtkmm-3.0 --libs --cflags")
-env.Append(CXXFLAGS=["-g3"])
+env.Append(CXXFLAGS=["-g3", "-std=c++17"])
 
-opts = Variables(ARGUMENTS)
+opts = Variables(None, ARGUMENTS)
 
 if (os.getenv("XDG_CURRENT_DESKTOP")!=None):
 	detected_platform="freedesktop"
@@ -34,9 +34,14 @@ opts.Add(BoolVariable("enable_lv2","Enable LV2",True)) # Experimental, no UI
 opts.Update(env)  # update environment
 Help(opts.GenerateHelpText(env))  # generate help
 
-if (detected_platform==""):
+if (env["platform"]==""):
 	print("No build platform detected, available platforms: windows, freedesktop,osx")
 	sys.exit()
+
+# Apply platform-level feature overrides before feature flags are evaluated
+if (env["platform"]=="osx"):
+	env["enable_jack"] = False
+	env["enable_lv2"] = False
 
 if (env["enable_rtaudio"]):
 
@@ -94,6 +99,24 @@ if (env["platform"]=="freedesktop"):
 
 	env.ParseConfig("pkg-config x11 --libs --cflags")
 	env.Append(LIBS=["dl"])
+
+if (env["platform"]=="osx"):
+	env.Append(CXXFLAGS=["-DOSX_ENABLED"])
+	if (env["enable_vst2"]):
+		env.Append(CXXFLAGS=["-DVST2_ENABLED"])
+	if (env["enable_rtaudio"]):
+		env.Append(CXXFLAGS=["-D__MACOSX_CORE__"])
+	if (env["enable_rtmidi"]):
+		env.Append(CXXFLAGS=["-D__MACOSX_CORE__"])
+	env.Append(FRAMEWORKS=["CoreAudio","CoreFoundation","CoreMIDI","AudioToolbox","Cocoa"])
+	# Teach SCons to compile Objective-C++ (.mm) files using clang++
+	import SCons.Builder, SCons.Action
+	mm_action  = SCons.Action.Action('$CXX -o $TARGET -c $CXXFLAGS $CCFLAGS $_CPPINCFLAGS $SOURCE',
+	                                  '$CXXCOMSTR')
+	mm_builder = SCons.Builder.Builder(action=mm_action, suffix='.o', src_suffix='.mm',
+	                                   source_scanner=SCons.Tool.CScanner)
+	env.Append(BUILDERS={'ObjCXX': mm_builder})
+	env.AppendUnique(CXXSUFFIXES=['.mm'])
 
 
 def add_sources(self, sources, filetype, lib_env = None, shared = False):

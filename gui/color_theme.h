@@ -42,6 +42,7 @@ struct Theme {
 
 	String font;
 	void select_font_face(const Cairo::RefPtr<Cairo::Context> &cr);
+	static int get_char_width(const Cairo::RefPtr<Cairo::Context> &cr); ///< Cell width of the font already selected on cr
 
 	enum {
 
